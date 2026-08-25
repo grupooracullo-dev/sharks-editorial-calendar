@@ -1,0 +1,13 @@
+project_id = "cyumczehpiiarwqrpgnu"
+
+# OAuth endpoints receive plain browser redirects from Google
+[functions.google-oauth-start]
+verify_jwt = false
+
+[functions.google-oauth-callback]
+verify_jwt = false
+
+# google-sync: platform JWT gate disabled — the function authenticates
+# internally via x-worker-secret (cron) or Supabase user JWT.
+[functions.google-sync]
+verify_jwt = false

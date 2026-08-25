@@ -1,0 +1,238 @@
+import { useState } from 'react';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useActions } from '@/hooks/useActions';
+import { Action, CalendarViewType } from '@/types';
+import CalendarEvent from '@/components/calendar/CalendarEvent';
+import Drawer from '@/components/ui/Drawer';
+import StatusBadge from '@/components/actions/StatusBadge';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import EmptyState from '@/components/ui/EmptyState';
+import Card from '@/components/ui/Card';
+import { CONTENT_FORMATS, OBJECTIVES } from '@/lib/constants';
+import { cn } from '@/lib/utils';
+import { formatCalendarDate, getCalendarDays, isSameMonth, isSameDay, format, ptBR, addMonths, subMonths } from '@/lib/dateUtils';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+
+export default function ClientCalendar() {
+  const { currentWorkspace } = useWorkspace();
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [view, setView] = useState<CalendarViewType>('month');
+  const [selectedAction, setSelectedAction] = useState<Action | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const { actions } = useActions(currentWorkspace ? { workspaceId: currentWorkspace.id } : {});
+
+  const calendarDays = getCalendarDays(currentDate);
+  const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const monthLabel = format(currentDate, 'MMMM yyyy', { locale: ptBR });
+
+  const handleActionClick = (action: Action) => {
+    setSelectedAction(action);
+    setDrawerOpen(true);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <h1 className="text-xl font-bold text-gray-900 capitalize">Meu Calendário — {monthLabel}</h1>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+            {(['month', 'week', 'agenda'] as CalendarViewType[]).map(v => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={cn(
+                  'px-3 py-1.5 text-sm font-medium rounded-md transition-all',
+                  view === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                {v === 'month' ? 'Mês' : v === 'week' ? 'Semana' : 'Agenda'}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" onClick={() => setCurrentDate(d => subMonths(d, 1))}>
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>Hoje</Button>
+            <Button variant="outline" size="icon" onClick={() => setCurrentDate(d => addMonths(d, 1))}>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Month view (read-only) */}
+      {view === 'month' && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="grid grid-cols-7 border-b border-gray-200">
+            {weekDays.map(day => (
+              <div key={day} className="px-2 py-2 text-xs font-semibold text-gray-500 text-center">{day}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7">
+            {calendarDays.map((day, i) => {
+              const dateStr = formatCalendarDate(day);
+              const dayActions = actions.filter(a => a.action_date === dateStr);
+              const isCurrentMonth = isSameMonth(day, currentDate);
+              const isToday = isSameDay(day, new Date());
+
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    'min-h-[90px] sm:min-h-[110px] border-r border-b last:border-r-0 p-1.5',
+                    !isCurrentMonth && 'bg-gray-50/50',
+                    isToday && 'bg-primary-50/30'
+                  )}
+                >
+                  <span className={cn(
+                    'text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mb-1',
+                    isToday && 'bg-primary-500 text-white',
+                    !isToday && isCurrentMonth && 'text-gray-900',
+                    !isCurrentMonth && 'text-gray-300'
+                  )}>
+                    {day.getDate()}
+                  </span>
+                  <div className="space-y-1">
+                    {dayActions.slice(0, 2).map(action => (
+                      <CalendarEvent key={action.id} action={action} onClick={() => handleActionClick(action)} compact />
+                    ))}
+                    {dayActions.length > 2 && (
+                      <p className="text-[10px] text-gray-400">+{dayActions.length - 2}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Week view (read-only) */}
+      {view === 'week' && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="grid grid-cols-7 min-h-[400px]">
+            {calendarDays.slice(0, 7).map((day, i) => {
+              const dateStr = formatCalendarDate(day);
+              const dayActions = actions.filter(a => a.action_date === dateStr);
+
+              return (
+                <div key={i} className="border-r last:border-r-0 p-2">
+                  <div className="text-center py-2 border-b border-gray-100 mb-2">
+                    <p className="text-xs text-gray-500">{weekDays[i]}</p>
+                    <p className={cn('font-semibold', isSameDay(day, new Date()) ? 'text-primary-600' : 'text-gray-900')}>
+                      {day.getDate()}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {dayActions.map(action => (
+                      <CalendarEvent key={action.id} action={action} onClick={() => handleActionClick(action)} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Agenda view (read-only) */}
+      {view === 'agenda' && (
+        <Card padding="none">
+          {(() => {
+            const daysWithActions = calendarDays.filter(d => actions.some(a => a.action_date === formatCalendarDate(d)));
+            if (daysWithActions.length === 0) {
+              return (
+                <EmptyState icon={CalendarIcon} title="Nenhuma ação programada" description="Seu calendário está em branco neste período." />
+              );
+            }
+            return daysWithActions.map((day, i) => {
+              const dateStr = formatCalendarDate(day);
+              const dayActions = actions.filter(a => a.action_date === dateStr);
+              if (dayActions.length === 0) return null;
+              return (
+                <div key={i} className="p-4 border-b last:border-b-0 border-gray-100">
+                  <p className="text-sm font-semibold text-gray-900 capitalize mb-2">
+                    {format(day, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                  </p>
+                  <div className="space-y-2 ml-2">
+                    {dayActions.map(action => (
+                      <CalendarEvent key={action.id} action={action} onClick={() => handleActionClick(action)} />
+                    ))}
+                  </div>
+                </div>
+              );
+            });
+          })()}
+        </Card>
+      )}
+
+      {/* Action detail drawer (client-friendly, read-only) */}
+      <Drawer isOpen={drawerOpen} onClose={() => { setDrawerOpen(false); setSelectedAction(null); }} title="Detalhes da Ação" width="md">
+        {selectedAction && (
+          <div className="space-y-5">
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-lg font-semibold text-gray-900">{selectedAction.title}</h3>
+              <StatusBadge status={selectedAction.status} />
+            </div>
+
+            {selectedAction.description && (
+              <p className="text-sm text-gray-500">{selectedAction.description}</p>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Data</p>
+                <p className="text-sm text-gray-900">
+                  {new Date(selectedAction.action_date + 'T00:00:00').toLocaleDateString('pt-BR', {
+                    weekday: 'long', day: 'numeric', month: 'long'
+                  })}
+                </p>
+              </div>
+              {selectedAction.action_time && (
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Horário</p>
+                  <p className="text-sm text-gray-900">{selectedAction.action_time.slice(0, 5)}</p>
+                </div>
+              )}
+              {selectedAction.format && (
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Formato</p>
+                  <Badge variant="primary">{CONTENT_FORMATS[selectedAction.format]}</Badge>
+                </div>
+              )}
+              {selectedAction.channel && (
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Canal</p>
+                  <p className="text-sm text-gray-900">{selectedAction.channel}</p>
+                </div>
+              )}
+              {selectedAction.objective && (
+                <div className="col-span-2">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Objetivo</p>
+                  <p className="text-sm text-gray-900">{OBJECTIVES[selectedAction.objective]}</p>
+                </div>
+              )}
+            </div>
+
+            {selectedAction.copy_text && (
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1.5">Copy</p>
+                <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-900 whitespace-pre-wrap">
+                  {selectedAction.copy_text}
+                </div>
+              </div>
+            )}
+
+            <p className="text-xs text-gray-400 bg-blue-50 p-3 rounded-lg">
+              💡 Dúvidas ou sugestões sobre esta ação? Use o Chat para conversar com a equipe Sharks!
+            </p>
+          </div>
+        )}
+      </Drawer>
+    </div>
+  );
+}

@@ -1,0 +1,270 @@
+import { useState } from 'react';
+import { Action } from '@/types';
+import Drawer from '@/components/ui/Drawer';
+import Modal from '@/components/ui/Modal';
+import StatusBadge from './StatusBadge';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Avatar from '@/components/ui/Avatar';
+import { CONTENT_FORMATS, OBJECTIVES, FUNNEL_STAGES, ACTION_TYPES, ACTION_STATUSES } from '@/lib/constants';
+import { formatDate, formatTime, cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { Pencil, Copy, Trash2, ExternalLink, MessageSquare, Calendar, Clock, Target, Megaphone, Send } from 'lucide-react';
+
+interface ActionDrawerProps {
+  action: Action | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onEdit: (action: Action) => void;
+  onDelete?: (id: string) => Promise<boolean | { ok: boolean; error?: string }> | boolean | { ok: boolean; error?: string };
+  onDuplicate?: (action: Action) => void;
+}
+
+export default function ActionDrawer({ action, isOpen, onClose, onEdit, onDelete, onDuplicate }: ActionDrawerProps) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  if (!action) return null;
+
+  const pillar = action.editorial_pillar;
+  const campaign = action.campaign;
+
+  return (
+    <Drawer isOpen={isOpen} onClose={onClose} title="Detalhes da Ação" width="lg">
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <div className="flex items-start justify-between mb-3">
+            <h3 className="text-lg font-semibold text-gray-900">{action.title}</h3>
+            <StatusBadge status={action.status} />
+          </div>
+          {action.description && (
+            <p className="text-sm text-gray-500">{action.description}</p>
+          )}
+        </div>
+
+        {/* Sync Status */}
+        {action.sync_status !== 'not_synced' && (
+          <div className={cn(
+            'flex items-center gap-2 px-3 py-2 rounded-lg text-sm',
+            action.sync_status === 'synced' && 'bg-green-50 text-green-700',
+            action.sync_status === 'modified_after_sync' && 'bg-yellow-50 text-yellow-700',
+            action.sync_status === 'sync_error' && 'bg-red-50 text-red-700',
+          )}>
+            <ExternalLink className="w-4 h-4" />
+            {action.sync_status === 'synced' && 'Sincronizado com Google Calendar'}
+            {action.sync_status === 'modified_after_sync' && 'Alterado após última sincronização'}
+            {action.sync_status === 'sync_error' && 'Erro na sincronização'}
+          </div>
+        )}
+
+        {/* Basic Info */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Data</p>
+            <p className="text-sm text-gray-900 flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-gray-400" />
+              {formatDate(action.action_date)}
+            </p>
+          </div>
+          {action.action_time && (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Horário</p>
+              <p className="text-sm text-gray-900 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-gray-400" />
+                {formatTime(action.action_time)}
+              </p>
+            </div>
+          )}
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Tipo</p>
+            <p className="text-sm text-gray-900">{ACTION_TYPES[action.action_type]}</p>
+          </div>
+          {action.format && (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Formato</p>
+              <p className="text-sm text-gray-900">{CONTENT_FORMATS[action.format]}</p>
+            </div>
+          )}
+          {action.channel && (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Canal</p>
+              <p className="text-sm text-gray-900">{action.channel}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Strategy */}
+        {(action.objective || action.funnel_stage || pillar || campaign) && (
+          <div className="border-t border-gray-100 pt-4">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3">Estratégia</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {action.objective && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Objetivo</p>
+                  <p className="text-sm text-gray-900 flex items-center gap-2">
+                    <Target className="w-4 h-4 text-gray-400" />
+                    {OBJECTIVES[action.objective]}
+                  </p>
+                </div>
+              )}
+              {action.funnel_stage && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Etapa do Funil</p>
+                  <p className="text-sm text-gray-900">{FUNNEL_STAGES[action.funnel_stage]}</p>
+                </div>
+              )}
+              {pillar && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Pilar Editorial</p>
+                  <Badge style={{ backgroundColor: pillar.color + '20', color: pillar.color }}>
+                    {pillar.name}
+                  </Badge>
+                </div>
+              )}
+              {campaign && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Campanha</p>
+                  <p className="text-sm text-gray-900 flex items-center gap-2">
+                    <Megaphone className="w-4 h-4 text-gray-400" />
+                    {campaign.name}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Content */}
+        {(action.hook || action.main_message || action.copy_text || action.cta) && (
+          <div className="border-t border-gray-100 pt-4">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3">Conteúdo</h4>
+            <div className="space-y-3">
+              {action.hook && (
+                <div>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Hook</p>
+                  <p className="text-sm text-gray-900 bg-gray-50 rounded-lg p-3">{action.hook}</p>
+                </div>
+              )}
+              {action.main_message && (
+                <div>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Mensagem Principal</p>
+                  <p className="text-sm text-gray-900 bg-gray-50 rounded-lg p-3">{action.main_message}</p>
+                </div>
+              )}
+              {action.copy_text && (
+                <div>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Copy</p>
+                  <p className="text-sm text-gray-900 bg-gray-50 rounded-lg p-3 whitespace-pre-wrap">{action.copy_text}</p>
+                </div>
+              )}
+              {action.cta && (
+                <div>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">CTA</p>
+                  <p className="text-sm text-gray-900 bg-gray-50 rounded-lg p-3">{action.cta}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Production */}
+        {(action.audience || action.product || action.theme || action.observations) && (
+          <div className="border-t border-gray-100 pt-4">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3">Produção</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {action.audience && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Público</p>
+                  <p className="text-sm text-gray-900">{action.audience}</p>
+                </div>
+              )}
+              {action.product && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Produto</p>
+                  <p className="text-sm text-gray-900">{action.product}</p>
+                </div>
+              )}
+              {action.theme && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Tema</p>
+                  <p className="text-sm text-gray-900">{action.theme}</p>
+                </div>
+              )}
+              {action.observations && (
+                <div className="col-span-2 space-y-1">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Observações</p>
+                  <p className="text-sm text-gray-900">{action.observations}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Meta */}
+        <div className="border-t border-gray-100 pt-4 text-xs text-gray-400 space-y-1">
+          <p>Criado em: {formatDate(action.created_at)}</p>
+          {action.updated_at !== action.created_at && (
+            <p>Atualizado em: {formatDate(action.updated_at)}</p>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="border-t border-gray-100 pt-4 flex flex-wrap gap-2">
+          <Button onClick={() => onEdit(action)} size="sm">
+            <Pencil className="w-4 h-4" />
+            Editar
+          </Button>
+          {onDuplicate && (
+            <Button variant="outline" size="sm" onClick={() => { onDuplicate(action); onClose(); }}>
+              <Copy className="w-4 h-4" />
+              Duplicar
+            </Button>
+          )}
+          {onDelete && (
+            <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
+              <Trash2 className="w-4 h-4" />
+              Excluir
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal isOpen={confirmDelete} onClose={() => setConfirmDelete(false)} title="Excluir Ação" size="sm">
+        <p className="text-sm text-gray-600">
+          Tem certeza que deseja excluir a ação <strong>"{action.title}"</strong>?
+        </p>
+        <p className="text-xs text-gray-400 mt-2">
+          Esta ação não pode ser desfeita.
+        </p>
+        <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100">
+          <Button variant="ghost" onClick={() => setConfirmDelete(false)}>Cancelar</Button>
+          <Button
+            variant="danger"
+            onClick={async () => {
+              setDeleting(true);
+              const result = await onDelete!(action.id);
+              setDeleting(false);
+              setConfirmDelete(false);
+              if (typeof result === 'object') {
+                if (result.ok) {
+                  toast.success('Ação excluída com sucesso!');
+                  onClose();
+                } else {
+                  toast.error(`Erro ao excluir: ${result.error || 'tente novamente'}`);
+                }
+              } else {
+                toast.success('Ação excluída com sucesso!');
+                onClose();
+              }
+            }}
+            loading={deleting}
+          >
+            Excluir
+          </Button>
+        </div>
+      </Modal>
+    </Drawer>
+  );
+}
