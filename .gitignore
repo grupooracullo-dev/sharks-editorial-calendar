@@ -43,3 +43,7 @@ supabase/.temp
 # misc
 .cache/
 .parcel-cache/
+
+# local dev scripts (contain Supabase tokens)
+apply-*.ps1
+supabase/apply-*.ps1
