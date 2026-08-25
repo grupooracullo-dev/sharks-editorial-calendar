@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { supabase } from '@/lib/supabase';
 import Avatar from '@/components/ui/Avatar';
 import {
   LayoutDashboard,
@@ -20,6 +21,7 @@ import {
   ChevronRight,
   Menu,
   UserCog,
+  UserPlus,
 } from 'lucide-react';
 import logoUrl from '/logo.png?url';
 
@@ -33,6 +35,7 @@ const sharksNavItems = [
   { icon: History, label: 'Histórico', path: '/sharks/history' },
   { icon: MessageSquare, label: 'Chat', path: '/sharks/chat' },
   { icon: UserCog, label: 'Time', path: '/sharks/team' },
+  { icon: UserPlus, label: 'Acessos', path: '/sharks/access-requests', adminOnly: true },
   { icon: Link2, label: 'Integrações', path: '/sharks/integrations' },
   { icon: Settings, label: 'Configurações', path: '/sharks/settings' },
 ];
@@ -47,11 +50,38 @@ const clientNavItems = [
 export default function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, signOut, isSharks } = useAuth();
+  const { user, signOut, isSharks, isAdmin } = useAuth();
   const { currentWorkspace } = useWorkspace();
   const navigate = useNavigate();
+  const [pendingRequests, setPendingRequests] = useState(0);
 
-  const navItems = isSharks ? sharksNavItems : clientNavItems;
+  // Badge: contagem de solicitações de acesso pendentes (admin only)
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const loadCount = async () => {
+      const { count } = await supabase
+        .from('access_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      setPendingRequests(count ?? 0);
+    };
+    loadCount();
+
+    const channel = supabase
+      .channel('sidebar-access-requests')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'access_requests' },
+        () => { loadCount(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [isAdmin]);
+
+  const navItems = isSharks
+    ? sharksNavItems.filter(i => !i.adminOnly || isAdmin)
+    : clientNavItems;
 
   const handleSignOut = async () => {
     await signOut();
@@ -117,7 +147,7 @@ export default function AppSidebar() {
                   onClick={() => setMobileOpen(false)}
                   className={({ isActive }) =>
                     cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+                      'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
                       isActive
                         ? 'bg-primary-50 text-primary-600'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
@@ -127,6 +157,16 @@ export default function AppSidebar() {
                 >
                   <item.icon className="w-5 h-5 flex-shrink-0" />
                   {!collapsed && <span>{item.label}</span>}
+                  {item.path === '/sharks/access-requests' && pendingRequests > 0 && (
+                    <span
+                      className={cn(
+                        'ml-auto min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold',
+                        collapsed && 'absolute -top-0.5 -right-0.5 ml-0 w-5 px-0'
+                      )}
+                    >
+                      {pendingRequests > 9 ? '9+' : pendingRequests}
+                    </span>
+                  )}
                 </NavLink>
               </li>
             ))}

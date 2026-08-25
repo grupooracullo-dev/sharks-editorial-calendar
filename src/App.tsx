@@ -11,6 +11,7 @@ import { loadEditorial } from '@/hooks/useEditorial';
 import { useIntegration } from '@/hooks/useIntegration';
 import { SharksLayout, ClientLayout } from '@/components/layout/AppLayout';
 import LoginPage from '@/pages/auth/LoginPage';
+import RequestAccess from '@/pages/auth/RequestAccess';
 import SharksDashboard from '@/pages/sharks/SharksDashboard';
 import SharksCalendarPage from '@/pages/sharks/SharksCalendar';
 import SharksClients from '@/pages/sharks/SharksClients';
@@ -22,6 +23,7 @@ import SharksChat from '@/pages/sharks/SharksChat';
 import SharksIntegrations from '@/pages/sharks/SharksIntegrations';
 import SharksSettings from '@/pages/sharks/SharksSettings';
 import SharksTeam from '@/pages/sharks/SharksTeam';
+import SharksAccessRequests from '@/pages/sharks/SharksAccessRequests';
 import ClientDashboard from '@/pages/client/ClientDashboard';
 import ClientCalendar from '@/pages/client/ClientCalendar';
 import ClientHistory from '@/pages/client/ClientHistory';
@@ -60,6 +62,7 @@ function AppRoutes() {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/request-access" element={<RequestAccess />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
@@ -82,6 +85,7 @@ function AppRoutes() {
       <Route path="/sharks/chat" element={<SharksLayout><SharksChat /></SharksLayout>} />
       <Route path="/sharks/integrations" element={<SharksLayout><SharksIntegrations /></SharksLayout>} />
       <Route path="/sharks/team" element={<SharksLayout><SharksTeam /></SharksLayout>} />
+      <Route path="/sharks/access-requests" element={<SharksLayout><SharksAccessRequests /></SharksLayout>} />
       <Route path="/sharks/settings" element={<SharksLayout><SharksSettings /></SharksLayout>} />
 
       {/* Client routes */}

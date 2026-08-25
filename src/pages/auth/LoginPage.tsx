@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import logoUrl from '/logo.png?url';
+import { UserPlus } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -78,6 +79,17 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" size="lg" loading={loading}>
               Entrar
             </Button>
+
+            <div className="text-center pt-3 border-t border-gray-100">
+              <p className="text-xs text-gray-500 mb-2">Ainda não tem acesso?</p>
+              <Link
+                to="/request-access"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
+              >
+                <UserPlus className="w-4 h-4" />
+                Solicitar acesso
+              </Link>
+            </div>
           </form>
         </div>
       </div>
