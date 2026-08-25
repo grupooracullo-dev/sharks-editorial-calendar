@@ -47,6 +47,22 @@ export function b64UrlEncode(str: string): string {
 
 // ---------- HMAC-signed OAuth state ----------
 
+// ---------- CORS: allow APP_URL + localhost dev ----------
+
+export function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin') ?? '';
+  const appUrl = Deno.env.get('APP_URL');
+  const allowed =
+    origin === appUrl ||
+    origin.startsWith('http://localhost:') ||
+    origin.startsWith('http://127.0.0.1:');
+  return {
+    'Access-Control-Allow-Origin': allowed ? origin : (appUrl ?? '*'),
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-worker-secret',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+}
+
 function getStateSecret(): string {
   const secret = Deno.env.get('STATE_SECRET');
   if (!secret || secret.length < 16) {

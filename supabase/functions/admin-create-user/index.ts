@@ -1,10 +1,7 @@
-import { serviceClient } from '../_shared/google.ts';
+import { serviceClient, corsHeaders } from '../_shared/google.ts';
 
-const CORS = {
-  'Access-Control-Allow-Origin': Deno.env.get('APP_URL') ?? '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+// Per-request CORS (updated at handler start)
+let CORS: Record<string, string> = {};
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
@@ -26,6 +23,7 @@ const DEFAULT_PERMISSIONS = [
 ];
 
 Deno.serve(async req => {
+  CORS = corsHeaders(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json(405, { error: 'Use POST' });
 

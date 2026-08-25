@@ -6,7 +6,7 @@
 // No JWT required (Google redirects here).
 // ==========================================
 
-import { TOKEN_API, verifyState, verifyWorkspaceAccess, serviceClient } from '../_shared/google.ts';
+import { TOKEN_API, verifyState, verifyWorkspaceAccess, serviceClient, getGoogleCredentials } from '../_shared/google.ts';
 
 Deno.serve(async req => {
   const url = new URL(req.url);
@@ -27,13 +27,14 @@ Deno.serve(async req => {
   try {
     console.log('[callback] trocando codigo por tokens...');
     // Exchange code for tokens
+    const { clientId, clientSecret } = getGoogleCredentials();
     const tokenRes = await fetch(TOKEN_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code,
-        client_id: Deno.env.get('GOOGLE_CLIENT_ID') ?? '',
-        client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') ?? '',
+        client_id: clientId,
+        client_secret: clientSecret,
         redirect_uri: `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-oauth-callback`,
         grant_type: 'authorization_code',
       }),

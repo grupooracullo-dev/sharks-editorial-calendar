@@ -10,13 +10,10 @@
 //     ops: list_calendars | set_target | disconnect.
 // ==========================================
 
-import { CAL_API, getValidToken, processWorkspace, serviceClient, verifyWorkspaceAccess } from '../_shared/google.ts';
+import { CAL_API, corsHeaders, getValidToken, processWorkspace, serviceClient, verifyWorkspaceAccess } from '../_shared/google.ts';
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-worker-secret',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+// Per-request CORS (updated at handler start)
+let CORS: Record<string, string> = {};
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -64,8 +61,9 @@ async function migrateTarget(
       .insert(acts.map(a => ({ workspace_id: wsId, action_id: a.id, operation: 'create' })));
   }
 }
-
 Deno.serve(async req => {
+  CORS = corsHeaders(req);
+
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json(405, { error: 'Use POST' });
 
