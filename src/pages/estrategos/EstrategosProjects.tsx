@@ -9,7 +9,8 @@ import Badge from '@/components/ui/Badge';
 import { supabase } from '@/lib/supabase';
 import { createProject, updateProject, deleteProject } from '@/lib/estrategosService';
 import { formatDate } from '@/lib/utils';
-import type { EstrategosProject, EstrategosProjectStatus, Workspace } from '@/types';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import type { EstrategosProject, EstrategosProjectStatus } from '@/types';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
 
@@ -23,20 +24,17 @@ const STATUS_LABEL: Record<EstrategosProjectStatus, { label: string; variant: 'd
 
 export default function EstrategosProjects() {
   const [projects, setProjects] = useState<EstrategosProject[]>([]);
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
+  const { workspacesByEnv } = useWorkspace();
+  const workspaces = workspacesByEnv('estrategos');
   const [modal, setModal] = useState<{ open: boolean; editing: EstrategosProject | null }>({ open: false, editing: null });
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ workspace_id: '', name: '', description: '', status: 'planning', start_date: '', end_date: '' });
 
   useEffect(() => {
     const load = async () => {
-      const [p, w] = await Promise.all([
-        supabase.from('estrategos_projects').select('*').order('created_at', { ascending: false }),
-        supabase.from('workspaces').select('*').eq('is_active', true).order('name'),
-      ]);
+      const p = await supabase.from('estrategos_projects').select('*').order('created_at', { ascending: false });
       setProjects((p.data as unknown as EstrategosProject[]) ?? []);
-      setWorkspaces((w.data as unknown as Workspace[]) ?? []);
       setLoading(false);
     };
     load();

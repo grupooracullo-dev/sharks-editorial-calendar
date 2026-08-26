@@ -67,7 +67,8 @@ function slugify(name: string): string {
 }
 
 export default function SharksClients() {
-  const { workspaces, setCurrentWorkspace, refreshWorkspaces } = useWorkspace();
+  const { workspaces: allWorkspaces, workspacesByEnv, setCurrentWorkspace, refreshWorkspaces } = useWorkspace();
+  const workspaces = workspacesByEnv('sharks_company');
   const [wizardOpen, setWizardOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [creating, setCreating] = useState(false);

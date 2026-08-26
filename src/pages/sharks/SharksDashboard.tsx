@@ -22,7 +22,8 @@ import {
 
 export default function SharksDashboard() {
   const navigate = useNavigate();
-  const { workspaces } = useWorkspace();
+  const { workspacesByEnv } = useWorkspace();
+  const workspaces = workspacesByEnv('sharks_company');
 
   const allActions = useActions({});
   const overdue = useOverdueActions();

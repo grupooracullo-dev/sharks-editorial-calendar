@@ -19,7 +19,8 @@ import {
 
 export default function EstrategosDashboard() {
   const navigate = useNavigate();
-  const { workspaces } = useWorkspace();
+  const { workspacesByEnv } = useWorkspace();
+  const workspaces = workspacesByEnv('estrategos');
 
   const allActions = useActions({});
   const overdue = useOverdueActions();

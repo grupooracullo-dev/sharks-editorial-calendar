@@ -9,7 +9,8 @@ import Badge from '@/components/ui/Badge';
 import { supabase } from '@/lib/supabase';
 import { createImplementation, updateImplementation, deleteImplementation } from '@/lib/estrategosService';
 import { formatDate } from '@/lib/utils';
-import type { EstrategosImplementation, EstrategosImplementationStatus, EstrategosProject, Workspace } from '@/types';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import type { EstrategosImplementation, EstrategosImplementationStatus, EstrategosProject } from '@/types';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Loader2, CalendarSync } from 'lucide-react';
 
@@ -31,22 +32,21 @@ const SYNC_LABEL: Record<string, { label: string; variant: 'default' | 'success'
 export default function EstrategosImplementations() {
   const [impls, setImpls] = useState<EstrategosImplementation[]>([]);
   const [projects, setProjects] = useState<EstrategosProject[]>([]);
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
+  const { workspacesByEnv } = useWorkspace();
+  const workspaces = workspacesByEnv('estrategos');
   const [modal, setModal] = useState<{ open: boolean; editing: EstrategosImplementation | null }>({ open: false, editing: null });
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ workspace_id: '', project_id: '', name: '', description: '', system_name: '', status: 'pending', target_date: '' });
 
   useEffect(() => {
     const load = async () => {
-      const [i, p, w] = await Promise.all([
+      const [i, p] = await Promise.all([
         supabase.from('estrategos_implementations').select('*').order('created_at', { ascending: false }),
         supabase.from('estrategos_projects').select('id, name, workspace_id').neq('status', 'cancelled'),
-        supabase.from('workspaces').select('*').eq('is_active', true).order('name'),
       ]);
       setImpls((i.data as unknown as EstrategosImplementation[]) ?? []);
       setProjects((p.data as unknown as EstrategosProject[]) ?? []);
-      setWorkspaces((w.data as unknown as Workspace[]) ?? []);
       setLoading(false);
     };
     load();

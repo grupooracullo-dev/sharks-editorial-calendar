@@ -11,7 +11,8 @@ import { formatDate, formatTime } from '@/lib/utils';
 import { History as HistoryIcon, Search } from 'lucide-react';
 
 export default function SharksHistory() {
-  const { workspaces, currentWorkspace } = useWorkspace();
+  const { workspacesByEnv, currentWorkspace } = useWorkspace();
+  const workspaces = workspacesByEnv('sharks_company');
   const { actions } = useActions({});
 
   const [filters, setFilters] = useState({

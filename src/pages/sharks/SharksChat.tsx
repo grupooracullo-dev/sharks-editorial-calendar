@@ -14,7 +14,8 @@ import { toast } from 'sonner';
 
 export default function SharksChat() {
   const { user } = useAuth();
-  const { workspaces, currentWorkspace } = useWorkspace();
+  const { workspacesByEnv, currentWorkspace } = useWorkspace();
+  const workspaces = workspacesByEnv('sharks_company');
   const { isMobile } = useBreakpoint();
   const [selectedWsId, setSelectedWsId] = useState<string>(currentWorkspace?.id || '');
   const [showWsList, setShowWsList] = useState(false);

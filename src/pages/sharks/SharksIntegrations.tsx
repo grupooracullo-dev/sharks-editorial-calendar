@@ -38,7 +38,8 @@ function formatDateTime(iso: string | null): string {  if (!iso) return 'Nunca';
 }
 
 export default function SharksIntegrations() {
-  const { currentWorkspace, workspaces, setCurrentWorkspace } = useWorkspace();
+  const { currentWorkspace, workspacesByEnv, setCurrentWorkspace } = useWorkspace();
+  const workspaces = workspacesByEnv('sharks_company');
   const { user, isSharks, isAdmin } = useAuth();
 
   const [syncing, setSyncing] = useState(false);
