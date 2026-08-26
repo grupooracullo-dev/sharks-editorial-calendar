@@ -53,6 +53,9 @@ function applyLocalFilters(filters?: ActionFilters): Action[] {
   if (filters?.endDate) {
     result = result.filter(a => a.action_date <= filters.endDate!);
   }
+  if (filters?.environment) {
+    result = result.filter(a => a.environment === filters.environment);
+  }
 
   return result.sort((a, b) =>
     a.action_date === b.action_date
@@ -70,11 +73,14 @@ export function subscribeToActions(listener: () => void): () => void {
 
 const SELECT_WITH_JOINS = '*, campaign:campaigns(*), editorial_pillar:editorial_pillars(*), workspace:workspaces(name)';
 
-export async function loadActions(workspaceId?: string | null): Promise<void> {
+export async function loadActions(workspaceId?: string | null, environment?: string | null): Promise<void> {
   currentScope = workspaceId ?? null;
   let query = supabase.from('actions').select(SELECT_WITH_JOINS);
   if (workspaceId) {
     query = query.eq('workspace_id', workspaceId);
+  }
+  if (environment) {
+    query = query.eq('environment', environment);
   }
   const { data, error } = await query.order('action_date');
 

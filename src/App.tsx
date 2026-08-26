@@ -32,9 +32,8 @@ import ClientHistory from '@/pages/client/ClientHistory';
 import ClientChat from '@/pages/client/ClientChat';
 import ClientIntegrations from '@/pages/client/ClientIntegrations';
 import EstrategosDashboard from '@/pages/estrategos/EstrategosDashboard';
+import EstrategosCalendar from '@/pages/estrategos/EstrategosCalendar';
 import EstrategosProjects from '@/pages/estrategos/EstrategosProjects';
-import EstrategosMeetings from '@/pages/estrategos/EstrategosMeetings';
-import EstrategosImplementations from '@/pages/estrategos/EstrategosImplementations';
 import EstrategosChat from '@/pages/estrategos/EstrategosChat';
 import EstrategosClients from '@/pages/estrategos/EstrategosClients';
 import EstrategosIntegrations from '@/pages/estrategos/EstrategosIntegrations';
@@ -142,9 +141,8 @@ function AppRoutes() {
 
       {/* Estrategos routes */}
       <Route path="/estrategos" element={<EstrategosLayout><EstrategosDashboard /></EstrategosLayout>} />
+      <Route path="/estrategos/calendar" element={<EstrategosLayout><EstrategosCalendar /></EstrategosLayout>} />
       <Route path="/estrategos/projects" element={<EstrategosLayout><EstrategosProjects /></EstrategosLayout>} />
-      <Route path="/estrategos/meetings" element={<EstrategosLayout><EstrategosMeetings /></EstrategosLayout>} />
-      <Route path="/estrategos/implementations" element={<EstrategosLayout><EstrategosImplementations /></EstrategosLayout>} />
       <Route path="/estrategos/chat" element={<EstrategosLayout><EstrategosChat /></EstrategosLayout>} />
       <Route path="/estrategos/clients" element={<EstrategosLayout><EstrategosClients /></EstrategosLayout>} />
       <Route path="/estrategos/integrations" element={<EstrategosLayout><EstrategosIntegrations /></EstrategosLayout>} />

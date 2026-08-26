@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Calendar, Users, MessageSquare, History, Link2, Briefcase, Presentation, Rocket, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, MessageSquare, History, Link2, Briefcase, Rocket, ShieldCheck } from 'lucide-react';
 
 const sharksNavItems = [
   { path: '/sharks', icon: LayoutDashboard, label: 'Home' },
@@ -20,8 +20,8 @@ const clientNavItems = [
 
 const estrategosNavItems = [
   { path: '/estrategos', icon: LayoutDashboard, label: 'Home' },
+  { path: '/estrategos/calendar', icon: Calendar, label: 'Calendário' },
   { path: '/estrategos/projects', icon: Briefcase, label: 'Projetos' },
-  { path: '/estrategos/meetings', icon: Presentation, label: 'Reuniões' },
   { path: '/estrategos/chat', icon: MessageSquare, label: 'Chat' },
 ];
 

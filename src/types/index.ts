@@ -65,7 +65,7 @@ export interface Membership {
 // Editorial
 export type ActionStatus = 'draft' | 'briefing' | 'in_production' | 'sharks_review' | 'scheduled' | 'published' | 'completed' | 'cancelled' | 'overdue';
 
-export type ActionType = 'content' | 'campaign' | 'production' | 'recording' | 'photo_session' | 'approval' | 'publication' | 'ad' | 'crm' | 'whatsapp' | 'email' | 'event' | 'meeting' | 'strategic_date' | 'commercial' | 'other';
+export type ActionType = 'content' | 'campaign' | 'production' | 'recording' | 'photo_session' | 'approval' | 'publication' | 'ad' | 'crm' | 'whatsapp' | 'email' | 'event' | 'meeting' | 'strategic_date' | 'commercial' | 'other' | 'implementation' | 'milestone' | 'onboarding' | 'review' | 'follow_up' | 'strategy' | 'training';
 
 export type ContentFormat = 'reels' | 'story' | 'story_sequence' | 'carousel' | 'static_post' | 'photo' | 'video' | 'live' | 'whatsapp' | 'whatsapp_status' | 'email_marketing' | 'newsletter' | 'landing_page' | 'blog' | 'youtube' | 'ad' | 'commercial_material' | 'other';
 
@@ -166,6 +166,7 @@ export interface Action {
   reference_urls: string[];
   sync_status: SyncStatus;
   is_auto_generated: boolean;
+  environment: EnvironmentType;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -370,6 +371,7 @@ export interface ActionFilters {
   actionType?: ActionType;
   startDate?: string;
   endDate?: string;
+  environment?: EnvironmentType;
 }
 
 // Week Generator

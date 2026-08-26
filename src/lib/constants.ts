@@ -46,6 +46,13 @@ export const ACTION_TYPES: Record<ActionType, string> = {
   strategic_date: 'Data Estratégica',
   commercial: 'Comercial',
   other: 'Outro',
+  implementation: 'Implantação',
+  milestone: 'Marco',
+  onboarding: 'Onboarding',
+  review: 'Revisão',
+  follow_up: 'Acompanhamento',
+  strategy: 'Estratégia',
+  training: 'Treinamento',
 };
 
 // Content Formats

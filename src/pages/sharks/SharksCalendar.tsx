@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Action, CalendarViewType } from '@/types';
+import { Action, CalendarViewType, EnvironmentType } from '@/types';
 import { cn } from '@/lib/utils';
 import { getCalendarDays, isSameMonth, isSameDay, formatCalendarDate, format, ptBR } from '@/lib/dateUtils';
 import { isOverdue } from '@/lib/utils';
@@ -25,9 +25,10 @@ import { toast } from 'sonner';
 
 interface SharksCalendarProps {
   initialView?: CalendarViewType;
+  environment?: EnvironmentType;
 }
 
-export default function SharksCalendar({ initialView = 'month' }: SharksCalendarProps) {
+export default function SharksCalendar({ initialView = 'month', environment }: SharksCalendarProps) {
   const { isMobile } = useBreakpoint();
   const { isAdmin } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -48,7 +49,8 @@ export default function SharksCalendar({ initialView = 'month' }: SharksCalendar
     format: (filters.format as Action['format'] | undefined) || undefined,
     status: (filters.status as Action['status'] | undefined) || undefined,
     objective: (filters.objective as Action['objective'] | undefined) || undefined,
-  }), [currentWorkspace?.id, filters.format, filters.status, filters.objective]);
+    environment,
+  }), [currentWorkspace?.id, filters.format, filters.status, filters.objective, environment]);
 
   const { actions, update, remove, create } = useActions(filterObj);
   const { pillars, profile } = useEditorial(currentWorkspace?.id);

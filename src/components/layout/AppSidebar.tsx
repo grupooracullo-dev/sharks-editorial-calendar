@@ -25,7 +25,6 @@ import {
   UserCog,
   UserPlus,
   Briefcase,
-  Presentation,
   Rocket,
   ShieldCheck,
 } from 'lucide-react';
@@ -56,9 +55,8 @@ const clientNavItems = [
 
 const estrategosNavItems = [
   { icon: LayoutDashboard, label: 'Visão Geral', path: '/estrategos' },
+  { icon: Calendar, label: 'Calendário', path: '/estrategos/calendar' },
   { icon: Briefcase, label: 'Projetos', path: '/estrategos/projects' },
-  { icon: Presentation, label: 'Reuniões', path: '/estrategos/meetings' },
-  { icon: Rocket, label: 'Implantações', path: '/estrategos/implementations' },
   { icon: MessageSquare, label: 'Chat', path: '/estrategos/chat' },
   { icon: Users, label: 'Clientes', path: '/estrategos/clients' },
   { icon: Link2, label: 'Integrações', path: '/estrategos/integrations' },
