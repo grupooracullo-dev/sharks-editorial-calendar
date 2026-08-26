@@ -27,9 +27,10 @@ export interface IntegrationRow {
 export interface QueueItem {
   id: string;
   workspace_id: string;
-  action_id: string;
+  action_id: string | null;
   operation: 'create' | 'update' | 'delete';
   attempts: number;
+  google_event_id?: string | null;
   action: Record<string, unknown> | null;
 }
 
@@ -308,7 +309,7 @@ export async function processWorkspace(
 
     const { data: queue } = await admin
       .from('calendar_sync_queue')
-      .select('id, workspace_id, action_id, operation, attempts, action:actions(*, campaign:campaigns(name,objective), editorial_pillar:editorial_pillars(name))')
+      .select('id, workspace_id, action_id, operation, attempts, google_event_id, action:actions(*, campaign:campaigns(name,objective), editorial_pillar:editorial_pillars(name))')
       .eq('workspace_id', workspaceId)
       .eq('status', 'pending')
       .order('created_at')
@@ -347,13 +348,32 @@ export async function processWorkspace(
       stat.processed++;
       const now = () => new Date().toISOString();
       try {
+        // Embedded delete (migration 014): action row already removed;
+        // google_event_id captured by the BEFORE DELETE trigger.
+        if (item.operation === 'delete' && !item.action_id) {
+          const eventId = item.google_event_id;
+          if (eventId) {
+            const res = await gFetch(
+              `${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`,
+              { method: 'DELETE' },
+              token,
+            );
+            if (!res.ok && res.status !== 404 && res.status !== 410) {
+              throw new Error(`Google DELETE ${res.status}: ${(await res.text()).slice(0, 200)}`);
+            }
+          }
+          await admin.from('calendar_sync_queue').update({ status: 'done', processed_at: now() }).eq('id', item.id);
+          stat.ok++;
+          continue;
+        }
+
         if (!item.action_id) {
           await admin.from('calendar_sync_queue').update({ status: 'done', processed_at: now() }).eq('id', item.id);
           continue;
         }
 
         if (item.operation === 'delete') {
-          const eventId = linkMap.get(item.action_id);
+          const eventId = item.google_event_id || linkMap.get(item.action_id);
           if (eventId) {
             const res = await gFetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`, { method: 'DELETE' }, token);
             if (!res.ok && res.status !== 404 && res.status !== 410) {
