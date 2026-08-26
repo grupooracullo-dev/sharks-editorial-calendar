@@ -1,0 +1,170 @@
+# CodeRabbit Configuration — Oracullo Calendar
+# https://docs.coderabbit.ai/getting-started/configure-coderabbit
+reviews:
+  profile: "assertive"
+  base_branches:
+    - main
+
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: true
+
+  path_instructions:
+    - path: "supabase/functions/**"
+      instructions: |
+        Edge Functions (Deno). Rules:
+        - ALWAYS verify JWT with verifyHeaderUnlessAnon()
+        - NEVER log service_role key or secrets
+        - Use Environment Variables (Deno.env), never hardcoded values
+        - Each function should handle CORS headers
+        - Return structured errors with appropriate HTTP status codes
+
+    - path: "supabase/migrations/**"
+      instructions: |
+        SQL migrations. Rules:
+        - Every new table MUST have RLS policies (SELECT, INSERT, UPDATE, DELETE)
+        - Use helper functions is_sharks_admin(), is_oracullo_admin(), has_workspace_access() for RLS
+        - Never grant blanket permissions without WHERE conditions
+        - Include updated_at triggers for tables with mutable data
+        - Add to realtime publication only when needed for UI subscriptions
+
+    - path: "src/types/**"
+      instructions: |
+        TypeScript types. Rules:
+        - UserRole must include all roles: oracullo_admin, admin_sharks, sharks_team, client
+        - EnvironmentType must be 'sharks_company' | 'estrategos'
+        - CalendarIntegration must have sync_mode, env_calendar_ids, env_auto_sync fields
+        - No duplicate type definitions
+
+    - path: "src/lib/**"
+      instructions: |
+        Service/helper layer. Rules:
+        - Never import from supabase client directly in components, use services
+        - Use supabase.auth.getUser() not supabase.auth.getSession() for auth checks
+        - All Supabase queries must use .select() with explicit column names
+        - Error handling: always check `error` property before using data
+        - No hardcoded Supabase URLs or keys — use import from @/lib/supabase
+
+    - path: "src/contexts/**"
+      instructions: |
+        React contexts. Rules:
+        - AuthContext must load user_environments on login
+        - WorkspaceContext must join organizations(environment) for workspace filtering
+        - Realtime subscriptions must be cleaned up in useEffect return
+        - Never store secrets or tokens in context state
+
+    - path: "src/pages/**"
+      instructions: |
+        Page components. Rules:
+        - Use Card, Button, Input, Select from @/components/ui
+        - Use supabase.from() via service layer, not directly in components
+        - All data loading must have loading states and error handling
+        - Mobile: respect safe-area-bottom for bottom nav pages
+        - Use formatDate, formatDateTime from @/lib/utils for dates
+
+    - path: "src/components/**"
+      instructions: |
+        Reusable components. Rules:
+        - Use forwardRef for all interactive components
+        - Use cn() utility for className merging (never template literals with ternaries)
+        - Props interfaces must be exported
+        - No inline styles, use Tailwind classes
+        - Animations: use motion from framer-motion for page transitions
+
+    - path: "src/contexts/AuthContext.tsx"
+      instructions: |
+        Critical auth file. Rules:
+        - environments[] must be loaded from user_environments table
+        - hasAccess(environment, roles?) must check both environment and role
+        - isOracullo must check role === 'oracullo_admin'
+        - Realtime subscription on user_environments for instant revocation
+        - NEVER fall back to users.role column for access decisions
+
+    - path: "src/App.tsx"
+      instructions: |
+        Route definitions. Rules:
+        - Oracullo routes (/oracullo/*) use OraculloLayout
+        - Sharks routes (/sharks/*) use SharksLayout
+        - Estrategos routes (/estrategos/*) use EstrategosLayout
+        - Client routes (/client/*) use ClientLayout
+        - Fallback route must use useHomePath() hook
+        - EnvironmentSelector at /select-environment for 2+ env users
+
+learnings:
+  - details: |
+      Multi-environment architecture:
+      - user_environments table links users to environments with roles
+      - RLS uses user_environments, NOT users.role column
+      - is_oracullo_admin() checks user_environments for oracullo role
+      - has_workspace_access() joins workspaces→organizations→user_environments
+      - ws_env_allows_write() checks environment-level write permissions
+    domain: database
+    type: architecture
+
+  - details: |
+      Google Calendar sync modes:
+      - split: creates 2 calendars (Sharks Company, Estrategos) per environment
+      - unified: single calendar with [Sharks]/[Estrategos] prefixes
+      - Client chooses at OAuth connection time, stored in calendar_integrations.sync_mode
+      - Drafts do NOT trigger sync (fn_enqueue_calendar_sync returns NULL for drafts)
+    domain: integration
+    type: architecture
+
+  - details: |
+      Edge Functions auth pattern:
+      - Public: verifyHeaderUnlessAnon() → anon works, auth optional
+      - Auth required: verifyHeader() → must have valid JWT
+      - Admin: verifyHeader() + is_sharks_admin()/is_oracullo_admin() check
+      - Service role: only in admin-env-access for user management
+    domain: supabase
+    type: pattern
+
+  - details: |
+      Environment detection in frontend:
+      - AppSidebar uses useLocation() to detect /estrategos, /oracullo, /sharks, /client
+      - App.tsx uses useHomePath() to determine redirect based on user_environments
+      - LoginPage redirects: oracullo→/oracullo, 1 env→env home, 2+ envs→/select-environment
+      - BottomNav shows nav items based on current URL prefix
+    domain: frontend
+    type: pattern
+
+  - details: |
+      Deployment:
+      - GitHub push → Vercel auto-deploy (production)
+      - Supabase migrations applied via Management API (not CLI)
+      - Edge Functions deployed via supabase_edge_function tool
+      - Never commit access tokens or API keys
+    domain: deployment
+    type: workflow
+
+  - details: |
+      Known issues to watch:
+      - Partial indexes cannot be used with ON CONFLICT (migration 025 fix)
+      - CASE WHEN TG_TABLE_NAME = ... THEN ... END is invalid PostgreSQL
+      - Use TG_TABLE_NAME = 'table_name' directly, not CASE expressions
+      - UseComplete is undefined in React 18 strict mode (useCompleteRef workaround)
+    domain: supabase
+    type: gotcha
+
+  - details: |
+      Naming conventions:
+      - Environment files: 023_environment_system.sql, 024_estrategos_schema.sql, etc.
+      - Edge Functions: google-sync, google-oauth-start, google-oauth-callback, admin-env-access
+      - Pages: src/pages/{environment}/{PageName}.tsx
+      - Services: src/lib/{domain}Service.ts
+      - Components: src/components/{category}/{ComponentName}.tsx
+    domain: codebase
+    type: convention
+
+ignore:
+  - "dist/**"
+  - "node_modules/**"
+  - "*.min.js"
+  - "*.css"
+  - "package-lock.json"
+  - "*.test.*"
+  - "*.spec.*"
+
+tsconfig: "tsconfig.json"
