@@ -10,6 +10,7 @@ const FN_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 
 export interface GoogleIntegration {
   workspace_id: string;
+  user_id: string | null;
   google_calendar_id: string | null;
   google_calendar_name: string | null;
   google_account_email: string | null;
@@ -141,9 +142,12 @@ export function disconnectCalendar(workspaceId: string | null): Promise<{ ok: bo
 }
 
 export async function setAutoSync(workspaceId: string | null, value: boolean): Promise<void> {
-  const q = supabase.from('calendar_integrations').update({ auto_sync: value });
+  // Migration 021: modo global = linha PESSOAL do usuario logado
+  const { data: { session } } = await supabase.auth.getSession();
+  const uid = session?.user?.id;
+  let q = supabase.from('calendar_integrations').update({ auto_sync: value });
   const { error } = workspaceId === null
-    ? await q.is('workspace_id', null)
+    ? await (uid ? q.is('workspace_id', null).eq('user_id', uid) : q.is('workspace_id', null))
     : await q.eq('workspace_id', workspaceId);
   if (error) throw error;
 }

@@ -8,7 +8,7 @@ import { markIntegrationConnected, type GoogleIntegration } from '@/lib/googleSy
 // Supports per-workspace AND global (admin) mode.
 // ==========================================
 
-const COLS = 'workspace_id, google_calendar_id, google_calendar_name, google_account_email, is_connected, auto_sync, last_synced_at, sync_error';
+const COLS = 'workspace_id, user_id, google_calendar_id, google_calendar_name, google_account_email, is_connected, auto_sync, last_synced_at, sync_error';
 
 const cache = new Map<string, GoogleIntegration | null>();
 let globalCache: GoogleIntegration | null = null;
@@ -57,11 +57,15 @@ export function getGlobalIntegration(): GoogleIntegration | null {
 }
 
 export async function loadGlobalIntegration(): Promise<GoogleIntegration | null> {
-  const { data } = await supabase
+  // Migration 021: "global" agora = linha PESSOAL do usuario logado
+  const { data: { session } } = await supabase.auth.getSession();
+  const uid = session?.user?.id;
+  let q = supabase
     .from('calendar_integrations')
     .select(COLS)
-    .is('workspace_id', null)
-    .maybeSingle();
+    .is('workspace_id', null);
+  if (uid) q = q.eq('user_id', uid);
+  const { data } = await q.maybeSingle();
   globalCache = (data as GoogleIntegration) ?? null;
   markIntegrationConnected(null, !!data?.is_connected);
   notify();
@@ -79,12 +83,17 @@ export function subscribeIntegration(fn: () => void): () => void {
 }
 
 export async function loadAllIntegrations(): Promise<Record<string, GoogleIntegration>> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const myId = session?.user?.id;
   const { data } = await supabase.from('calendar_integrations').select(COLS);
   const map: Record<string, GoogleIntegration> = {};
   for (const row of (data ?? []) as unknown as GoogleIntegration[]) {
     if (row.workspace_id === null) {
-      globalCache = row;
-      markIntegrationConnected(null, !!row.is_connected);
+      // Admin enxerga linhas pessoais de TODOS; so a minha e "global"
+      if (!myId || row.user_id === myId) {
+        globalCache = row;
+        markIntegrationConnected(null, !!row.is_connected);
+      }
     } else {
       map[row.workspace_id] = row;
       cache.set(row.workspace_id, row);
@@ -105,26 +114,33 @@ function ensureChannel(): void {
       'postgres_changes',
       { event: '*', schema: 'public', table: 'calendar_integrations' },
       payload => {
-        if (payload.eventType === 'DELETE') {
-          const ws = (payload.old as Record<string, unknown> | null)?.workspace_id as string | undefined | null;
-          if (ws === null || ws === undefined) {
-            globalCache = null;
-            markIntegrationConnected(null, false);
-          } else if (ws) {
-            cache.set(ws, null);
-            markIntegrationConnected(ws, false);
+        // Migration 021: linhas pessoais de OUTROS usuarios nao sao "minha"
+        // integracao global — admin as enxerga via RLS, mas so a propria conta.
+        supabase.auth.getSession().then(({ data }) => {
+          const myId = data.session?.user?.id;
+          if (payload.eventType === 'DELETE') {
+            const ws = (payload.old as Record<string, unknown> | null)?.workspace_id as string | undefined | null;
+            if (ws === null || ws === undefined) {
+              globalCache = null;
+              markIntegrationConnected(null, false);
+            } else if (ws) {
+              cache.set(ws, null);
+              markIntegrationConnected(ws, false);
+            }
+          } else {
+            const row = payload.new as unknown as GoogleIntegration | null;
+            if (row?.workspace_id === null || row?.workspace_id === undefined) {
+              if (!myId || row?.user_id === myId) {
+                globalCache = row;
+                markIntegrationConnected(null, !!row?.is_connected);
+              }
+            } else if (row?.workspace_id) {
+              cache.set(row.workspace_id, row);
+              markIntegrationConnected(row.workspace_id, !!row.is_connected);
+            }
           }
-        } else {
-          const row = payload.new as unknown as GoogleIntegration | null;
-          if (row?.workspace_id === null || row?.workspace_id === undefined) {
-            globalCache = row;
-            markIntegrationConnected(null, !!row?.is_connected);
-          } else if (row?.workspace_id) {
-            cache.set(row.workspace_id, row);
-            markIntegrationConnected(row.workspace_id, !!row.is_connected);
-          }
-        }
-        notify();
+          notify();
+        });
       }
     )
     .subscribe();

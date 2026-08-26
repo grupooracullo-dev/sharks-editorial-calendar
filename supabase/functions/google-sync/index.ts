@@ -34,12 +34,14 @@ async function migrateTarget(
   wsId: string,
   token: string,
   oldCalId: string,
+  integId: string,
 ): Promise<void> {
-  // 1. remover eventos da agenda antiga
+  // 1. remover eventos da agenda antiga (apenas os links DESSA integracao)
   const { data: links } = await admin
     .from('calendar_event_links')
     .select('google_event_id')
-    .eq('workspace_id', wsId);
+    .eq('workspace_id', wsId)
+    .or(`integration_id.eq.${integId},integration_id.is.null`);
   for (const l of links ?? []) {
     if (!l.google_event_id) continue;
     await fetch(
@@ -48,11 +50,12 @@ async function migrateTarget(
     ).catch(() => {});
   }
 
-  // 2. resetar vinculos e status
-  await admin.from('calendar_event_links').delete().eq('workspace_id', wsId);
+  // 2. resetar vinculos (só dessa integracao) e status
+  await admin.from('calendar_event_links').delete().eq('workspace_id', wsId).or(`integration_id.eq.${integId},integration_id.is.null`);
   await admin.from('actions').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).neq('status', 'cancelled');
 
   // 3. re-enfileirar todas as acoes ativas para re-sync na nova agenda
+  //    (fan-out recria para TODAS as integracoes ativas)
   await admin.from('calendar_sync_queue').delete().eq('workspace_id', wsId).in('status', ['pending', 'error']);
   const { data: acts } = await admin.from('actions').select('id').eq('workspace_id', wsId).neq('status', 'cancelled');
   if (acts?.length) {
@@ -118,11 +121,15 @@ Deno.serve(async req => {
     }
   }
 
+  // Migration 021: modo global = LINHA PESSOAL do usuario
+  // (workspace_id IS NULL + user_id). Cada usuario gerencia a
+  // propria integracao Google — nao existe mais linha global compartilhada.
   const { data: integ } = isGlobal
     ? await admin
         .from('calendar_integrations')
         .select('*')
         .is('workspace_id', null)
+        .eq('user_id', userData.user.id)
         .maybeSingle()
     : await admin
         .from('calendar_integrations')
@@ -157,18 +164,18 @@ Deno.serve(async req => {
         const t = await getValidToken(admin, integ);
         const oldCal = integ.google_calendar_id || 'primary';
 
-        // Update integration
+        // Update integration (apenas a linha em questao — nunca a de outros usuarios)
         if (isGlobal) {
           await admin
             .from('calendar_integrations')
             .update({ google_calendar_id: body.calendar_id, google_calendar_name: body.calendar_name ?? null })
-            .is('workspace_id', null);
+            .eq('id', integ.id);
         } else {
           await admin
             .from('calendar_integrations')
             .update({ google_calendar_id: body.calendar_id, google_calendar_name: body.calendar_name ?? null })
-            .eq('workspace_id', wsId);
-          await migrateTarget(admin, wsId, t, oldCal);
+            .eq('id', integ.id);
+          await migrateTarget(admin, wsId, t, oldCal, integ.id);
         }
         return json(200, { ok: true });
       }
@@ -193,50 +200,57 @@ Deno.serve(async req => {
           await admin
             .from('calendar_integrations')
             .update({ google_calendar_id: cal.id, google_calendar_name: summary })
-            .is('workspace_id', null);
+            .eq('id', integ.id);
         } else {
           await admin
             .from('calendar_integrations')
             .update({ google_calendar_id: cal.id, google_calendar_name: summary })
-            .eq('workspace_id', wsId);
-          await migrateTarget(admin, wsId, t, oldCal);
+            .eq('id', integ.id);
+          await migrateTarget(admin, wsId, t, oldCal, integ.id);
         }
 
         return json(200, { ok: true, calendar_id: cal.id, calendar_name: summary });
       }
 
       case 'disconnect': {
+        const wipe = {
+          is_connected: false,
+          access_token: null,
+          refresh_token: null,
+          token_expires_at: null,
+          last_synced_at: null,
+          sync_error: null,
+        };
         if (isGlobal) {
-          await admin
-            .from('calendar_integrations')
-            .update({
-              is_connected: false,
-              access_token: null,
-              refresh_token: null,
-              token_expires_at: null,
-              last_synced_at: null,
-              sync_error: null,
-            })
-            .is('workspace_id', null);
-          // Clear all workspace-level event links (global was syncing everything)
-          await admin.from('calendar_event_links').delete().neq('action_id', '00000000-0000-0000-0000-000000000000');
-          await admin.from('actions').update({ sync_status: 'not_synced' }).neq('sync_status', 'not_synced');
-          await admin.from('calendar_sync_queue').delete().in('status', ['pending', 'error']);
+          // Migration 021: desconecta SOMENTE a linha pessoal do usuario.
+          // Links/fila de outros usuarios permanecem intactos.
+          if (!integ) return json(200, { ok: true });
+          await admin.from('calendar_integrations').update(wipe).eq('id', integ.id);
+          await admin.from('calendar_event_links').delete().eq('integration_id', integ.id);
+
+          // Acoes sem nenhum link restante voltam a not_synced
+          const { data: remaining } = await admin
+            .from('calendar_event_links')
+            .select('action_id')
+            .or(`integration_id.neq.${integ.id},integration_id.is.null`);
+          const keepIds = [...new Set((remaining ?? []).map(r => r.action_id))];
+          const resetQuery = admin.from('actions').update({ sync_status: 'not_synced' }).neq('sync_status', 'not_synced');
+          if (keepIds.length) await resetQuery.not('id', 'in', `(${keepIds.join(',')})`);
+          else await resetQuery;
+
+          // Deletes embutidos alvejando minha integracao nao fazem mais sentido
+          await admin.from('calendar_sync_queue').delete().eq('integration_id', integ.id);
         } else {
+          if (!integ) return json(200, { ok: true });
+          await admin.from('calendar_integrations').update(wipe).eq('id', integ.id);
+          // Remove apenas os links dessa integracao (e legados NULL do workspace)
           await admin
-            .from('calendar_integrations')
-            .update({
-              is_connected: false,
-              access_token: null,
-              refresh_token: null,
-              token_expires_at: null,
-              last_synced_at: null,
-              sync_error: null,
-            })
-            .eq('workspace_id', wsId);
-          await admin.from('calendar_event_links').delete().eq('workspace_id', wsId);
+            .from('calendar_event_links')
+            .delete()
+            .eq('workspace_id', wsId)
+            .or(`integration_id.eq.${integ.id},integration_id.is.null`);
           await admin.from('actions').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).neq('sync_status', 'not_synced');
-          await admin.from('calendar_sync_queue').delete().eq('workspace_id', wsId).in('status', ['pending', 'error']);
+          // Fila permanece: integracoes pessoais de outros usuarios ainda cobrem o workspace
         }
         return json(200, { ok: true });
       }

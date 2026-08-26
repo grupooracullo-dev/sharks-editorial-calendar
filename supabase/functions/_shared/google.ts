@@ -12,6 +12,7 @@ export const TOKEN_API = 'https://oauth2.googleapis.com/token';
 export interface IntegrationRow {
   id: string;
   workspace_id: string;
+  user_id: string | null;
   google_calendar_id: string | null;
   google_calendar_name: string | null;
   google_account_email: string | null;
@@ -31,6 +32,7 @@ export interface QueueItem {
   operation: 'create' | 'update' | 'delete';
   attempts: number;
   google_event_id?: string | null;
+  integration_id?: string | null;
   action: Record<string, unknown> | null;
 }
 
@@ -260,106 +262,110 @@ export async function processWorkspace(
   if (!locked) return { ...stat, skipped_lock: true } as typeof stat & { skipped_lock: boolean };
 
   try {
-    // Try per-workspace integration first, then fall back to global (workspace_id IS NULL)
-    let { data: integ } = await admin
-      .from('calendar_integrations')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .maybeSingle();
-
-    let isGlobal = false;
-    if (!integ || !integ.is_connected) {
-      const { data: globalInteg } = await admin
+    // Integracoes que cobrem este workspace:
+    //  a) linha por cliente (workspace_id = ws)
+    //  b) linhas pessoais globais (workspace_id IS NULL, user_id NOT NULL)
+    // Cada usuario conecta a PROPRIA conta Google (migration 021).
+    const [{ data: wsRows }, { data: personalRows }] = await Promise.all([
+      admin
+        .from('calendar_integrations')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .eq('is_connected', true)
+        .eq('auto_sync', true),
+      admin
         .from('calendar_integrations')
         .select('*')
         .is('workspace_id', null)
+        .not('user_id', 'is', null)
         .eq('is_connected', true)
-        .eq('auto_sync', true)
-        .maybeSingle();
-      if (globalInteg) {
-        integ = globalInteg;
-        isGlobal = true;
-      }
-    }
-
-    if (!integ || !integ.is_connected) {
-      await admin
-        .from('calendar_sync_queue')
-        .update({ status: 'done', processed_at: new Date().toISOString(), last_error: 'integracao inativa' })
-        .eq('workspace_id', workspaceId)
-        .eq('status', 'pending');
-      return stat;
-    }
-
-    let token: string;
-    try {
-      token = await getValidToken(admin, integ as IntegrationRow);
-    } catch (e) {
-      const errFilter = isGlobal
-        ? { workspace_id: null as unknown }
-        : { workspace_id: workspaceId };
-      await admin
-        .from('calendar_integrations')
-        .update({ sync_error: `Falha de autenticacao Google: ${String((e as Error).message).slice(0, 300)}` })
-        .match(errFilter as Record<string, unknown>);
-      return stat;
-    }
-
-    const calId = integ.google_calendar_id || 'primary';
+        .eq('auto_sync', true),
+    ]);
+    const integs = [...(wsRows ?? []), ...(personalRows ?? [])] as unknown as IntegrationRow[];
 
     const { data: queue } = await admin
       .from('calendar_sync_queue')
-      .select('id, workspace_id, action_id, operation, attempts, google_event_id, action:actions(*, campaign:campaigns(name,objective), editorial_pillar:editorial_pillars(name))')
+      .select('id, workspace_id, action_id, operation, attempts, google_event_id, integration_id, action:actions(*, campaign:campaigns(name,objective), editorial_pillar:editorial_pillars(name))')
       .eq('workspace_id', workspaceId)
       .eq('status', 'pending')
       .order('created_at')
       .limit(50);
 
+    const now = () => new Date().toISOString();
+
     if (!queue || queue.length === 0) {
-      // No pending items — still update last_synced_at so the UI shows
-      // the worker is alive even when idle.
-      const updateFilterEmpty = isGlobal
-        ? null
-        : { workspace_id: workspaceId };
-      if (updateFilterEmpty === null) {
+      if (integs.length > 0) {
         await admin
           .from('calendar_integrations')
-          .update({ last_synced_at: new Date().toISOString(), sync_error: null })
-          .is('workspace_id', null);
-      } else {
-        await admin
-          .from('calendar_integrations')
-          .update({ last_synced_at: new Date().toISOString(), sync_error: null })
-          .eq('workspace_id', workspaceId);
+          .update({ last_synced_at: now(), sync_error: null })
+          .in('id', integs.map(i => i.id));
       }
       return stat;
     }
 
+    // Links existentes por (acao:integracao) + legado (integration_id NULL)
     const actionIds = queue.map(q => q.action_id).filter(Boolean);
-    // Cross-workspace dedup: fetch ALL links for these action_ids (not just current workspace)
-    // to prevent duplicate Google Calendar events when same action is queued for multiple workspaces
     const { data: links } = await admin
       .from('calendar_event_links')
-      .select('action_id, google_event_id, workspace_id')
+      .select('action_id, google_event_id, workspace_id, integration_id')
       .in('action_id', actionIds.length ? actionIds : [NULL_UUID]);
-    const linkMap = new Map<string, string>((links ?? []).map(l => [l.action_id, l.google_event_id]));
+    const linkMap = new Map<string, string>();
+    for (const l of links ?? []) {
+      if (l.integration_id) linkMap.set(`${l.action_id}:${l.integration_id}`, l.google_event_id);
+      else if (!linkMap.has(`${l.action_id}:legacy`)) linkMap.set(`${l.action_id}:legacy`, l.google_event_id);
+    }
+
+    // Cache de token por integracao (evita refresh repetido no fan-out)
+    const tokens = new Map<string, string>();
+    const tokenFor = async (integ: IntegrationRow): Promise<string> => {
+      const cached = tokens.get(integ.id);
+      if (cached) return cached;
+      try {
+        const t = await getValidToken(admin, integ);
+        tokens.set(integ.id, t);
+        return t;
+      } catch (e) {
+        await admin
+          .from('calendar_integrations')
+          .update({ sync_error: `Falha de autenticacao Google: ${String((e as Error).message).slice(0, 300)}` })
+          .eq('id', integ.id);
+        throw e;
+      }
+    };
+
+    const usedIntegIds = new Set<string>();
 
     for (const item of queue as unknown as QueueItem[]) {
       stat.processed++;
-      const now = () => new Date().toISOString();
       try {
-        // Embedded delete (migration 014): action row already removed;
-        // google_event_id captured by the BEFORE DELETE trigger.
+        // Delete embutido (migration 014/021): a action ja foi removida;
+        // integration_id diz EM QUAL agenda apagar o evento.
         if (item.operation === 'delete' && !item.action_id) {
-          const eventId = item.google_event_id;
-          if (eventId) {
-            const res = await gFetch(
-              `${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`,
-              { method: 'DELETE' },
-              token,
-            );
-            if (!res.ok && res.status !== 404 && res.status !== 410) {
-              throw new Error(`Google DELETE ${res.status}: ${(await res.text()).slice(0, 200)}`);
+          let target: IntegrationRow | null = null;
+          if (item.integration_id) {
+            const { data: t } = await admin
+              .from('calendar_integrations')
+              .select('*')
+              .eq('id', item.integration_id)
+              .maybeSingle();
+            target = (t as IntegrationRow) ?? null;
+          } else if (integs.length > 0) {
+            target = integs[0]; // legado: sem integration_id
+          }
+          if (target) {
+            usedIntegIds.add(target.id);
+            const token = await tokenFor(target);
+            const calId = target.google_calendar_id || 'primary';
+            const eventId = item.google_event_id;
+            if (eventId) {
+              const res = await gFetch(
+                `${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`,
+                { method: 'DELETE' },
+                token,
+              );
+              if (!res.ok && res.status !== 404 && res.status !== 410) {
+                throw new Error(`Google DELETE ${res.status}: ${(await res.text()).slice(0, 200)}`);
+              }
             }
           }
           await admin.from('calendar_sync_queue').update({ status: 'done', processed_at: now() }).eq('id', item.id);
@@ -372,74 +378,101 @@ export async function processWorkspace(
           continue;
         }
 
+        if (integs.length === 0) {
+          await admin
+            .from('calendar_sync_queue')
+            .update({ status: 'done', processed_at: now(), last_error: 'integracao inativa' })
+            .eq('id', item.id);
+          stat.ok++;
+          continue;
+        }
+
         if (item.operation === 'delete') {
-          const eventId = item.google_event_id || linkMap.get(item.action_id);
-          if (eventId) {
-            const res = await gFetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`, { method: 'DELETE' }, token);
-            if (!res.ok && res.status !== 404 && res.status !== 410) {
-              throw new Error(`Google DELETE ${res.status}: ${(await res.text()).slice(0, 200)}`);
+          // Acao cancelada / voltou a draft: remove o evento de TODAS as agendas
+          const errs: string[] = [];
+          let anyOk = false;
+          for (const integ of integs) {
+            usedIntegIds.add(integ.id);
+            try {
+              const eventId = linkMap.get(`${item.action_id}:${integ.id}`) ?? linkMap.get(`${item.action_id}:legacy`);
+              if (eventId) {
+                const token = await tokenFor(integ);
+                const calId = integ.google_calendar_id || 'primary';
+                const res = await gFetch(
+                  `${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`,
+                  { method: 'DELETE' },
+                  token,
+                );
+                if (!res.ok && res.status !== 404 && res.status !== 410) {
+                  throw new Error(`DELETE ${res.status}`);
+                }
+              }
+              anyOk = true;
+            } catch (e) {
+              errs.push(`${integ.google_account_email ?? integ.id}: ${String((e as Error).message).slice(0, 120)}`);
             }
           }
+          if (!anyOk) throw new Error(errs.join(' | ').slice(0, 380));
           await admin.from('calendar_event_links').delete().eq('action_id', item.action_id);
+          await admin
+            .from('calendar_sync_queue')
+            .update({ status: 'done', processed_at: now(), last_error: errs.length ? `parcial: ${errs.join(' | ').slice(0, 200)}` : null })
+            .eq('id', item.id);
+          stat.ok++;
         } else {
+          // create/update: fan-out para TODAS as integracoes ativas
           const action = item.action as Record<string, any> | null;
           if (!action) {
             await admin.from('calendar_sync_queue').update({ status: 'done', processed_at: now(), last_error: 'acao removida antes do sync' }).eq('id', item.id);
             stat.ok++;
             continue;
           }
-          const eventId = linkMap.get(item.action_id);
           const bodyJson = JSON.stringify(buildEventBody(action));
-          let res: Response;
-          let googleEventId: string;
+          const errs: string[] = [];
+          let anyOk = false;
+          for (const integ of integs) {
+            usedIntegIds.add(integ.id);
+            try {
+              const token = await tokenFor(integ);
+              const calId = integ.google_calendar_id || 'primary';
+              const eventId = linkMap.get(`${item.action_id}:${integ.id}`);
+              let res: Response;
+              if (eventId) {
+                res = await gFetch(
+                  `${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`,
+                  { method: 'PATCH', body: bodyJson },
+                  token,
+                );
+                if (res.status === 404 || res.status === 410) {
+                  res = await gFetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events`, { method: 'POST', body: bodyJson }, token);
+                }
+              } else {
+                res = await gFetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events`, { method: 'POST', body: bodyJson }, token);
+              }
+              if (!res.ok) throw new Error(`Google ${res.status}: ${(await res.text()).slice(0, 150)}`);
+              const ev = await res.json();
 
-          if (eventId) {
-            // Event exists (possibly from another workspace in global mode) — update it
-            googleEventId = eventId;
-            res = await gFetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`, { method: 'PATCH', body: bodyJson }, token);
-            if ((res.status === 404 || res.status === 410)) {
-              res = await gFetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events`, { method: 'POST', body: bodyJson }, token);
-            }
-          } else {
-            // No link found — create new event
-            res = await gFetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events`, { method: 'POST', body: bodyJson }, token);
-          }
-          if (!res.ok) throw new Error(`Google ${res.status}: ${(await res.text()).slice(0, 200)}`);
-          const ev = await res.json();
-          googleEventId = ev.id;
-
-          // Upsert link with conflict handling (fixes race condition R1)
-          const { error: linkError } = await admin
-            .from('calendar_event_links')
-            .upsert({
-              action_id: item.action_id,
-              workspace_id: workspaceId,
-              google_event_id: googleEventId,
-              last_synced_at: now(),
-              sync_status: 'synced',
-            }, { onConflict: 'action_id,workspace_id' });
-
-          if (linkError) {
-            // Composite conflict passed — check for legacy single-link (cross-workspace dedup)
-            const { data: existingLink } = await admin
-              .from('calendar_event_links')
-              .select('action_id')
-              .eq('action_id', item.action_id)
-              .limit(1)
-              .maybeSingle();
-            if (existingLink) {
-              await admin.from('calendar_event_links')
-                .update({ last_synced_at: now(), sync_status: 'synced' })
-                .eq('action_id', item.action_id);
-            } else {
-              throw new Error(`link upsert: ${linkError.message}`);
+              await admin.from('calendar_event_links').upsert({
+                action_id: item.action_id,
+                workspace_id: workspaceId,
+                integration_id: integ.id,
+                google_event_id: ev.id,
+                last_synced_at: now(),
+                sync_status: 'synced',
+              }, { onConflict: 'action_id,integration_id' });
+              anyOk = true;
+            } catch (e) {
+              errs.push(`${integ.google_account_email ?? integ.id}: ${String((e as Error).message).slice(0, 120)}`);
             }
           }
-          await admin.from('actions').update({ sync_status: 'synced' }).eq('id', item.action_id);
+          await admin.from('actions').update({ sync_status: anyOk ? 'synced' : 'sync_error' }).eq('id', item.action_id);
+          if (!anyOk) throw new Error(errs.join(' | ').slice(0, 380));
+          await admin
+            .from('calendar_sync_queue')
+            .update({ status: 'done', processed_at: now(), last_error: errs.length ? `parcial: ${errs.join(' | ').slice(0, 200)}` : null })
+            .eq('id', item.id);
+          stat.ok++;
         }
-
-        await admin.from('calendar_sync_queue').update({ status: 'done', processed_at: now() }).eq('id', item.id);
-        stat.ok++;
       } catch (e) {
         stat.failed++;
         const msg = String((e as Error).message ?? e).slice(0, 400);
@@ -451,25 +484,15 @@ export async function processWorkspace(
       }
     }
 
-    // Update last_synced_at on the integration used (per-workspace or global).
-    // Use .is() for NULL workspace_id (global) since .match() with null
-    // uses = NULL which never matches in SQL.
-    if (isGlobal) {
+    // Heartbeat nas integracoes efetivamente usadas neste ciclo
+    if (usedIntegIds.size > 0) {
       await admin
         .from('calendar_integrations')
         .update({
           last_synced_at: new Date().toISOString(),
           sync_error: stat.failed ? `${stat.failed} item(ns) falharam no ultimo ciclo` : null,
         })
-        .is('workspace_id', null);
-    } else {
-      await admin
-        .from('calendar_integrations')
-        .update({
-          last_synced_at: new Date().toISOString(),
-          sync_error: stat.failed ? `${stat.failed} item(ns) falharam no ultimo ciclo` : null,
-        })
-        .eq('workspace_id', workspaceId);
+        .in('id', [...usedIntegIds]);
     }
 
     return stat;

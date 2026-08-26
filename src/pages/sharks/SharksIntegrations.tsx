@@ -300,7 +300,7 @@ export default function SharksIntegrations() {
 
         {!currentWorkspace ? (
           <>
-            {/* Global integration card — only for sharks admin/team */}
+            {/* Card pessoal — cada usuario conecta a PROPRIA conta Google */}
             {isSharks && (
             <div className="mb-4">
               {globalInteg?.is_connected ? (
@@ -309,7 +309,7 @@ export default function SharksIntegrations() {
                     <div>
                       <p className="text-sm font-semibold text-green-900">Minha agenda Google</p>
                       <p className="text-xs text-green-700">
-                        {globalInteg.google_account_email} · Sincroniza TODOS os clientes
+                        {globalInteg.google_account_email} · Sincroniza TODOS os clientes para a sua agenda
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -331,12 +331,13 @@ export default function SharksIntegrations() {
                 </div>
               ) : (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <p className="text-sm font-medium text-gray-900 mb-1">Minha agenda Google (admin)</p>
+                  <p className="text-sm font-medium text-gray-900 mb-1">Minha agenda Google</p>
                   <p className="text-xs text-gray-500 mb-3">
-                    Conecte sua conta Google para sincronizar automaticamente as ações de TODOS os clientes numa única agenda.
+                    Conecte a <strong>sua</strong> conta Google — o cronograma de todos os clientes é
+                    importado automaticamente para a sua agenda. Cada membro do time conecta a própria conta.
                   </p>
                   <Button onClick={handleConnect} size="sm">
-                    <LinkIcon className="w-4 h-4" /> Conectar Google Calendar (global)
+                    <LinkIcon className="w-4 h-4" /> Conectar minha conta Google
                   </Button>
                 </div>
               )}

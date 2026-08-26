@@ -103,13 +103,16 @@ Deno.serve(async req => {
     }
 
     // Merge refresh token (Google omits it on re-consent)
+    // Migration 021: global mode = LINHA PESSOAL do usuario (workspace_id NULL
+    // + user_id). Cada usuario conecta a propria conta Google.
     const existingQuery = isGlobal
-      ? await admin.from('calendar_integrations').select('id, refresh_token').is('workspace_id', null).maybeSingle()
+      ? await admin.from('calendar_integrations').select('id, refresh_token').is('workspace_id', null).eq('user_id', verified.u).maybeSingle()
       : await admin.from('calendar_integrations').select('id, refresh_token').eq('workspace_id', verified.ws).maybeSingle();
     const existing = existingQuery.data;
 
     const row = {
       workspace_id: wsId,
+      user_id: isGlobal ? verified.u : null,
       google_calendar_id: calId,
       google_calendar_name: calName,
       google_account_email: email,
