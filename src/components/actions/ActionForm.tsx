@@ -147,6 +147,7 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
       const payload = {
         ...formData,
         workspace_id: formData.workspace_id,
+        environment: environment || 'sharks_company',
         format: (formData.format || null) as ContentFormat | null,
         objective: (formData.objective || null) as Objective | null,
         funnel_stage: (formData.funnel_stage || null) as FunnelStage | null,

@@ -136,6 +136,7 @@ export interface ActionResult {
 export async function createAction(data: Partial<Action>): Promise<ActionResult> {
   const payload = {
     workspace_id: data.workspace_id || '',
+    environment: data.environment || 'sharks_company',
     campaign_id: data.campaign_id || null,
     editorial_pillar_id: data.editorial_pillar_id || null,
     responsible_id: data.responsible_id || null,
