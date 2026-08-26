@@ -57,23 +57,23 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Branding */}
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Subtle radial glow */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15)_0%,transparent_70%)]" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary-500/5 rounded-full blur-3xl" />
+
+      <div className="w-full max-w-md relative z-10">
+        {/* Logo */}
         <div className="text-center mb-8">
           <img
             src={logoUrl}
-            alt="Oracullo Calendar"
-            className="h-28 mx-auto mb-6 object-contain drop-shadow-lg"
+            alt="Oracullo"
+            className="h-40 mx-auto object-contain drop-shadow-2xl"
           />
-          <h1 className="text-2xl font-bold text-white">Oracullo Calendar</h1>
-          <p className="text-primary-200 text-sm mt-1">
-            Sharks Company <span className="mx-1 opacity-50">·</span> Estrategos
-          </p>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8">
+        <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/20 p-6 sm:p-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-1">Entrar</h2>
           <p className="text-sm text-gray-500 mb-6">Acesse sua conta para continuar</p>
 
