@@ -28,12 +28,12 @@ import logoUrl from '/logo.png?url';
 const sharksNavItems = [
   { icon: LayoutDashboard, label: 'Visão Geral', path: '/sharks' },
   { icon: Calendar, label: 'Calendário', path: '/sharks/calendar' },
-  { icon: Users, label: 'Clientes', path: '/sharks/clients' },
   { icon: Megaphone, label: 'Campanhas', path: '/sharks/campaigns' },
   { icon: BookOpen, label: 'Linha Editorial', path: '/sharks/editorial' },
   { icon: LayoutTemplate, label: 'Modelos', path: '/sharks/templates' },
-  { icon: History, label: 'Histórico', path: '/sharks/history' },
   { icon: MessageSquare, label: 'Chat', path: '/sharks/chat' },
+  { icon: History, label: 'Histórico', path: '/sharks/history' },
+  { icon: Users, label: 'Clientes', path: '/sharks/clients' },
   { icon: UserCog, label: 'Time', path: '/sharks/team' },
   { icon: UserPlus, label: 'Acessos', path: '/sharks/access-requests', adminOnly: true },
   { icon: Link2, label: 'Integrações', path: '/sharks/integrations' },
@@ -43,8 +43,8 @@ const sharksNavItems = [
 const clientNavItems = [
   { icon: LayoutDashboard, label: 'Início', path: '/client' },
   { icon: Calendar, label: 'Meu Calendário', path: '/client/calendar' },
-  { icon: History, label: 'Histórico', path: '/client/history' },
   { icon: MessageSquare, label: 'Chat', path: '/client/chat' },
+  { icon: History, label: 'Histórico', path: '/client/history' },
 ];
 
 export default function AppSidebar() {
