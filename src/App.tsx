@@ -29,6 +29,7 @@ import ClientDashboard from '@/pages/client/ClientDashboard';
 import ClientCalendar from '@/pages/client/ClientCalendar';
 import ClientHistory from '@/pages/client/ClientHistory';
 import ClientChat from '@/pages/client/ClientChat';
+import ClientIntegrations from '@/pages/client/ClientIntegrations';
 
 function DataSync() {
   const { user } = useAuth();
@@ -109,6 +110,7 @@ function AppRoutes() {
       <Route path="/client/calendar" element={<ClientLayout><ClientCalendar /></ClientLayout>} />
       <Route path="/client/history" element={<ClientLayout><ClientHistory /></ClientLayout>} />
       <Route path="/client/chat" element={<ClientLayout><ClientChat /></ClientLayout>} />
+      <Route path="/client/integrations" element={<ClientLayout><ClientIntegrations /></ClientLayout>} />
 
       {/* Fallback */}
       <Route path="*" element={

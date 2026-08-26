@@ -89,30 +89,34 @@ Deno.serve(async req => {
     const isGlobal = verified.ws === 'global';
     const wsId = isGlobal ? null : verified.ws;
 
+    const { data: requester } = await admin.from('users').select('role').eq('id', verified.u).maybeSingle();
+    const isSharksUser = requester?.role === 'admin_sharks' || requester?.role === 'sharks_team';
+
     if (!isGlobal) {
       const allowed = await verifyWorkspaceAccess(admin, verified.u, verified.ws);
       if (!allowed) return back('google=error&reason=sem_acesso');
     }
 
     // Global mode: only admin_sharks and sharks_team allowed
-    if (isGlobal) {
-      const { data: u } = await admin.from('users').select('role').eq('id', verified.u).maybeSingle();
-      if (!u || (u.role !== 'admin_sharks' && u.role !== 'sharks_team')) {
-        return back('google=error&reason=sem_acesso_global');
-      }
+    if (isGlobal && !isSharksUser) {
+      return back('google=error&reason=sem_acesso_global');
     }
 
     // Merge refresh token (Google omits it on re-consent)
-    // Migration 021: global mode = LINHA PESSOAL do usuario (workspace_id NULL
-    // + user_id). Cada usuario conecta a propria conta Google.
+    // Migration 021/022: quem conecta define a linha alvo —
+    //   global (time)   -> linha pessoal (workspace_id NULL + user_id)
+    //   workspace + time -> linha da agência (workspace_id W + user_id NULL)
+    //   workspace + cliente -> linha pessoal do cliente (W + user_id)
     const existingQuery = isGlobal
       ? await admin.from('calendar_integrations').select('id, refresh_token').is('workspace_id', null).eq('user_id', verified.u).maybeSingle()
-      : await admin.from('calendar_integrations').select('id, refresh_token').eq('workspace_id', verified.ws).maybeSingle();
+      : isSharksUser
+        ? await admin.from('calendar_integrations').select('id, refresh_token').eq('workspace_id', verified.ws).is('user_id', null).maybeSingle()
+        : await admin.from('calendar_integrations').select('id, refresh_token').eq('workspace_id', verified.ws).eq('user_id', verified.u).maybeSingle();
     const existing = existingQuery.data;
 
     const row = {
       workspace_id: wsId,
-      user_id: isGlobal ? verified.u : null,
+      user_id: isGlobal ? verified.u : (isSharksUser ? null : verified.u),
       google_calendar_id: calId,
       google_calendar_name: calName,
       google_account_email: email,

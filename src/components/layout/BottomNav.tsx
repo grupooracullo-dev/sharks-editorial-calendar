@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Calendar, Users, MessageSquare, History } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, MessageSquare, History, Link2 } from 'lucide-react';
 
 const sharksNavItems = [
   { path: '/sharks', icon: LayoutDashboard, label: 'Home' },
@@ -15,6 +15,7 @@ const clientNavItems = [
   { path: '/client/calendar', icon: Calendar, label: 'Calendário' },
   { path: '/client/history', icon: History, label: 'Histórico' },
   { path: '/client/chat', icon: MessageSquare, label: 'Chat' },
+  { path: '/client/integrations', icon: Link2, label: 'Integrações' },
 ];
 
 export default function BottomNav() {

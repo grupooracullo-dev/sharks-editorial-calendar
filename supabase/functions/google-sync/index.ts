@@ -113,17 +113,18 @@ Deno.serve(async req => {
     if (!allowed) return json(403, { error: 'Sem acesso a este workspace' });
   }
 
+  // Migration 021/022: resolução consciente de papel.
+  //   global (time)        -> linha pessoal (workspace_id NULL + user_id)
+  //   workspace + time     -> linha da agência (W + user_id NULL)
+  //   workspace + cliente  -> linha pessoal do cliente (W + user_id)
+  const { data: me } = await admin.from('users').select('role').eq('id', userData.user.id).maybeSingle();
+  const isSharksUser = me?.role === 'admin_sharks' || me?.role === 'sharks_team';
+
   // Global mode: only admin_sharks and sharks_team allowed
-  if (isGlobal) {
-    const { data: u } = await admin.from('users').select('role').eq('id', userData.user.id).maybeSingle();
-    if (!u || (u.role !== 'admin_sharks' && u.role !== 'sharks_team')) {
-      return json(403, { error: 'Sem acesso ao modo global' });
-    }
+  if (isGlobal && !isSharksUser) {
+    return json(403, { error: 'Sem acesso ao modo global' });
   }
 
-  // Migration 021: modo global = LINHA PESSOAL do usuario
-  // (workspace_id IS NULL + user_id). Cada usuario gerencia a
-  // propria integracao Google — nao existe mais linha global compartilhada.
   const { data: integ } = isGlobal
     ? await admin
         .from('calendar_integrations')
@@ -131,11 +132,19 @@ Deno.serve(async req => {
         .is('workspace_id', null)
         .eq('user_id', userData.user.id)
         .maybeSingle()
-    : await admin
-        .from('calendar_integrations')
-        .select('*')
-        .eq('workspace_id', wsId)
-        .maybeSingle();
+    : isSharksUser
+      ? await admin
+          .from('calendar_integrations')
+          .select('*')
+          .eq('workspace_id', wsId)
+          .is('user_id', null)
+          .maybeSingle()
+      : await admin
+          .from('calendar_integrations')
+          .select('*')
+          .eq('workspace_id', wsId)
+          .eq('user_id', userData.user.id)
+          .maybeSingle();
 
   try {
     switch (op) {
@@ -243,14 +252,19 @@ Deno.serve(async req => {
         } else {
           if (!integ) return json(200, { ok: true });
           await admin.from('calendar_integrations').update(wipe).eq('id', integ.id);
-          // Remove apenas os links dessa integracao (e legados NULL do workspace)
-          await admin
+          // Remove apenas os links DESSA integracao (agencia ou do cliente)
+          await admin.from('calendar_event_links').delete().eq('integration_id', integ.id);
+          // Acoes sem nenhum link restante voltam a not_synced
+          const { data: remainingWs } = await admin
             .from('calendar_event_links')
-            .delete()
+            .select('action_id')
             .eq('workspace_id', wsId)
-            .or(`integration_id.eq.${integ.id},integration_id.is.null`);
-          await admin.from('actions').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).neq('sync_status', 'not_synced');
-          // Fila permanece: integracoes pessoais de outros usuarios ainda cobrem o workspace
+            .or(`integration_id.neq.${integ.id},integration_id.is.null`);
+          const keepIds = [...new Set((remainingWs ?? []).map(r => r.action_id))];
+          const resetWsQuery = admin.from('actions').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).neq('sync_status', 'not_synced');
+          if (keepIds.length) await resetWsQuery.not('id', 'in', `(${keepIds.join(',')})`);
+          else await resetWsQuery;
+          // Fila permanece: outras integracoes (pessoais/agencia) ainda cobrem o workspace
         }
         return json(200, { ok: true });
       }

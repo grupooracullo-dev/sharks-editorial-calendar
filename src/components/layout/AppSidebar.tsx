@@ -45,6 +45,7 @@ const clientNavItems = [
   { icon: Calendar, label: 'Meu Calendário', path: '/client/calendar' },
   { icon: MessageSquare, label: 'Chat', path: '/client/chat' },
   { icon: History, label: 'Histórico', path: '/client/history' },
+  { icon: Link2, label: 'Integrações', path: '/client/integrations' },
 ];
 
 export default function AppSidebar() {

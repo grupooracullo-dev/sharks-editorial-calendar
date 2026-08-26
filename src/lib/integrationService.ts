@@ -38,12 +38,33 @@ export async function loadIntegration(wsId?: string | null): Promise<void> {
 }
 
 async function fetchOne(wsId: string): Promise<void> {
-  const { data } = await supabase
-    .from('calendar_integrations')
-    .select(COLS)
-    .eq('workspace_id', wsId)
-    .maybeSingle();
-  cache.set(wsId, (data as GoogleIntegration) ?? null);
+  // Migration 021/022: um workspace pode ter linha da agência (user_id NULL)
+  // E linhas pessoais de clientes (user_id = X). Resolução:
+  //   1. linha pessoal do usuário logado (cliente conectou a própria conta)
+  //   2. fallback -> linha da agência (time/admin gerencia essa)
+  // RLS garante que cliente só enxerga a própria; time/admin veem a da agência.
+  const { data: { session } } = await supabase.auth.getSession();
+  const uid = session?.user?.id;
+  let data: GoogleIntegration | null = null;
+  if (uid) {
+    const own = await supabase
+      .from('calendar_integrations')
+      .select(COLS)
+      .eq('workspace_id', wsId)
+      .eq('user_id', uid)
+      .maybeSingle();
+    data = (own.data as GoogleIntegration) ?? null;
+  }
+  if (!data) {
+    const agency = await supabase
+      .from('calendar_integrations')
+      .select(COLS)
+      .eq('workspace_id', wsId)
+      .is('user_id', null)
+      .maybeSingle();
+    data = (agency.data as GoogleIntegration) ?? null;
+  }
+  cache.set(wsId, data);
   markIntegrationConnected(wsId, !!data?.is_connected);
   notify();
 }
@@ -94,11 +115,14 @@ export async function loadAllIntegrations(): Promise<Record<string, GoogleIntegr
         globalCache = row;
         markIntegrationConnected(null, !!row.is_connected);
       }
-    } else {
+    } else if (!row.user_id) {
+      // Linha da agência — é o alvo do modo workspace para o time
       map[row.workspace_id] = row;
       cache.set(row.workspace_id, row);
       markIntegrationConnected(row.workspace_id, !!row.is_connected);
     }
+    // Linhas pessoais de clientes (user_id != myId): visíveis só ao admin
+    // via RLS — não alteram cache/map da agência.
   }
   notify();
   return map;
@@ -135,8 +159,12 @@ function ensureChannel(): void {
                 markIntegrationConnected(null, !!row?.is_connected);
               }
             } else if (row?.workspace_id) {
-              cache.set(row.workspace_id, row);
-              markIntegrationConnected(row.workspace_id, !!row.is_connected);
+              // Linha da agência atualiza o cache do workspace;
+              // linha pessoal de cliente só interessa ao dono
+              if (!row.user_id || row.user_id === myId) {
+                cache.set(row.workspace_id, row);
+                markIntegrationConnected(row.workspace_id, !!row.is_connected);
+              }
             }
           }
           notify();

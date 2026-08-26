@@ -87,13 +87,13 @@ async function callFn<T>(body: Record<string, unknown>): Promise<T> {
 
 // ---------- public API ----------
 
-export function startGoogleConnect(workspaceId: string | null, userId: string): void {
+export function startGoogleConnect(workspaceId: string | null, userId: string, returnTo = '/sharks/integrations'): void {
   const wsParam = workspaceId ?? 'global';
   window.location.href =
     `${FN_BASE}/google-oauth-start` +
     `?workspace_id=${encodeURIComponent(wsParam)}` +
     `&user_id=${encodeURIComponent(userId)}` +
-    `&return_to=${encodeURIComponent('/sharks/integrations')}`;
+    `&return_to=${encodeURIComponent(returnTo)}`;
 }
 
 export interface SyncResult {
