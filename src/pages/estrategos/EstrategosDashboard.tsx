@@ -1,127 +1,189 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
+import { useActions, useOverdueActions } from '@/hooks/useActions';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import StatsCard from '@/components/dashboard/StatsCard';
-import Badge from '@/components/ui/Badge';
-import { supabase } from '@/lib/supabase';
-import { formatDate } from '@/lib/utils';
-import type { EstrategosProject, EstrategosMeeting, EstrategosImplementation } from '@/types';
-import { Briefcase, Presentation, Rocket, CalendarDays, Clock, AlertTriangle } from 'lucide-react';
+import AlertCard from '@/components/dashboard/AlertCard';
+import MiniCalendar from '@/components/dashboard/MiniCalendar';
+import StatusBadge from '@/components/actions/StatusBadge';
+import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
+import { formatDate, cn } from '@/lib/utils';
+import { formatCalendarDate, startOfWeek, endOfWeek, parseISO, format, ptBR } from '@/lib/dateUtils';
+import {
+  Briefcase,
+  CalendarDays,
+  Clock,
+  AlertTriangle,
+  ArrowRight,
+} from 'lucide-react';
 
 export default function EstrategosDashboard() {
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<EstrategosProject[]>([]);
-  const [meetings, setMeetings] = useState<EstrategosMeeting[]>([]);
-  const [impls, setImpls] = useState<EstrategosImplementation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { workspaces } = useWorkspace();
 
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      const [p, m, i] = await Promise.all([
-        supabase.from('estrategos_projects').select('*').order('created_at', { ascending: false }),
-        supabase.from('estrategos_meetings').select('*').order('meeting_date').neq('status', 'cancelled'),
-        supabase.from('estrategos_implementations').select('*').order('target_date').neq('status', 'cancelled'),
-      ]);
-      if (!mounted) return;
-      setProjects((p.data as unknown as EstrategosProject[]) ?? []);
-      setMeetings((m.data as unknown as EstrategosMeeting[]) ?? []);
-      setImpls((i.data as unknown as EstrategosImplementation[]) ?? []);
-      setLoading(false);
+  const allActions = useActions({});
+  const overdue = useOverdueActions();
+
+  const today = new Date();
+  const todayStr = formatCalendarDate(today);
+  const weekStart = formatCalendarDate(startOfWeek(today, { weekStartsOn: 0 }));
+  const weekEnd = formatCalendarDate(endOfWeek(today, { weekStartsOn: 0 }));
+
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const isSelectedToday = selectedDate === todayStr;
+
+  const stats = useMemo(() => {
+    const actionsThisWeek = allActions.actions.filter(a => a.action_date >= weekStart && a.action_date <= weekEnd);
+    const scheduled = allActions.actions.filter(a => a.status === 'scheduled');
+    const pending = allActions.actions.filter(a => ['draft', 'briefing'].includes(a.status));
+
+    return {
+      activeClients: workspaces.length,
+      actionsThisWeek: actionsThisWeek.length,
+      scheduled: scheduled.length,
+      pending: pending.length,
+      overdue: overdue.length,
+      todayActions: allActions.actions.filter(a => a.action_date === todayStr),
+      selectedDayActions: allActions.actions
+        .filter(a => a.action_date === selectedDate && a.status !== 'cancelled')
+        .sort((a, b) => (a.action_time || '').localeCompare(b.action_time || '')),
+      next7Days: allActions.actions
+        .filter(a => a.action_date > todayStr && a.action_date <= formatCalendarDate(new Date(Date.now() + 7 * 86400000)))
+        .slice(0, 8),
     };
-    load();
+  }, [allActions.actions, overdue.length, workspaces.length, todayStr, selectedDate, weekStart, weekEnd]);
 
-    const channel = supabase
-      .channel('estrategos-dash')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'estrategos_projects' }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'estrategos_meetings' }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'estrategos_implementations' }, load)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); mounted = false; };
-  }, []);
-
-  const today = new Date().toISOString().slice(0, 10);
-  const activeProjects = projects.filter(p => p.status === 'active');
-  const upcomingMeetings = meetings.filter(m => m.meeting_date >= today).slice(0, 6);
-  const pendingImpls = impls.filter(i => i.status === 'pending' || i.status === 'in_progress');
-  const blockedImpls = impls.filter(i => i.status === 'blocked');
+  const selectedDayLabel = useMemo(() => {
+    if (isSelectedToday) return 'Hoje';
+    const d = parseISO(selectedDate + 'T00:00:00');
+    const raw = format(d, "EEEE, d 'de' MMMM", { locale: ptBR });
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }, [selectedDate, isSelectedToday]);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Estrategos — Visão Geral</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Gestão empresarial: projetos, reuniões e implantações</p>
+        <p className="text-sm text-gray-500 mt-0.5">
+          {formatDate(today)} — Gestão empresarial: projetos, reuniões e implantações
+        </p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <StatsCard icon={Briefcase} label="Projetos ativos" value={activeProjects.length} onClick={() => navigate('/estrategos/projects')} />
-        <StatsCard icon={Presentation} label="Reuniões agendadas" value={upcomingMeetings.length} onClick={() => navigate('/estrategos/meetings')} />
-        <StatsCard icon={Rocket} label="Implantações" value={pendingImpls.length} onClick={() => navigate('/estrategos/implementations')} />
-        <StatsCard icon={AlertTriangle} label="Bloqueadas" value={blockedImpls.length} iconBg="bg-red-50 text-red-600" onClick={() => navigate('/estrategos/implementations')} />
-        <StatsCard icon={CalendarDays} label="Total projetos" value={projects.length} onClick={() => navigate('/estrategos/projects')} />
+        <StatsCard icon={Briefcase} label="Clientes ativos" value={stats.activeClients} onClick={() => navigate('/estrategos/clients')} />
+        <StatsCard icon={CalendarDays} label="Ações esta semana" value={stats.actionsThisWeek} />
+        <StatsCard icon={Clock} label="Programadas" value={stats.scheduled} />
+        <StatsCard icon={AlertTriangle} label="Atrasadas" value={stats.overdue} iconBg="bg-red-50 text-red-600" />
+        <StatsCard icon={CalendarDays} label="Pendências" value={stats.pending} />
       </div>
 
-      {loading ? (
-        <Card><p className="text-sm text-gray-400 py-8 text-center">Carregando...</p></Card>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Próximas reuniões</CardTitle>
-              <button onClick={() => navigate('/estrategos/meetings')} className="text-xs text-primary-600 hover:text-primary-700">
-                Ver todas
-              </button>
-            </CardHeader>
-            {upcomingMeetings.length === 0 ? (
-              <p className="text-sm text-gray-500 py-8 text-center">Nenhuma reunião agendada</p>
-            ) : (
-              <div className="space-y-2">
-                {upcomingMeetings.map(m => (
-                  <div key={m.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{m.title}</p>
-                      <p className="text-xs text-gray-500 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {formatDate(m.meeting_date)}{m.meeting_time ? ` · ${m.meeting_time.slice(0, 5)}` : ''}
-                      </p>
-                    </div>
-                    <Badge variant={m.status === 'scheduled' ? 'info' : 'success'} size="sm">
-                      {m.status === 'scheduled' ? 'Agendada' : m.status === 'completed' ? 'Realizada' : 'Cancelada'}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Calendário</CardTitle>
+            <span className="text-xs text-gray-400">clique em um dia</span>
+          </CardHeader>
+          <MiniCalendar
+            actions={allActions.actions}
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+          />
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Implantações em andamento</CardTitle>
-              <button onClick={() => navigate('/estrategos/implementations')} className="text-xs text-primary-600 hover:text-primary-700">
-                Ver todas
+        <Card>
+          <CardHeader>
+            <CardTitle>{selectedDayLabel}</CardTitle>
+            <button
+              onClick={() => navigate('/estrategos/calendar')}
+              className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
+            >
+              Ver calendário <ArrowRight className="w-3 h-3" />
+            </button>
+          </CardHeader>
+          {stats.selectedDayActions.length === 0 ? (
+            <div className="py-8 text-center">
+              <CalendarDays className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">
+                {isSelectedToday ? 'Nenhuma ação para hoje' : 'Nenhuma ação neste dia'}
+              </p>
+              <button
+                onClick={() => navigate('/estrategos/calendar')}
+                className="mt-3 text-sm text-primary-600 hover:text-primary-700 font-medium"
+              >
+                + Nova ação
               </button>
-            </CardHeader>
-            {pendingImpls.length === 0 ? (
-              <p className="text-sm text-gray-500 py-8 text-center">Nenhuma implantação pendente</p>
-            ) : (
-              <div className="space-y-2">
-                {pendingImpls.slice(0, 6).map(i => (
-                  <div key={i.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{i.name}</p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {i.system_name ? `${i.system_name} · ` : ''}{i.target_date ? formatDate(i.target_date) : 'Sem data'}
-                      </p>
-                    </div>
-                    <Badge variant={i.status === 'in_progress' ? 'info' : i.status === 'blocked' ? 'danger' : 'default'} size="sm">
-                      {i.status === 'in_progress' ? 'Em andamento' : i.status === 'blocked' ? 'Bloqueada' : 'Pendente'}
-                    </Badge>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[22rem] overflow-y-auto pr-1">
+              {stats.selectedDayActions.map(action => (
+                <div key={action.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{action.title}</p>
+                    <p className="text-xs text-gray-500">
+                      {action.action_time?.slice(0, 5) || '—'} · {workspaces.find(w => w.id === action.workspace_id)?.name}
+                    </p>
                   </div>
-                ))}
-              </div>
+                  <StatusBadge status={action.status} size="sm" />
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Alertas</CardTitle>
+          </CardHeader>
+          <div className="space-y-2">
+            {overdue.slice(0, 3).map(action => (
+              <AlertCard
+                key={action.id}
+                type="danger"
+                title="Ação atrasada"
+                message={action.title}
+                onClick={() => navigate('/estrategos/calendar')}
+              />
+            ))}
+            {stats.pending > 0 && (
+              <AlertCard
+                type="warning"
+                title={`${stats.pending} pendências`}
+                message="Ações aguardando aprovação ou revisão"
+                onClick={() => navigate('/estrategos/calendar')}
+              />
             )}
-          </Card>
-        </div>
+            {overdue.length === 0 && stats.pending === 0 && (
+              <p className="text-sm text-gray-400 text-center py-6">Tudo em dia!</p>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {stats.next7Days.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Próximos 7 dias</CardTitle>
+            <button
+              onClick={() => navigate('/estrategos/calendar')}
+              className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
+            >
+              Ver calendário <ArrowRight className="w-3 h-3" />
+            </button>
+          </CardHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {stats.next7Days.map(action => (
+              <div key={action.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <div className="w-10 h-10 rounded-lg bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold shrink-0">
+                  {format(parseISO(action.action_date + 'T00:00:00'), 'dd/MM', { locale: ptBR })}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{action.title}</p>
+                  <p className="text-xs text-gray-500">{action.action_time?.slice(0, 5) || '—'}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
       )}
     </div>
   );
