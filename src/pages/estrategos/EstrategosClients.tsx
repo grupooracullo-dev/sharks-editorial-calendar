@@ -102,11 +102,15 @@ export default function EstrategosClients() {
     setCreating(true);
     try {
       // Org resolvida dinamicamente pelo ambiente — sem UUID hardcoded
-      const { data: estOrg } = await supabase
+      const { data: estOrg, error: orgErr } = await supabase
         .from('organizations')
         .select('id')
         .eq('environment', 'estrategos')
         .maybeSingle();
+      if (orgErr) {
+        console.error('[EstrategosClients] org SELECT error:', orgErr);
+        throw new Error(`Erro ao buscar organização: ${orgErr.message}`);
+      }
       if (!estOrg) throw new Error('Organização Estrategos não encontrada');
 
       const slugBase = slugify(formData.name) || `estrategos-${Date.now()}`;
@@ -123,7 +127,11 @@ export default function EstrategosClients() {
         .select('*')
         .single();
 
-      if (wsError || !ws) throw new Error(wsError?.message || 'Erro ao criar workspace');
+      if (wsError) {
+        console.error('[EstrategosClients] workspace INSERT error:', wsError);
+        throw new Error(`Erro ao criar workspace: ${wsError.message}`);
+      }
+      if (!ws) throw new Error('Erro ao criar workspace: sem dados retornados');
 
       await refreshWorkspaces();
       toast.success(`Cliente "${ws.name}" criado com sucesso!`);

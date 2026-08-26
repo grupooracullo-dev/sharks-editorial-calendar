@@ -57,14 +57,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-gray-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Branding */}
         <div className="text-center mb-8">
           <img
             src={logoUrl}
             alt="Oracullo Calendar"
-            className="h-16 mx-auto mb-4 object-contain drop-shadow-lg"
+            className="h-28 mx-auto mb-6 object-contain drop-shadow-lg"
           />
           <h1 className="text-2xl font-bold text-white">Oracullo Calendar</h1>
           <p className="text-primary-200 text-sm mt-1">
