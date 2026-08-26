@@ -7,12 +7,9 @@ function json(status: number, body: unknown) {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// admin_sharks intencionalmente ausente: concessão de admin
-// continua exclusiva da página Time (decisão de segurança).
 const GRANTABLE_ROLES = ['client', 'sharks_team'] as const;
 type GrantableRole = typeof GRANTABLE_ROLES[number];
 
-// Deve espelhar PERMISSION_META em src/lib/permissions.ts
 const VALID_PERMISSIONS = ['calendar', 'campaigns', 'editorial', 'templates', 'history', 'chat', 'clients', 'integrations', 'team'];
 
 const DEFAULT_PERMISSIONS = [
@@ -35,6 +32,12 @@ interface PermissionInput {
   can_delete?: boolean;
 }
 
+// Mapeamento ambiente → organization_id
+const ENV_ORG_MAP: Record<string, string> = {
+  sharks_company: '00000000-0000-0000-0000-000000000001',
+  estrategos: '00000000-0000-0000-0000-000000000002',
+};
+
 function generateTempPassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   let pwd = '';
@@ -56,7 +59,7 @@ Deno.serve(async req => {
   if (!userData?.user) return json(401, { error: 'Token invalido' });
 
   const { data: caller } = await admin.from('users').select('role').eq('id', userData.user.id).maybeSingle();
-  if (!caller || caller.role !== 'admin_sharks') {
+  if (!caller || (caller.role !== 'admin_sharks' && caller.role !== 'oracullo_admin')) {
     return json(403, { error: 'Apenas administradores podem aprovar acessos' });
   }
 
@@ -77,16 +80,14 @@ Deno.serve(async req => {
   if (reqErr || !reqRow) return json(404, { error: 'Solicitacao nao encontrada' });
   if (reqRow.status !== 'pending') return json(400, { error: `Solicitacao ja foi ${reqRow.status}` });
 
-  // 2. Resolve granted role (admin decision overrides requested_role)
+  // 2. Resolve granted role
   let role: GrantableRole;
   if (body.role !== undefined) {
     if (!GRANTABLE_ROLES.includes(body.role)) {
-      return json(400, { error: `role invalido. Use: ${GRANTABLE_ROLES.join(', ')} (admin_sharks somente via pagina Time)` });
+      return json(400, { error: `role invalido. Use: ${GRANTABLE_ROLES.join(', ')}` });
     }
     role = body.role;
   } else {
-    // Backward-compatible fallback: clientes solicitam 'client';
-    // se o solicitante pediu sharks_team, honra o pedido.
     role = reqRow.requested_role === 'sharks_team' ? 'sharks_team' : 'client';
   }
 
@@ -94,7 +95,19 @@ Deno.serve(async req => {
     ? body.full_name.trim()
     : reqRow.full_name;
 
-  // 3. Resolve workspaces per role
+  // 3. Resolve environments (admin override ou solicitacao)
+  let environments: string[] = [];
+  if (Array.isArray(body.requested_environments) && body.requested_environments.length > 0) {
+    environments = body.requested_environments.filter((e: string) => ENV_ORG_MAP[e]);
+  } else if (Array.isArray(reqRow.requested_environments) && reqRow.requested_environments.length > 0) {
+    environments = reqRow.requested_environments;
+  } else if (reqRow.requested_environment && ENV_ORG_MAP[reqRow.requested_environment]) {
+    environments = [reqRow.requested_environment];
+  } else {
+    environments = ['sharks_company'];
+  }
+
+  // 4. Resolve workspaces per role
   let clientWorkspaceId: string | null = null;
   if (role === 'client') {
     const candidate = (typeof body.workspace_id === 'string' && UUID_RE.test(body.workspace_id))
@@ -120,7 +133,7 @@ Deno.serve(async req => {
     }
   }
 
-  // 4. Resolve permissions matrix (team only)
+  // 5. Resolve permissions matrix (team only)
   let permissions: PermissionInput[] = DEFAULT_PERMISSIONS;
   if (role === 'sharks_team' && Array.isArray(body.permissions) && body.permissions.length > 0) {
     for (const p of body.permissions) {
@@ -131,8 +144,7 @@ Deno.serve(async req => {
     permissions = body.permissions;
   }
 
-  // 5. Does an auth user already exist for this email?
-  //    (Google-first flow: user signed in with Google BEFORE approval)
+  // 6. Does an auth user already exist?
   const { data: existingAuthId, error: rpcErr } = await admin
     .rpc('admin_find_auth_user_by_email', { p_email: reqRow.email });
 
@@ -143,8 +155,6 @@ Deno.serve(async req => {
   let authProvider: 'google' | 'password';
 
   if (existingAuthId) {
-    // ---- Google-first: attach profile/membership to the existing identity.
-    // No password is generated — the user already authenticates via Google.
     userId = existingAuthId;
     authProvider = 'google';
 
@@ -155,10 +165,9 @@ Deno.serve(async req => {
       .maybeSingle();
 
     if (existingProfile) {
-      return json(400, { error: 'Este e-mail ja possui conta completa no sistema. Verifique o usuario ou rejeite a solicitacao.' });
+      return json(400, { error: 'Este e-mail ja possui conta completa no sistema.' });
     }
 
-    // Pull the name from Google metadata when the provided name is empty
     const resolvedName = fullName
       || (await admin.auth.admin.getUserById(userId)).data?.user?.user_metadata?.full_name
       || reqRow.email;
@@ -171,7 +180,6 @@ Deno.serve(async req => {
     });
     if (profileErr) return json(500, { error: `Perfil: ${profileErr.message}` });
   } else {
-    // ---- Classic flow: no auth user yet — create one with a temp password.
     authProvider = 'password';
     tempPassword = generateTempPassword();
 
@@ -198,7 +206,20 @@ Deno.serve(async req => {
     }
   }
 
-  // 6. Team permissions (rollback everything on failure)
+  // 7. Criar user_environments para cada ambiente solicitado
+  const envRows = environments.map(env => ({
+    user_id: userId,
+    environment: env,
+    role: role === 'sharks_team' ? 'team' as const : 'client' as const,
+  }));
+
+  const { error: envErr } = await admin
+    .from('user_environments')
+    .upsert(envRows, { onConflict: 'user_id,environment' });
+
+  if (envErr) console.warn('[approve] user_environments warning:', envErr.message);
+
+  // 8. Team permissions
   if (role === 'sharks_team') {
     const permsToInsert = permissions.map((p) => ({
       user_id: userId,
@@ -217,16 +238,48 @@ Deno.serve(async req => {
     }
   }
 
-  // 7. Memberships: client -> 'member' no workspace escolhido;
-  //    team -> 'manager' nos clientes atribuidos.
+  // 9. Memberships
   let membershipsWarning: string | null = null;
-  if (role === 'client' && clientWorkspaceId) {
-    const { error: memErr } = await admin.from('memberships').upsert(
-      { user_id: userId, workspace_id: clientWorkspaceId, role: 'member' },
-      { onConflict: 'user_id,workspace_id' },
-    );
-    if (memErr) membershipsWarning = `Cliente: ${memErr.message}`;
+
+  if (role === 'client') {
+    // Se tem workspace especifico, usa ele
+    if (clientWorkspaceId) {
+      const { error: memErr } = await admin.from('memberships').upsert(
+        { user_id: userId, workspace_id: clientWorkspaceId, role: 'member' },
+        { onConflict: 'user_id,workspace_id' },
+      );
+      if (memErr) membershipsWarning = `Cliente: ${memErr.message}`;
+    } else {
+      // Sem workspace escolhido: criar um workspace default para cada ambiente solicitado
+      for (const env of environments) {
+        const orgId = ENV_ORG_MAP[env];
+        if (!orgId) continue;
+
+        const envLabel = env === 'sharks_company' ? 'Sharks' : 'Estrategos';
+        const wsName = `${fullName} - ${envLabel}`;
+        const slug = `${fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${env}`;
+
+        const { data: newWs, error: wsErr } = await admin.from('workspaces').insert({
+          organization_id: orgId,
+          name: wsName,
+          slug,
+          is_active: true,
+        }).select('id').maybeSingle();
+
+        if (wsErr || !newWs) {
+          console.warn(`[approve] workspace creation warning (${env}):`, wsErr?.message);
+          continue;
+        }
+
+        const { error: memErr } = await admin.from('memberships').upsert(
+          { user_id: userId, workspace_id: newWs.id, role: 'member' },
+          { onConflict: 'user_id,workspace_id' },
+        );
+        if (memErr) membershipsWarning = `Cliente (${env}): ${memErr.message}`;
+      }
+    }
   }
+
   if (role === 'sharks_team' && teamWorkspaceIds.length > 0) {
     const rows = teamWorkspaceIds.map((wsId) => ({
       user_id: userId,
@@ -237,13 +290,13 @@ Deno.serve(async req => {
     if (memErr) membershipsWarning = `Clientes: ${memErr.message}`;
   }
 
-  // 8. Mark the request approved (granted_role = papel efetivamente concedido)
+  // 10. Mark approved
   const { error: updErr } = await admin
     .from('access_requests')
     .update({
       status: 'approved',
       granted_role: role,
-      temp_password: tempPassword, // null for Google-first
+      temp_password: tempPassword,
       auth_provider: authProvider === 'google' ? 'google' : null,
       approved_by: userData.user.id,
       approved_at: new Date().toISOString(),
@@ -257,6 +310,7 @@ Deno.serve(async req => {
     ok: true,
     user_id: userId,
     role,
+    environments,
     auth_provider: authProvider,
     temp_password: tempPassword,
     email: reqRow.email,

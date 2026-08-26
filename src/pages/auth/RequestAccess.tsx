@@ -41,7 +41,7 @@ export default function RequestAccess({ authUser = null, onSubmitted }: RequestA
     company: '',
     phone: '',
     workspace_id: '',
-    requested_environment: 'sharks_company',
+    requested_environments: ['sharks_company'] as string[],
     message: '',
   });
 
@@ -72,7 +72,7 @@ export default function RequestAccess({ authUser = null, onSubmitted }: RequestA
         company: form.company.trim() || null,
         phone: form.phone.trim() || null,
         workspace_id: form.workspace_id || null,
-        requested_environment: form.requested_environment,
+        requested_environments: form.requested_environments,
         message: form.message.trim() || null,
         requested_role: 'client',
       };
@@ -206,15 +206,43 @@ export default function RequestAccess({ authUser = null, onSubmitted }: RequestA
                   </div>
                 )}
 
-                <Select
-                  label="Ambiente que deseja acessar"
-                  value={form.requested_environment}
-                  onChange={e => setForm(p => ({ ...p, requested_environment: e.target.value }))}
-                  options={[
-                    { value: 'sharks_company', label: '🦈 Sharks Company — Marketing' },
-                    { value: 'estrategos', label: '📊 Estrategos — Gestão Empresarial' },
-                  ]}
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Ambientes que deseja acessar</label>
+                  <div className="space-y-2">
+                    {[
+                      { value: 'sharks_company', emoji: '🦈', label: 'Sharks Company', desc: 'Marketing e conteúdo' },
+                      { value: 'estrategos', emoji: '📊', label: 'Estrategos', desc: 'Gestão empresarial' },
+                    ].map(env => (
+                      <label
+                        key={env.value}
+                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                          form.requested_environments.includes(env.value)
+                            ? 'border-primary-400 bg-primary-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={form.requested_environments.includes(env.value)}
+                          onChange={e => {
+                            setForm(p => ({
+                              ...p,
+                              requested_environments: e.target.checked
+                                ? [...p.requested_environments, env.value]
+                                : p.requested_environments.filter(v => v !== env.value),
+                            }));
+                          }}
+                          className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span className="text-lg">{env.emoji}</span>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{env.label}</p>
+                          <p className="text-xs text-gray-500">{env.desc}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
                 {workspaces.length > 0 && (
                   <Select
@@ -251,7 +279,7 @@ export default function RequestAccess({ authUser = null, onSubmitted }: RequestA
                     type="submit"
                     className="flex-1"
                     loading={submitting}
-                    disabled={!form.full_name.trim() || !form.email.trim()}
+                    disabled={!form.full_name.trim() || !form.email.trim() || form.requested_environments.length === 0}
                   >
                     <Send className="w-4 h-4" />
                     Enviar solicitação

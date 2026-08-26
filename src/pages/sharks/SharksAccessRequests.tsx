@@ -28,6 +28,7 @@ interface AccessRequest {
   message: string | null;
   status: 'pending' | 'approved' | 'rejected';
   requested_role: string;
+  requested_environments: string[] | null;
   granted_role: 'client' | 'sharks_team' | null;
   temp_password: string | null;
   auth_provider: string | null;
@@ -56,12 +57,13 @@ export default function SharksAccessRequests() {
   const [showPassword, setShowPassword] = useState(false);
   const [viewModal, setViewModal] = useState<AccessRequest | null>(null);
 
-  // Approve form (v2): papel + configuração completa do cadastro
+  // Approve form (v2): papel + configuracao completa do cadastro
   const [approveRole, setApproveRole] = useState<'client' | 'sharks_team'>('client');
   const [approveName, setApproveName] = useState('');
   const [approveWorkspaceId, setApproveWorkspaceId] = useState('');
   const [approveWorkspaceIds, setApproveWorkspaceIds] = useState<string[]>([]);
   const [approvePermissions, setApprovePermissions] = useState<Permission[]>([]);
+  const [approveEnvironments, setApproveEnvironments] = useState<string[]>([]);
 
   const openApprove = (req: AccessRequest) => {
     setApproveModal(req);
@@ -70,6 +72,9 @@ export default function SharksAccessRequests() {
     setApproveWorkspaceId(req.workspace_id ?? '');
     setApproveWorkspaceIds([]);
     setApprovePermissions(defaultPermissions());
+    setApproveEnvironments(req.requested_environments && req.requested_environments.length > 0
+      ? req.requested_environments
+      : ['sharks_company']);
   };
 
   const load = useCallback(async () => {
@@ -115,11 +120,11 @@ export default function SharksAccessRequests() {
   const handleApprove = async () => {
     if (!approveModal) return;
     if (!approveName.trim()) {
-      toast.error('Informe o nome do usuário');
+      toast.error('Informe o nome do usuario');
       return;
     }
-    if (approveRole === 'client' && !approveWorkspaceId) {
-      toast.error('Selecione o cliente (workspace) para acesso de cliente');
+    if (approveEnvironments.length === 0) {
+      toast.error('Selecione pelo menos um ambiente');
       return;
     }
     setProcessing(true);
@@ -132,16 +137,20 @@ export default function SharksAccessRequests() {
           workspace_id: approveRole === 'client' ? approveWorkspaceId : null,
           workspace_ids: approveRole === 'sharks_team' ? approveWorkspaceIds : [],
           permissions: approveRole === 'sharks_team' ? approvePermissions : undefined,
+          requested_environments: approveEnvironments,
         },
       });
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(data.error);
 
       const roleLabel = approveRole === 'sharks_team' ? 'Time Sharks' : 'Cliente';
+      const envLabel = approveEnvironments.length > 1
+        ? approveEnvironments.map(e => e === 'sharks_company' ? 'Sharks' : 'Estrategos').join(' + ')
+        : approveEnvironments[0] === 'sharks_company' ? 'Sharks' : 'Estrategos';
       if (data.auth_provider === 'google') {
-        toast.success(`Aprovado como ${roleLabel}! ${data.email} já possui conta Google ativa.`);
+        toast.success(`Aprovado como ${roleLabel} (${envLabel})! ${data.email} ja possui conta Google ativa.`);
       } else {
-        toast.success(`Aprovado como ${roleLabel}! Senha temporária: ${data.temp_password}`);
+        toast.success(`Aprovado como ${roleLabel} (${envLabel})! Senha temporaria: ${data.temp_password}`);
         setShowPassword(true);
       }
       setApproveModal(null);
@@ -272,6 +281,15 @@ export default function SharksAccessRequests() {
                         {req.granted_role === 'sharks_team' ? 'Time Sharks' : 'Cliente'}
                       </Badge>
                     )}
+                    {req.requested_environments && req.requested_environments.length > 0 && (
+                      <>
+                        {req.requested_environments.map(env => (
+                          <Badge key={env} variant={env === 'sharks_company' ? 'info' : 'warning'}>
+                            {env === 'sharks_company' ? 'Sharks' : 'Estrategos'}
+                          </Badge>
+                        ))}
+                      </>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-gray-500">
                     <span className="flex items-center gap-1"><Mail className="w-3 h-3" /> {req.email}</span>
@@ -390,6 +408,44 @@ export default function SharksAccessRequests() {
                   <p className="text-[11px] text-gray-500">Equipe de produção, com permissões por módulo</p>
                 </div>
               </button>
+            </div>
+          </div>
+
+          {/* Ambientes */}
+          <div>
+            <p className="text-sm font-medium text-gray-700 mb-2">Ambientes de acesso</p>
+            <div className="space-y-2">
+              {[
+                { value: 'sharks_company', emoji: '🦈', label: 'Sharks Company', desc: 'Marketing e conteudo' },
+                { value: 'estrategos', emoji: '📊', label: 'Estrategos', desc: 'Gestao empresarial' },
+              ].map(env => (
+                <label
+                  key={env.value}
+                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    approveEnvironments.includes(env.value)
+                      ? 'border-primary-400 bg-primary-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={approveEnvironments.includes(env.value)}
+                    onChange={e => {
+                      setApproveEnvironments(envs =>
+                        e.target.checked
+                          ? [...envs, env.value]
+                          : envs.filter(v => v !== env.value)
+                      );
+                    }}
+                    className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-lg">{env.emoji}</span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{env.label}</p>
+                    <p className="text-xs text-gray-500">{env.desc}</p>
+                  </div>
+                </label>
+              ))}
             </div>
           </div>
 
@@ -542,6 +598,21 @@ export default function SharksAccessRequests() {
                 label="Cliente solicitado"
                 value={workspaces[viewModal.workspace_id].name}
               />
+            )}
+            {viewModal.requested_environments && viewModal.requested_environments.length > 0 && (
+              <div className="flex items-start gap-3">
+                <Briefcase className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-500">Ambientes solicitados</p>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {viewModal.requested_environments.map(env => (
+                      <Badge key={env} variant={env === 'sharks_company' ? 'info' : 'warning'}>
+                        {env === 'sharks_company' ? 'Sharks Company' : 'Estrategos'}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
             <DetailRow
               icon={Calendar}
