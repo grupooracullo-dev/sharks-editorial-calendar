@@ -38,6 +38,15 @@ const ENV_ORG_MAP: Record<string, string> = {
   estrategos: '00000000-0000-0000-0000-000000000002',
 };
 
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
 function generateTempPassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   let pwd = '';
@@ -58,10 +67,8 @@ Deno.serve(async req => {
   const { data: userData } = await admin.auth.getUser(token);
   if (!userData?.user) return json(401, { error: 'Token invalido' });
 
-  const { data: caller } = await admin.from('users').select('role').eq('id', userData.user.id).maybeSingle();
-  if (!caller || (caller.role !== 'admin_sharks' && caller.role !== 'oracullo_admin')) {
-    return json(403, { error: 'Apenas administradores podem aprovar acessos' });
-  }
+  const { data: caller } = await admin.from('users').select('role, is_guardian').eq('id', userData.user.id).maybeSingle();
+  const isGuardian = !!caller?.is_guardian || caller?.role === 'oracullo_admin';
 
   const body = await req.json().catch(() => null);
   if (!body?.request_id || !UUID_RE.test(body.request_id)) {
@@ -100,11 +107,26 @@ Deno.serve(async req => {
   if (Array.isArray(body.requested_environments) && body.requested_environments.length > 0) {
     environments = body.requested_environments.filter((e: string) => ENV_ORG_MAP[e]);
   } else if (Array.isArray(reqRow.requested_environments) && reqRow.requested_environments.length > 0) {
-    environments = reqRow.requested_environments;
+    environments = reqRow.requested_environments.filter((e: string) => ENV_ORG_MAP[e]);
   } else if (reqRow.requested_environment && ENV_ORG_MAP[reqRow.requested_environment]) {
     environments = [reqRow.requested_environment];
   } else {
     environments = ['sharks_company'];
+  }
+
+  // 3.1 Permissão POR AMBIENTE: caller deve ser guardião OU admin de CADA env concedido
+  if (!isGuardian) {
+    const { data: callerEnvs } = await admin
+      .from('user_environments')
+      .select('environment, role')
+      .eq('user_id', userData.user.id);
+    const adminEnvs = new Set(
+      (callerEnvs ?? []).filter(e => e.role === 'admin').map(e => e.environment),
+    );
+    const missing = environments.filter(e => !adminEnvs.has(e));
+    if (missing.length > 0) {
+      return json(403, { error: `Sem permissao de admin nos ambientes: ${missing.join(', ')}` });
+    }
   }
 
   // 4. Resolve workspaces per role
@@ -242,27 +264,68 @@ Deno.serve(async req => {
   let membershipsWarning: string | null = null;
 
   if (role === 'client') {
-    // Se tem workspace especifico, usa ele
+    // Novos clientes criados na aprovação: { "sharks_company": "Nome", "estrategos": "Nome" }
+    const newWorkspaces: Record<string, string> =
+      (typeof body?.new_workspaces === 'object' && body.new_workspaces !== null) ? body.new_workspaces : {};
+
+    // Workspace específico escolhido (validado pertencer a algum dos envs concedidos)
     if (clientWorkspaceId) {
       const { error: memErr } = await admin.from('memberships').upsert(
         { user_id: userId, workspace_id: clientWorkspaceId, role: 'member' },
         { onConflict: 'user_id,workspace_id' },
       );
       if (memErr) membershipsWarning = `Cliente: ${memErr.message}`;
-    } else {
-      // Sem workspace escolhido: criar um workspace default para cada ambiente solicitado
+
+      // Ambientes ADICIONAIS (sem workspace escolhido): garantir ao menos
+      // um workspace em cada, criando default quando necessário
+      const { data: chosenWs } = await admin
+        .from('workspaces')
+        .select('organization_id')
+        .eq('id', clientWorkspaceId)
+        .maybeSingle();
+      const chosenOrg = chosenWs?.organization_id ?? null;
+      const { data: orgs } = await admin.from('organizations').select('id, environment');
+      const orgByEnv = new Map((orgs ?? []).map(o => [o.environment, o.id]));
+
       for (const env of environments) {
-        const orgId = ENV_ORG_MAP[env];
+        const envOrg = orgByEnv.get(env);
+        if (!envOrg || envOrg === chosenOrg) continue;
+
+        const wsName = newWorkspaces[env]?.trim()
+          || `${fullName} - ${env === 'sharks_company' ? 'Sharks' : 'Estrategos'}`;
+        const slugBase = slugify(wsName) || `cliente-${Date.now()}`;
+        const { data: newWs, error: wsErr } = await admin.from('workspaces').insert({
+          organization_id: envOrg,
+          name: wsName,
+          slug: `${slugBase}-${Math.random().toString(36).slice(2, 6)}`,
+          is_active: true,
+        }).select('id').maybeSingle();
+        if (wsErr || !newWs) { console.warn(`[approve] ws creation (${env}):`, wsErr?.message); continue; }
+
+        const { error: memErr2 } = await admin.from('memberships').upsert(
+          { user_id: userId, workspace_id: newWs.id, role: 'member' },
+          { onConflict: 'user_id,workspace_id' },
+        );
+        if (memErr2) membershipsWarning = `Cliente (${env}): ${memErr2.message}`;
+      }
+    } else {
+      // Sem workspace escolhido: criar um workspace para cada ambiente solicitado
+      // (nome customizado via new_workspaces[env] ou default)
+      const { data: orgs } = await admin.from('organizations').select('id, environment');
+      const orgByEnv = new Map((orgs ?? []).map(o => [o.environment, o.id]));
+
+      for (const env of environments) {
+        const orgId = orgByEnv.get(env);
         if (!orgId) continue;
 
-        const envLabel = env === 'sharks_company' ? 'Sharks' : 'Estrategos';
-        const wsName = `${fullName} - ${envLabel}`;
-        const slug = `${fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${env}`;
+        const wsName = newWorkspaces[env]?.trim()
+          || `${fullName} - ${env === 'sharks_company' ? 'Sharks' : 'Estrategos'}`;
+        const slugBase = slugify(wsName) || `cliente-${Date.now()}`;
 
         const { data: newWs, error: wsErr } = await admin.from('workspaces').insert({
           organization_id: orgId,
           name: wsName,
-          slug,
+          slug: `${slugBase}-${Math.random().toString(36).slice(2, 6)}`,
           is_active: true,
         }).select('id').maybeSingle();
 

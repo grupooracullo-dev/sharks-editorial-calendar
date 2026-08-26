@@ -58,13 +58,15 @@ const estrategosNavItems = [
   { icon: Calendar, label: 'Calendário', path: '/estrategos/calendar' },
   { icon: Briefcase, label: 'Projetos', path: '/estrategos/projects' },
   { icon: MessageSquare, label: 'Chat', path: '/estrategos/chat' },
-  { icon: Users, label: 'Clientes', path: '/estrategos/clients' },
+  { icon: Users, label: 'Clientes', path: '/estrategos/clients', adminOnly: true },
+  { icon: UserPlus, label: 'Acessos', path: '/estrategos/access-requests', adminOnly: true },
   { icon: Link2, label: 'Integrações', path: '/estrategos/integrations' },
 ];
 
 const oraculloNavItems = [
   { icon: LayoutDashboard, label: 'Visão Geral', path: '/oracullo' },
   { icon: ShieldCheck, label: 'Acessos', path: '/oracullo/access' },
+  { icon: UserPlus, label: 'Solicitações', path: '/oracullo/access-requests' },
   { icon: Users, label: 'Usuários', path: '/oracullo/users' },
 ];
 
@@ -106,9 +108,12 @@ export default function AppSidebar() {
     switcherTargets.unshift({ id: 'sharks_company', label: 'Oracullo', emoji: '🛡️', home: '/oracullo' });
   }
 
-  // Badge: contagem de solicitacoes de acesso pendentes (admin only)
+  const isEstrategosAdmin = hasAccess('estrategos', ['admin']);
+  const canSeeRequestsBadge = isAdmin || isEstrategosAdmin;
+
+  // Badge: contagem de solicitacoes de acesso pendentes (admin de qualquer ambiente)
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canSeeRequestsBadge) return;
 
     const loadCount = async () => {
       const { count } = await supabase
@@ -128,10 +133,10 @@ export default function AppSidebar() {
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [isAdmin]);
+  }, [canSeeRequestsBadge]);
 
   const baseItems =
-    env === 'estrategos' ? estrategosNavItems
+    env === 'estrategos' ? estrategosNavItems.filter(i => !i.adminOnly || isEstrategosAdmin)
     : env === 'oracullo' ? oraculloNavItems
     : isSharks ? sharksNavItems.filter(i => !i.adminOnly || isAdmin)
     : clientNavItems;
@@ -262,7 +267,7 @@ export default function AppSidebar() {
                 >
                   <item.icon className="w-5 h-5 flex-shrink-0" />
                   {!collapsed && <span>{item.label}</span>}
-                  {item.path === '/sharks/access-requests' && pendingRequests > 0 && (
+                  {item.path.endsWith('/access-requests') && pendingRequests > 0 && (
                     <span
                       className={cn(
                         'ml-auto min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold',

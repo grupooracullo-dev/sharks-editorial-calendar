@@ -90,7 +90,13 @@ Deno.serve(async req => {
     const wsId = isGlobal ? null : verified.ws;
 
     const { data: requester } = await admin.from('users').select('role').eq('id', verified.u).maybeSingle();
-    const isStaffUser = requester?.role === 'oracullo_admin' || requester?.role === 'admin_sharks' || requester?.role === 'sharks_team';
+    const { data: requesterEnvs } = await admin
+      .from('user_environments')
+      .select('environment, role')
+      .eq('user_id', verified.u);
+    const isStaffUser =
+      requester?.role === 'oracullo_admin' || requester?.role === 'admin_sharks' || requester?.role === 'sharks_team'
+      || (requesterEnvs ?? []).some(e => (e.environment === 'sharks_company' || e.environment === 'estrategos') && (e.role === 'admin' || e.role === 'team'));
 
     if (!isGlobal) {
       const allowed = await verifyWorkspaceAccess(admin, verified.u, verified.ws);

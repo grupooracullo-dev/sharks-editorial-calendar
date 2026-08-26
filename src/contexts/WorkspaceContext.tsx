@@ -22,20 +22,25 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loadWorkspaces = useCallback(async () => {
-    // RLS entrega apenas workspaces acessiveis; o join traz o
-    // ambiente da organizacao para filtragem multi-ambiente.
-    const { data, error } = await supabase
-      .from('workspaces')
-      .select('*, organizations(environment)')
-      .eq('is_active', true)
-      .order('name');
+    // RLS entrega apenas workspaces acessiveis. O ambiente vem do RPC
+    // ws_env_map (SECURITY DEFINER) — o join embedded de organizations
+    // era bloqueado pela RLS de organizations para staff single-env,
+    // causando classificacao errada (fallback 'sharks_company').
+    const [wsRes, envRes] = await Promise.all([
+      supabase.from('workspaces').select('*').eq('is_active', true).order('name'),
+      supabase.rpc('ws_env_map'),
+    ]);
 
-    if (error) {
-      console.error('[workspaces] load error:', error.message);
-    }
+    if (wsRes.error) console.error('[workspaces] load error:', wsRes.error.message);
+    if (envRes.error) console.error('[workspaces] env map error:', envRes.error.message);
 
-    const rows = ((data ?? []) as unknown as Array<Workspace & { organizations: { environment: EnvironmentType } | null }>)
-      .map(({ organizations, ...ws }) => ({ ...ws, environment: organizations?.environment ?? 'sharks_company' }));
+    const envMap = new Map<string, EnvironmentType>(
+      ((envRes.data ?? []) as Array<{ id: string; environment: EnvironmentType }>)
+        .map(r => [r.id, r.environment]),
+    );
+
+    const rows = ((wsRes.data ?? []) as Workspace[])
+      .map(ws => ({ ...ws, environment: envMap.get(ws.id) ?? 'sharks_company' }));
     setWorkspaces(rows);
     return rows;
   }, []);

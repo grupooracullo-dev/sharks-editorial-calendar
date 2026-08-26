@@ -5,18 +5,26 @@ import { useNotifications } from '@/contexts/NotificationContext';
 import { ChevronDown, Bell, Search, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Avatar from '@/components/ui/Avatar';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import type { EnvironmentType } from '@/types';
 
 export default function TopHeader() {
   const { user, isSharks } = useAuth();
-  const { currentWorkspace, workspaces, setCurrentWorkspace } = useWorkspace();
+  const { currentWorkspace, workspacesByEnv, setCurrentWorkspace } = useWorkspace();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [wsDropdownOpen, setWsDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
   const wsRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+
+  // Ambiente derivado da rota atual — dropdown de clientes nunca mistura ambientes
+  const routeEnv: EnvironmentType = location.pathname.startsWith('/estrategos')
+    ? 'estrategos'
+    : 'sharks_company';
+  const workspaces = workspacesByEnv(routeEnv);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -34,7 +42,7 @@ export default function TopHeader() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      navigate(`/sharks/calendar?search=${encodeURIComponent(searchQuery)}`);
+      navigate(`/${routeEnv === 'estrategos' ? 'estrategos' : 'sharks'}/calendar?search=${encodeURIComponent(searchQuery)}`);
     }
   };
 

@@ -226,7 +226,7 @@ export default function OraculloDashboard() {
           <button onClick={() => navigate('/oracullo/users')} className="px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm text-gray-700 transition-colors">
             Ver usuários
           </button>
-          <button onClick={() => navigate('/sharks/access-requests')} className="px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm text-gray-700 transition-colors">
+          <button onClick={() => navigate('/oracullo/access-requests')} className="px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm text-gray-700 transition-colors">
             Solicitações pendentes
           </button>
         </div>

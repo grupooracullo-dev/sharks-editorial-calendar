@@ -23,7 +23,9 @@ interface ActionFormProps {
 }
 
 export default function ActionForm({ action, isOpen, onClose, defaultDate, environment = 'sharks_company' }: ActionFormProps) {
-  const { currentWorkspace, workspaces } = useWorkspace();
+  const { currentWorkspace, workspacesByEnv } = useWorkspace();
+  // Apenas workspaces do ambiente do formulário (evita cross-env)
+  const workspaces = workspacesByEnv(environment);
   const isEditing = !!action;
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);

@@ -36,9 +36,11 @@ import EstrategosCalendar from '@/pages/estrategos/EstrategosCalendar';
 import EstrategosProjects from '@/pages/estrategos/EstrategosProjects';
 import EstrategosChat from '@/pages/estrategos/EstrategosChat';
 import EstrategosClients from '@/pages/estrategos/EstrategosClients';
+import EstrategosAccessRequests from '@/pages/estrategos/EstrategosAccessRequests';
 import EstrategosIntegrations from '@/pages/estrategos/EstrategosIntegrations';
 import OraculloDashboard from '@/pages/oracullo/OraculloDashboard';
 import OraculloAccess from '@/pages/oracullo/OraculloAccess';
+import OraculloAccessRequests from '@/pages/oracullo/OraculloAccessRequests';
 import OraculloUsers from '@/pages/oracullo/OraculloUsers';
 
 function DataSync() {
@@ -116,6 +118,7 @@ function AppRoutes() {
       {/* Oracullo (governança multi-ambiente) */}
       <Route path="/oracullo" element={<OraculloLayout><OraculloDashboard /></OraculloLayout>} />
       <Route path="/oracullo/access" element={<OraculloLayout><OraculloAccess /></OraculloLayout>} />
+      <Route path="/oracullo/access-requests" element={<OraculloLayout><OraculloAccessRequests /></OraculloLayout>} />
       <Route path="/oracullo/users" element={<OraculloLayout><OraculloUsers /></OraculloLayout>} />
 
       {/* Sharks routes */}
@@ -146,6 +149,7 @@ function AppRoutes() {
       <Route path="/estrategos/chat" element={<EstrategosLayout><EstrategosChat /></EstrategosLayout>} />
       <Route path="/estrategos/clients" element={<EstrategosLayout><EstrategosClients /></EstrategosLayout>} />
       <Route path="/estrategos/integrations" element={<EstrategosLayout><EstrategosIntegrations /></EstrategosLayout>} />
+      <Route path="/estrategos/access-requests" element={<EstrategosLayout><EstrategosAccessRequests /></EstrategosLayout>} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to={homePath} replace />} />

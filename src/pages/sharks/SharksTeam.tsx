@@ -100,11 +100,21 @@ export default function SharksTeam() {
 
     const [usersRes, wsRes] = await Promise.all([
       supabase.from('users').select('*').in('role', ['admin_sharks', 'sharks_team']).order('created_at', { ascending: false }),
+      // Pool de clientes SOMENTE do ambiente Sharks (org via RLS + filtro por ambiente)
       supabase.from('workspaces').select('id, name, segment').eq('is_active', true).order('name'),
     ]);
 
     const users = (usersRes.data as unknown as TeamUser[]) || [];
-    setAllWorkspaces((wsRes.data as unknown as Workspace[]) || []);
+    const allWs = (wsRes.data as unknown as Array<{ id: string; name: string; segment: string | null }>) || [];
+
+    // Filtrar por ambiente Sharks via env map (RPC SECURITY DEFINER)
+    const { data: envMap } = await supabase.rpc('ws_env_map');
+    const sharksIds = new Set(
+      ((envMap ?? []) as Array<{ id: string; environment: string }>)
+        .filter(r => r.environment === 'sharks_company')
+        .map(r => r.id),
+    );
+    setAllWorkspaces(allWs.filter(w => sharksIds.has(w.id)) as unknown as Workspace[]);
 
     // Load permissions and memberships for each user
     const enriched: MemberWithAccess[] = await Promise.all(

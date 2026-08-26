@@ -142,11 +142,19 @@ export default function SharksClients() {
     setCreating(true);
     try {
       // 1. Create workspace (chat thread is auto-created by DB trigger)
+      //    Org resolvida dinamicamente pelo ambiente — sem UUID hardcoded
+      const { data: sharksOrg } = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('environment', 'sharks_company')
+        .maybeSingle();
+      if (!sharksOrg) throw new Error('Organização Sharks Company não encontrada');
+
       const slugBase = slugify(formData.name) || `cliente-${Date.now()}`;
       const { data: ws, error: wsError } = await supabase
         .from('workspaces')
         .insert({
-          organization_id: '00000000-0000-0000-0000-000000000001',
+          organization_id: sharksOrg.id,
           name: formData.name.trim(),
           slug: `${slugBase}-${Math.random().toString(36).slice(2, 6)}`,
           segment: formData.segment || null,

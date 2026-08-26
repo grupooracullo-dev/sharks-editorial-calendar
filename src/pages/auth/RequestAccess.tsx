@@ -24,7 +24,7 @@ interface RequestAccessProps {
 
 export default function RequestAccess({ authUser = null, onSubmitted }: RequestAccessProps) {
   const navigate = useNavigate();
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [allWorkspaces, setAllWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -45,15 +45,27 @@ export default function RequestAccess({ authUser = null, onSubmitted }: RequestA
     message: '',
   });
 
+  // Dropdown só mostra clientes dos ambientes MARCADOS (evita cross-env)
+  const workspaces = allWorkspaces.filter(w =>
+    (w as Workspace & { environment?: string }).environment === undefined
+    || form.requested_environments.includes((w as Workspace & { environment?: string }).environment as string),
+  );
+
   useEffect(() => {
-    // Carrega workspaces ativos para o usuário escolher
+    // Carrega workspaces ativos (RLS) + mapa de ambientes (RPC)
     (async () => {
-      const { data } = await supabase
-        .from('workspaces')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('name');
-      setWorkspaces((data as Workspace[]) || []);
+      const [wsRes, envRes] = await Promise.all([
+        supabase.from('workspaces').select('id, name').eq('is_active', true).order('name'),
+        supabase.rpc('ws_env_map'),
+      ]);
+      const envMap = new Map<string, string>(
+        ((envRes.data ?? []) as Array<{ id: string; environment: string }>).map(r => [r.id, r.environment]),
+      );
+      const rows = ((wsRes.data ?? []) as Workspace[]).map(w => ({
+        ...w,
+        environment: envMap.get(w.id) ?? 'sharks_company',
+      }));
+      setAllWorkspaces(rows);
       setLoading(false);
     })();
   }, []);

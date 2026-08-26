@@ -133,7 +133,13 @@ Deno.serve(async req => {
   //   workspace + staff    -> linha da agência (W + user_id NULL)
   //   workspace + cliente  -> linha pessoal do cliente (W + user_id)
   const { data: me } = await admin.from('users').select('role').eq('id', userData.user.id).maybeSingle();
-  const isStaffUser = me?.role === 'oracullo_admin' || me?.role === 'admin_sharks' || me?.role === 'sharks_team';
+  const { data: myEnvs } = await admin
+    .from('user_environments')
+    .select('environment, role')
+    .eq('user_id', userData.user.id);
+  const isStaffUser =
+    me?.role === 'oracullo_admin' || me?.role === 'admin_sharks' || me?.role === 'sharks_team'
+    || (myEnvs ?? []).some(e => (e.environment === 'sharks_company' || e.environment === 'estrategos') && (e.role === 'admin' || e.role === 'team'));
 
   // Global mode: only staff allowed
   if (isGlobal && !isStaffUser) {

@@ -101,11 +101,19 @@ export default function EstrategosClients() {
     if (!formData.name.trim() || creating) return;
     setCreating(true);
     try {
+      // Org resolvida dinamicamente pelo ambiente — sem UUID hardcoded
+      const { data: estOrg } = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('environment', 'estrategos')
+        .maybeSingle();
+      if (!estOrg) throw new Error('Organização Estrategos não encontrada');
+
       const slugBase = slugify(formData.name) || `estrategos-${Date.now()}`;
       const { data: ws, error: wsError } = await supabase
         .from('workspaces')
         .insert({
-          organization_id: '00000000-0000-0000-0000-000000000002',
+          organization_id: estOrg.id,
           name: formData.name.trim(),
           slug: `${slugBase}-${Math.random().toString(36).slice(2, 6)}`,
           segment: formData.segment || null,
