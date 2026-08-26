@@ -17,6 +17,13 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md', s
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
+  // onClose chega como arrow inline (identidade nova a cada render do pai).
+  // Se entrar nas deps do effect, ele re-executa panelRef.focus() em cada
+  // tecla digitada e rouba o cursor do input. Ref mantem o valor fresco
+  // sem re-disparar o efeito.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -29,16 +36,15 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md', s
   }, [isOpen]);
 
   useEffect(() => {
+    if (!isOpen) return;
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      // Move focus into the dialog
-      panelRef.current?.focus();
-    }
+    document.addEventListener('keydown', handleEscape);
+    // Move focus into the dialog — uma vez por abertura, não por re-render
+    panelRef.current?.focus();
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
