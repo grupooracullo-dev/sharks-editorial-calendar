@@ -158,9 +158,10 @@ DO $do$ BEGIN
          url := 'https://cyumczehpiiarwqrpgnu.supabase.co/functions/v1/google-sync',
          headers := jsonb_build_object(
            'Content-Type', 'application/json',
-           'x-worker-secret', current_setting('app.worker_secret')
+           'x-worker-secret', (SELECT value FROM app_secrets WHERE key = 'worker_secret')
          ),
-         body := '{"mode":"worker"}'::jsonb
+         body := '{"mode":"worker"}'::jsonb,
+         timeout_milliseconds := 60000
        ) $job$
   );
 EXCEPTION WHEN undefined_table THEN

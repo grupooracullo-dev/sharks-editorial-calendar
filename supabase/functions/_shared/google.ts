@@ -314,7 +314,25 @@ export async function processWorkspace(
       .order('created_at')
       .limit(50);
 
-    if (!queue || queue.length === 0) return stat;
+    if (!queue || queue.length === 0) {
+      // No pending items — still update last_synced_at so the UI shows
+      // the worker is alive even when idle.
+      const updateFilterEmpty = isGlobal
+        ? null
+        : { workspace_id: workspaceId };
+      if (updateFilterEmpty === null) {
+        await admin
+          .from('calendar_integrations')
+          .update({ last_synced_at: new Date().toISOString(), sync_error: null })
+          .is('workspace_id', null);
+      } else {
+        await admin
+          .from('calendar_integrations')
+          .update({ last_synced_at: new Date().toISOString(), sync_error: null })
+          .eq('workspace_id', workspaceId);
+      }
+      return stat;
+    }
 
     const actionIds = queue.map(q => q.action_id).filter(Boolean);
     // Cross-workspace dedup: fetch ALL links for these action_ids (not just current workspace)
@@ -413,17 +431,26 @@ export async function processWorkspace(
       }
     }
 
-    // Update last_synced_at on the integration used (per-workspace or global)
-    const updateFilter = isGlobal
-      ? { workspace_id: null as unknown }
-      : { workspace_id: workspaceId };
-    await admin
-      .from('calendar_integrations')
-      .update({
-        last_synced_at: new Date().toISOString(),
-        sync_error: stat.failed ? `${stat.failed} item(ns) falharam no ultimo ciclo` : null,
-      })
-      .match(updateFilter as Record<string, unknown>);
+    // Update last_synced_at on the integration used (per-workspace or global).
+    // Use .is() for NULL workspace_id (global) since .match() with null
+    // uses = NULL which never matches in SQL.
+    if (isGlobal) {
+      await admin
+        .from('calendar_integrations')
+        .update({
+          last_synced_at: new Date().toISOString(),
+          sync_error: stat.failed ? `${stat.failed} item(ns) falharam no ultimo ciclo` : null,
+        })
+        .is('workspace_id', null);
+    } else {
+      await admin
+        .from('calendar_integrations')
+        .update({
+          last_synced_at: new Date().toISOString(),
+          sync_error: stat.failed ? `${stat.failed} item(ns) falharam no ultimo ciclo` : null,
+        })
+        .eq('workspace_id', workspaceId);
+    }
 
     return stat;
   } finally {
