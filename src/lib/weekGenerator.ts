@@ -7,11 +7,12 @@ import {
   StrategicDate,
   Campaign,
   ContentFormat,
+  FormatFrequencyZone,
   Objective,
   FunnelStage,
 } from '@/types';
 import { addDays, startOfWeek, format } from 'date-fns';
-import { CONTENT_FORMATS, OBJECTIVES } from '@/lib/constants';
+import { CONTENT_FORMATS, OBJECTIVES, FORMAT_ZONES } from '@/lib/constants';
 
 // ==========================================
 // WEEK GENERATOR v2
@@ -266,16 +267,47 @@ export function generateWeek(input: GeneratorInput): WeekGeneratorResult {
     strategicDates, activeCampaigns, existingActions, trackingPillars,
   );
 
+  // Monta fila de zonas baseada em format_frequency (quota por zona)
+  const ff = profile.format_frequency;
+  const ffActive = ff && Object.keys(ff).length > 0
+    ? (Object.entries(ff) as [string, number][]).filter(([, n]) => (n ?? 0) > 0)
+    : null;
+  let zoneQueue: string[] | null = null;
+  if (ffActive && ffActive.length > 0 && slots.length > 0) {
+    const base: string[] = [];
+    ffActive.forEach(([z, n]) => { for (let k = 0; k < n; k++) base.push(z); });
+    // Embaralha para evitar sequências (feed,feed,feed...)
+    for (let i = base.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [base[i], base[j]] = [base[j], base[i]];
+    }
+    zoneQueue = Array.from({ length: slots.length }, (_, i) => base[i % base.length]);
+  }
+
   const generated: GeneratedAction[] = [];
 
-  for (const slot of slots) {
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
     const pillar = pillars.find(p => p.id === slot.pillarId) || pillars[0];
     if (!pillar) continue;
 
-    const selectedFormat = pickWeighted(
-      (profile.priority_formats.length > 0 ? profile.priority_formats : ['reels', 'carousel', 'story']) as ContentFormat[],
-      trackingFormats, 0.3,
-    );
+    const selectedFormat = (() => {
+      // Se format_frequency está configurado, seleciona pela zona do slot
+      if (zoneQueue) {
+        const zone = zoneQueue[i] as FormatFrequencyZone;
+        const pool = FORMAT_ZONES[zone] ?? [zone] as ContentFormat[];
+        // Anti-repetição: evita repetir o mesmo formato nos últimos 3 slots
+        const recent = trackingFormats.slice(-3);
+        const fresh = pool.filter(f => !recent.includes(f));
+        const list = fresh.length > 0 ? fresh : pool;
+        return list[Math.floor(Math.random() * list.length)];
+      }
+      // Fallback: seleção ponderada por priority_formats (comportamento legado)
+      return pickWeighted(
+        (profile.priority_formats.length > 0 ? profile.priority_formats : ['reels', 'carousel', 'story']) as ContentFormat[],
+        trackingFormats, 0.3,
+      );
+    })();
     const selectedObjective = pickWeighted(
       (profile.priority_objectives.length > 0 ? profile.priority_objectives : ['educational', 'engagement']) as Objective[],
       trackingObjectives, 0.25,

@@ -1,4 +1,4 @@
-import { ContentFormat, Objective, ActionType, ActionStatus, FunnelStage, UserRole, DateRelevance, NotificationType, SyncStatus } from '@/types';
+import { ContentFormat, FormatFrequencyZone, Objective, ActionType, ActionStatus, FunnelStage, UserRole, DateRelevance, NotificationType, SyncStatus } from '@/types';
 
 // ==========================================
 // SHARKS EDITORIAL CALENDAR - CONSTANTS
@@ -67,6 +67,13 @@ export const CONTENT_FORMATS: Record<ContentFormat, string> = {
   ad: 'Anúncio',
   commercial_material: 'Material Comercial',
   other: 'Outro',
+};
+
+// Zonas de visualização → formatos do enum do banco
+export const FORMAT_ZONES: Record<FormatFrequencyZone, ContentFormat[]> = {
+  feed: ['static_post', 'carousel', 'photo', 'video'],
+  story: ['story', 'story_sequence'],
+  reels: ['reels'],
 };
 
 // Objectives

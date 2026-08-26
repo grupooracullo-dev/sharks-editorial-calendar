@@ -49,6 +49,9 @@ export type ActionType = 'content' | 'campaign' | 'production' | 'recording' | '
 
 export type ContentFormat = 'reels' | 'story' | 'story_sequence' | 'carousel' | 'static_post' | 'photo' | 'video' | 'live' | 'whatsapp' | 'whatsapp_status' | 'email_marketing' | 'newsletter' | 'landing_page' | 'blog' | 'youtube' | 'ad' | 'commercial_material' | 'other';
 
+export type FormatFrequencyZone = 'feed' | 'story' | 'reels';
+export type FormatFrequency = Partial<Record<FormatFrequencyZone, number>>;
+
 export type Objective = 'brand_awareness' | 'positioning' | 'authority' | 'educational' | 'engagement' | 'relationship' | 'traffic' | 'lead_conversion' | 'sale_conversion' | 'social_proof' | 'launch' | 'loyalty' | 'repurchase' | 'retention' | 'reactivation';
 
 export type FunnelStage = 'discovery' | 'interest' | 'consideration' | 'conversion' | 'relationship' | 'repurchase';
@@ -63,6 +66,7 @@ export interface EditorialProfile {
   distribution: Record<string, number>;
   priority_objectives: Objective[];
   priority_products: string[];
+  format_frequency: FormatFrequency;
   target_audience: string | null;
   restrictions: string | null;
   max_weekly: number;

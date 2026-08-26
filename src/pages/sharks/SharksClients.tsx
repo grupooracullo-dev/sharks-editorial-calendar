@@ -12,6 +12,8 @@ import { BR_STATES, detectDatesForClient, manualCityBirthday, type StrategicDate
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Plus, Building2, MapPin, ChevronRight, CalendarDays, CheckSquare, Square, Info, Pencil, Trash2 } from 'lucide-react';
+import FormatFrequencyStepper, { normalizeFormatFrequency, formatFrequencyTotal, defaultFormatFrequency } from '@/components/editorial/FormatFrequencyStepper';
+import type { FormatFrequency } from '@/types';
 
 const wizardSteps = ['Empresa', 'Localização', 'Linha Editorial', 'Frequência', 'Datas', 'Google Calendar'];
 
@@ -86,7 +88,7 @@ export default function SharksClients() {
     city: '',
     state: '',
     country: 'Brasil',
-    frequency: '5',
+    format_frequency: defaultFormatFrequency() as FormatFrequency,
     google_calendar_id: '',
   });
 
@@ -173,7 +175,8 @@ export default function SharksClients() {
       if (pillarsError) throw new Error(pillarsError.message);
 
       // 3. Editorial profile
-      const frequency = Math.max(1, Math.min(14, parseInt(formData.frequency) || 5));
+      const ff = normalizeFormatFrequency(formData.format_frequency);
+      const frequency = formatFrequencyTotal(ff);
       const distribution: Record<string, number> = {};
       pillarsInserted?.forEach(p => {
         distribution[p.id] = p.percentage;
@@ -181,9 +184,12 @@ export default function SharksClients() {
       await supabase.from('editorial_profiles').insert({
         workspace_id: ws.id,
         frequency_per_week: frequency,
+        format_frequency: ff,
         allowed_days: [1, 2, 3, 4, 5],
         preferred_times: ['09:00', '14:00', '18:00'],
-        priority_formats: ['reels', 'carousel', 'story'],
+        priority_formats: (ff.feed ?? 0) > 0
+          ? ['static_post', 'carousel', 'photo', 'video', 'story', 'reels']
+          : ['story', 'reels'],
         distribution,
         priority_objectives: ['educational', 'engagement'],
         priority_products: [],
@@ -219,7 +225,7 @@ export default function SharksClients() {
       toast.success(`Cliente "${ws.name}" criado com sucesso!`);
       setWizardOpen(false);
       setStep(0);
-      setFormData({ name: '', segment: '', city: '', state: '', country: 'Brasil', frequency: '5', google_calendar_id: '' });
+      setFormData({ name: '', segment: '', city: '', state: '', country: 'Brasil', format_frequency: defaultFormatFrequency(), google_calendar_id: '' });
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : 'Erro ao criar cliente');
@@ -445,7 +451,10 @@ export default function SharksClients() {
 
         {step === 3 && (
           <div className="space-y-4">
-            <Input label="Conteúdos por semana" type="number" min="1" max="14" value={formData.frequency} onChange={(e) => setFormData(p => ({ ...p, frequency: e.target.value }))} />
+            <FormatFrequencyStepper
+              value={formData.format_frequency}
+              onChange={(ff) => setFormData(p => ({ ...p, format_frequency: ff }))}
+            />
             <p className="text-sm text-gray-500">Dias permitidos: Segunda a Sexta (padrão)</p>
           </div>
         )}

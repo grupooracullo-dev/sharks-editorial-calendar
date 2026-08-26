@@ -8,6 +8,8 @@ import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import EmptyState from '@/components/ui/EmptyState';
 import StrategicDatesSection from '@/components/editorial/StrategicDatesSection';
+import FormatFrequencyStepper from '@/components/editorial/FormatFrequencyStepper';
+import type { FormatFrequency } from '@/types';
 import { DAYS_OF_WEEK } from '@/lib/constants';
 import { toast } from 'sonner';
 import { BookOpen, Target, Clock, Ban, Plus, Trash2 } from 'lucide-react';
@@ -45,17 +47,10 @@ export default function SharksEditorial() {
           </CardHeader>
           {profile && (
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Conteúdos por semana</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={14}
-                  value={profile.frequency_per_week}
-                  onChange={(e) => updateProfile({ frequency_per_week: parseInt(e.target.value) || 5 })}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-                />
-              </div>
+              <FormatFrequencyStepper
+                value={(profile.format_frequency ?? {}) as FormatFrequency}
+                onChange={(ff) => updateProfile({ format_frequency: ff })}
+              />
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Dias permitidos</label>
                 <div className="flex flex-wrap gap-1.5">
