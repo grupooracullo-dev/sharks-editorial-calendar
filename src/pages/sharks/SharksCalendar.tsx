@@ -225,7 +225,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
         </div>
 
         {/* Filters */}
-        <CalendarFilters activeFilters={filters} onFilterChange={setFilters} />
+        <CalendarFilters activeFilters={filters} onFilterChange={setFilters} environment={environment} />
 
         {/* Month View */}
         {view === 'month' && (
@@ -428,6 +428,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
         action={editingAction}
         isOpen={formOpen}
         onClose={() => { setFormOpen(false); setEditingAction(null); }}
+        environment={environment}
       />
 
       {/* Week Generator */}

@@ -241,3 +241,28 @@ export const PRIORITIES = [
   { value: 'high', label: 'Alta' },
   { value: 'urgent', label: 'Urgente' },
 ];
+
+// ==========================================
+// ENVIRONMENT-AWARE CONSTANTS
+// ==========================================
+
+/** Tipos de ação relevantes para cada ambiente */
+export const ACTION_TYPES_BY_ENV = {
+  sharks_company: ['content', 'campaign', 'production', 'recording', 'photo_session', 'approval', 'publication', 'ad', 'crm', 'whatsapp', 'email', 'event', 'meeting', 'strategic_date', 'commercial', 'other'] as ActionType[],
+  estrategos: ['meeting', 'implementation', 'milestone', 'onboarding', 'review', 'follow_up', 'strategy', 'training', 'event', 'other'] as ActionType[],
+};
+
+/** Seções do formulário por ambiente */
+export const FORM_SECTIONS_BY_ENV = {
+  sharks_company: [
+    { id: 'basic', label: 'Informações Básicas' },
+    { id: 'strategy', label: 'Estratégia' },
+    { id: 'content', label: 'Conteúdo' },
+    { id: 'production', label: 'Produção' },
+  ],
+  estrategos: [
+    { id: 'basic', label: 'Informações Básicas' },
+    { id: 'planning', label: 'Planejamento' },
+    { id: 'production', label: 'Detalhes' },
+  ],
+};

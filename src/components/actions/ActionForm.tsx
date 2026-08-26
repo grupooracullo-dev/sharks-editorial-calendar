@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Action, ContentFormat, Objective, ActionType, ActionStatus, FunnelStage } from '@/types';
+import { Action, ContentFormat, Objective, ActionType, ActionStatus, FunnelStage, EnvironmentType } from '@/types';
 import Drawer from '@/components/ui/Drawer';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
@@ -11,7 +11,7 @@ import { useActions } from '@/hooks/useActions';
 import { useEditorial } from '@/hooks/useEditorial';
 import { useActiveCampaigns } from '@/hooks/useCampaigns';
 import { supabase } from '@/lib/supabase';
-import { ACTION_TYPES, CONTENT_FORMATS, OBJECTIVES, FUNNEL_STAGES, ACTION_STATUSES } from '@/lib/constants';
+import { ACTION_TYPES, CONTENT_FORMATS, OBJECTIVES, FUNNEL_STAGES, ACTION_STATUSES, ACTION_TYPES_BY_ENV, FORM_SECTIONS_BY_ENV } from '@/lib/constants';
 import { toast } from 'sonner';
 
 interface ActionFormProps {
@@ -19,9 +19,10 @@ interface ActionFormProps {
   isOpen: boolean;
   onClose: () => void;
   defaultDate?: string;
+  environment?: EnvironmentType;
 }
 
-export default function ActionForm({ action, isOpen, onClose, defaultDate }: ActionFormProps) {
+export default function ActionForm({ action, isOpen, onClose, defaultDate, environment = 'sharks_company' }: ActionFormProps) {
   const { currentWorkspace, workspaces } = useWorkspace();
   const isEditing = !!action;
   const [saving, setSaving] = useState(false);
@@ -111,7 +112,7 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate }: Act
           workspace_id: workspaceId,
           action_date: defaultDate || new Date().toISOString().split('T')[0],
           action_time: '09:00',
-          action_type: 'content',
+          action_type: environment === 'estrategos' ? 'meeting' : 'content',
           format: '',
           channel: '',
           campaign_id: '',
@@ -191,12 +192,8 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate }: Act
     }
   };
 
-  const sections = [
-    { id: 'basic', label: 'Informações Básicas' },
-    { id: 'strategy', label: 'Estratégia' },
-    { id: 'content', label: 'Conteúdo' },
-    { id: 'production', label: 'Produção' },
-  ];
+  const sections = FORM_SECTIONS_BY_ENV[environment] || FORM_SECTIONS_BY_ENV.sharks_company;
+  const actionTypesForEnv = ACTION_TYPES_BY_ENV[environment] || ACTION_TYPES_BY_ENV.sharks_company;
 
   return (
     <Drawer isOpen={isOpen} onClose={onClose} title={isEditing ? 'Editar Ação' : 'Nova Ação'} width="xl">
@@ -261,7 +258,7 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate }: Act
                 label="Tipo de Ação"
                 value={formData.action_type}
                 onChange={(e) => handleChange('action_type', e.target.value)}
-                options={Object.entries(ACTION_TYPES).map(([v, l]) => ({ value: v, label: l }))}
+                options={actionTypesForEnv.map(v => ({ value: v, label: ACTION_TYPES[v] }))}
               />
               <Select
                 label="Status"
@@ -273,8 +270,8 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate }: Act
           </div>
         )}
 
-        {/* Strategy Section */}
-        {activeSection === 'strategy' && (
+        {/* Strategy Section (Sharks only) */}
+        {activeSection === 'strategy' && environment === 'sharks_company' && (
           <div className="space-y-4">
             <Select
               label="Campanha"
@@ -324,8 +321,8 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate }: Act
           </div>
         )}
 
-        {/* Content Section */}
-        {activeSection === 'content' && (
+        {/* Content Section (Sharks only) */}
+        {activeSection === 'content' && environment === 'sharks_company' && (
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Select
@@ -372,6 +369,43 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate }: Act
               value={formData.cta}
               onChange={(e) => handleChange('cta', e.target.value)}
               placeholder="Chamada para ação"
+            />
+          </div>
+        )}
+
+        {/* Planning Section (Estrategos only) */}
+        {activeSection === 'planning' && environment === 'estrategos' && (
+          <div className="space-y-4">
+            <Input
+              label="Projeto"
+              value={formData.product}
+              onChange={(e) => handleChange('product', e.target.value)}
+              placeholder="Ex: Implantação ERP, Onboarding cliente"
+            />
+            <Input
+              label="Participantes"
+              value={formData.audience}
+              onChange={(e) => handleChange('audience', e.target.value)}
+              placeholder="Ex: João, Maria, Diretor Comercial"
+            />
+            <Input
+              label="Tema / Assunto"
+              value={formData.theme}
+              onChange={(e) => handleChange('theme', e.target.value)}
+              placeholder="Ex: Revisão trimestral, Apresentação de resultados"
+            />
+            <Textarea
+              label="Pauta / Objetivo"
+              value={formData.main_message}
+              onChange={(e) => handleChange('main_message', e.target.value)}
+              placeholder="O que precisa ser discutido ou decidido..."
+            />
+            <Textarea
+              label="Notas"
+              value={formData.copy_text}
+              onChange={(e) => handleChange('copy_text', e.target.value)}
+              placeholder="Anotações, decisões tomadas, próximos passos..."
+              rows={5}
             />
           </div>
         )}
