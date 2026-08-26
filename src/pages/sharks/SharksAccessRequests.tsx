@@ -4,13 +4,18 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
+import Select from '@/components/ui/Select';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import {
+  PERMISSION_META, ALL_PERMISSIONS, defaultPermissions, togglePerm,
+  type Permission, type PermissionAction,
+} from '@/lib/permissions';
 import { toast } from 'sonner';
 import {
   UserPlus, Check, X, Mail, Building2, Phone,
   MessageSquare, Calendar, Eye, EyeOff, Copy,
-  Loader2, Inbox, ShieldCheck,
+  Loader2, Inbox, ShieldCheck, Briefcase, UserCog,
 } from 'lucide-react';
 
 interface AccessRequest {
@@ -23,6 +28,7 @@ interface AccessRequest {
   message: string | null;
   status: 'pending' | 'approved' | 'rejected';
   requested_role: string;
+  granted_role: 'client' | 'sharks_team' | null;
   temp_password: string | null;
   auth_provider: string | null;
   approved_by: string | null;
@@ -49,6 +55,22 @@ export default function SharksAccessRequests() {
   const [processing, setProcessing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [viewModal, setViewModal] = useState<AccessRequest | null>(null);
+
+  // Approve form (v2): papel + configuração completa do cadastro
+  const [approveRole, setApproveRole] = useState<'client' | 'sharks_team'>('client');
+  const [approveName, setApproveName] = useState('');
+  const [approveWorkspaceId, setApproveWorkspaceId] = useState('');
+  const [approveWorkspaceIds, setApproveWorkspaceIds] = useState<string[]>([]);
+  const [approvePermissions, setApprovePermissions] = useState<Permission[]>([]);
+
+  const openApprove = (req: AccessRequest) => {
+    setApproveModal(req);
+    setApproveRole(req.requested_role === 'sharks_team' ? 'sharks_team' : 'client');
+    setApproveName(req.full_name);
+    setApproveWorkspaceId(req.workspace_id ?? '');
+    setApproveWorkspaceIds([]);
+    setApprovePermissions(defaultPermissions());
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -92,18 +114,34 @@ export default function SharksAccessRequests() {
 
   const handleApprove = async () => {
     if (!approveModal) return;
+    if (!approveName.trim()) {
+      toast.error('Informe o nome do usuário');
+      return;
+    }
+    if (approveRole === 'client' && !approveWorkspaceId) {
+      toast.error('Selecione o cliente (workspace) para acesso de cliente');
+      return;
+    }
     setProcessing(true);
     try {
       const { data, error } = await supabase.functions.invoke('admin-approve-access-request', {
-        body: { request_id: approveModal.id },
+        body: {
+          request_id: approveModal.id,
+          role: approveRole,
+          full_name: approveName.trim(),
+          workspace_id: approveRole === 'client' ? approveWorkspaceId : null,
+          workspace_ids: approveRole === 'sharks_team' ? approveWorkspaceIds : [],
+          permissions: approveRole === 'sharks_team' ? approvePermissions : undefined,
+        },
       });
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(data.error);
 
+      const roleLabel = approveRole === 'sharks_team' ? 'Time Sharks' : 'Cliente';
       if (data.auth_provider === 'google') {
-        toast.success(`Acesso aprovado! ${data.email} já possui conta Google ativa.`);
+        toast.success(`Aprovado como ${roleLabel}! ${data.email} já possui conta Google ativa.`);
       } else {
-        toast.success(`Acesso aprovado! Senha temporária: ${data.temp_password}`);
+        toast.success(`Aprovado como ${roleLabel}! Senha temporária: ${data.temp_password}`);
         setShowPassword(true);
       }
       setApproveModal(null);
@@ -229,6 +267,11 @@ export default function SharksAccessRequests() {
                         Google
                       </Badge>
                     )}
+                    {req.status === 'approved' && req.granted_role && (
+                      <Badge variant={req.granted_role === 'sharks_team' ? 'primary' : 'default'}>
+                        {req.granted_role === 'sharks_team' ? 'Time Sharks' : 'Cliente'}
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-gray-500">
                     <span className="flex items-center gap-1"><Mail className="w-3 h-3" /> {req.email}</span>
@@ -257,7 +300,7 @@ export default function SharksAccessRequests() {
                   </button>
                   {req.status === 'pending' && (
                     <>
-                      <Button size="sm" onClick={() => setApproveModal(req)}>
+                      <Button size="sm" onClick={() => openApprove(req)}>
                         <Check className="w-4 h-4" />
                         Aprovar
                       </Button>
@@ -293,31 +336,165 @@ export default function SharksAccessRequests() {
         </div>
       )}
 
-      {/* Approve Modal — mostra senha gerada */}
+      {/* Approve Modal v2 — papel + configuração completa do cadastro */}
       <Modal
         isOpen={!!approveModal}
         onClose={() => setApproveModal(null)}
         title="Aprovar solicitação"
-        size="sm"
+        size="md"
       >
-        <p className="text-sm text-gray-600">
-          Aprovar <strong>{approveModal?.full_name}</strong> ({approveModal?.email})?
-        </p>
-        {approveModal?.auth_provider === 'google' ? (
-          <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2 mt-2">
-            Este usuário já possui conta Google autenticada. O acesso será liberado imediatamente —
-            nenhuma senha temporária será gerada.
+        <div className="space-y-4">
+          {/* Info do solicitante */}
+          <p className="text-sm text-gray-600">
+            <strong>{approveModal?.email}</strong>
+            {approveModal?.auth_provider === 'google' ? (
+              <span className="block mt-1 text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2">
+                Conta Google autenticada — nenhuma senha temporária será gerada.
+              </span>
+            ) : (
+              <span className="block mt-1 text-xs text-gray-500">
+                Será gerada uma senha temporária para enviar ao solicitante.
+              </span>
+            )}
           </p>
-        ) : (
-          <p className="text-xs text-gray-500 mt-2">
-            Será criado um usuário com uma senha temporária que você deverá enviar ao solicitante.
-          </p>
-        )}
+
+          {/* Papel de acesso */}
+          <div>
+            <p className="text-sm font-medium text-gray-700 mb-2">Papel de acesso</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setApproveRole('client')}
+                className={`flex items-start gap-2.5 p-3 rounded-lg border text-left transition-all ${
+                  approveRole === 'client'
+                    ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-200'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
+                }`}
+              >
+                <Briefcase className={`w-5 h-5 shrink-0 mt-0.5 ${approveRole === 'client' ? 'text-primary-600' : 'text-gray-400'}`} />
+                <div>
+                  <p className={`text-sm font-semibold ${approveRole === 'client' ? 'text-primary-700' : 'text-gray-700'}`}>Cliente</p>
+                  <p className="text-[11px] text-gray-500">Acesso ao portal do cliente (calendário, chat, histórico)</p>
+                </div>
+              </button>
+              <button
+                onClick={() => setApproveRole('sharks_team')}
+                className={`flex items-start gap-2.5 p-3 rounded-lg border text-left transition-all ${
+                  approveRole === 'sharks_team'
+                    ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-200'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
+                }`}
+              >
+                <UserCog className={`w-5 h-5 shrink-0 mt-0.5 ${approveRole === 'sharks_team' ? 'text-primary-600' : 'text-gray-400'}`} />
+                <div>
+                  <p className={`text-sm font-semibold ${approveRole === 'sharks_team' ? 'text-primary-700' : 'text-gray-700'}`}>Time Sharks</p>
+                  <p className="text-[11px] text-gray-500">Equipe de produção, com permissões por módulo</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Nome */}
+          <Input
+            label="Nome"
+            value={approveName}
+            onChange={(e) => setApproveName(e.target.value)}
+            placeholder="Nome completo"
+          />
+
+          {/* Config por papel */}
+          {approveRole === 'client' ? (
+            <Select
+              label="Cliente (workspace)"
+              value={approveWorkspaceId}
+              onChange={(e) => setApproveWorkspaceId(e.target.value)}
+              placeholder="Selecione o cliente..."
+              options={Object.values(workspaces).map(ws => ({ value: ws.id, label: ws.name }))}
+            />
+          ) : (
+            <>
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-1.5">
+                  Clientes que gerencia
+                  <span className="ml-1 text-xs font-normal text-gray-400">(opcional)</span>
+                </p>
+                {Object.values(workspaces).length === 0 ? (
+                  <p className="text-sm text-gray-400 py-2">Nenhum cliente cadastrado</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-32 overflow-y-auto">
+                    {Object.values(workspaces).map(ws => {
+                      const selected = approveWorkspaceIds.includes(ws.id);
+                      return (
+                        <button
+                          key={ws.id}
+                          onClick={() => setApproveWorkspaceIds(ids =>
+                            selected ? ids.filter(id => id !== ws.id) : [...ids, ws.id]
+                          )}
+                          className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border text-left text-sm transition-all ${
+                            selected
+                              ? 'border-primary-300 bg-primary-50 text-primary-700'
+                              : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                          }`}
+                        >
+                          <span className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${
+                            selected ? 'border-primary-500 bg-primary-500' : 'border-gray-300'
+                          }`}>
+                            {selected && <Check className="w-3 h-3 text-white" />}
+                          </span>
+                          <span className="truncate">{ws.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-1.5">Permissões por módulo</p>
+                <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                  {ALL_PERMISSIONS.map(perm => {
+                    const meta = PERMISSION_META[perm];
+                    const Icon = meta.icon;
+                    const p = approvePermissions.find(x => x.permission === perm)
+                      || { permission: perm, can_create: false, can_read: true, can_update: false, can_delete: false };
+                    return (
+                      <div key={perm} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white border border-gray-200">
+                        <Icon className="w-4 h-4 text-gray-400 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium text-gray-700">{meta.label}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {(['can_create', 'can_read', 'can_update', 'can_delete'] as PermissionAction[]).map(action => {
+                            const label = action === 'can_create' ? 'Criar' : action === 'can_read' ? 'Ver' : action === 'can_update' ? 'Editar' : 'Excluir';
+                            return (
+                              <button
+                                key={action}
+                                onClick={() => setApprovePermissions(perms => togglePerm(perms, perm, action))}
+                                className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+                                  p[action]
+                                    ? action === 'can_delete' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                                    : 'bg-gray-100 text-gray-400'
+                                }`}
+                                title={label}
+                              >
+                                {label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
         <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100">
           <Button variant="ghost" onClick={() => setApproveModal(null)}>Cancelar</Button>
           <Button onClick={handleApprove} loading={processing}>
             <Check className="w-4 h-4" />
-            {approveModal?.auth_provider === 'google' ? 'Aprovar acesso' : 'Aprovar e gerar senha'}
+            Aprovar como {approveRole === 'sharks_team' ? 'Time Sharks' : 'Cliente'}
           </Button>
         </div>
       </Modal>
