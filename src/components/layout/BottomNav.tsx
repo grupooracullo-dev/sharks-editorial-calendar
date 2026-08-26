@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Calendar, Users, MessageSquare, History, Link2 } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, MessageSquare, History, Link2, Briefcase, Presentation, Rocket, ShieldCheck } from 'lucide-react';
 
 const sharksNavItems = [
   { path: '/sharks', icon: LayoutDashboard, label: 'Home' },
@@ -18,15 +18,32 @@ const clientNavItems = [
   { path: '/client/integrations', icon: Link2, label: 'Integrações' },
 ];
 
+const estrategosNavItems = [
+  { path: '/estrategos', icon: LayoutDashboard, label: 'Home' },
+  { path: '/estrategos/projects', icon: Briefcase, label: 'Projetos' },
+  { path: '/estrategos/meetings', icon: Presentation, label: 'Reuniões' },
+  { path: '/estrategos/chat', icon: MessageSquare, label: 'Chat' },
+];
+
+const oraculloNavItems = [
+  { path: '/oracullo', icon: LayoutDashboard, label: 'Home' },
+  { path: '/oracullo/access', icon: ShieldCheck, label: 'Acessos' },
+  { path: '/oracullo/users', icon: Users, label: 'Usuários' },
+];
+
 export default function BottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isSharks } = useAuth();
 
-  const navItems = isSharks ? sharksNavItems : clientNavItems;
+  const navItems =
+    location.pathname.startsWith('/estrategos') ? estrategosNavItems
+    : location.pathname.startsWith('/oracullo') ? oraculloNavItems
+    : isSharks ? sharksNavItems
+    : clientNavItems;
 
   const isActive = (path: string) => {
-    if (path === '/sharks' || path === '/client') {
+    if (path === '/sharks' || path === '/client' || path === '/estrategos' || path === '/oracullo') {
       return location.pathname === path || location.pathname === path + '/';
     }
     return location.pathname.startsWith(path);

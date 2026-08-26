@@ -8,7 +8,7 @@ import { markIntegrationConnected, type GoogleIntegration } from '@/lib/googleSy
 // Supports per-workspace AND global (admin) mode.
 // ==========================================
 
-const COLS = 'workspace_id, user_id, google_calendar_id, google_calendar_name, google_account_email, is_connected, auto_sync, last_synced_at, sync_error';
+const COLS = 'workspace_id, user_id, google_calendar_id, google_calendar_name, google_account_email, is_connected, auto_sync, last_synced_at, sync_error, sync_mode, env_calendar_ids, env_auto_sync';
 
 const cache = new Map<string, GoogleIntegration | null>();
 let globalCache: GoogleIntegration | null = null;

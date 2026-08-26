@@ -53,15 +53,30 @@ async function migrateTarget(
   // 2. resetar vinculos (só dessa integracao) e status
   await admin.from('calendar_event_links').delete().eq('workspace_id', wsId).or(`integration_id.eq.${integId},integration_id.is.null`);
   await admin.from('actions').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).neq('status', 'cancelled');
+  await admin.from('estrategos_meetings').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).neq('status', 'cancelled');
+  await admin.from('estrategos_implementations').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).not('status', 'in', '(cancelled)');
 
-  // 3. re-enfileirar todas as acoes ativas para re-sync na nova agenda
-  //    (fan-out recria para TODAS as integracoes ativas)
+  // 3. re-enfileirar todos os itens ativos para re-sync na nova
+  //    agenda (fan-out recria para TODAS as integracoes ativas).
+  //    Migration 025: actions + meetings/impl estrategos.
   await admin.from('calendar_sync_queue').delete().eq('workspace_id', wsId).in('status', ['pending', 'error']);
   const { data: acts } = await admin.from('actions').select('id').eq('workspace_id', wsId).neq('status', 'cancelled');
   if (acts?.length) {
     await admin
       .from('calendar_sync_queue')
-      .insert(acts.map(a => ({ workspace_id: wsId, action_id: a.id, operation: 'create' })));
+      .insert(acts.map(a => ({ workspace_id: wsId, action_id: a.id, source: 'sharks_action' as const, source_id: a.id, operation: 'create' as const })));
+  }
+  const { data: meets } = await admin.from('estrategos_meetings').select('id').eq('workspace_id', wsId).neq('status', 'cancelled');
+  if (meets?.length) {
+    await admin
+      .from('calendar_sync_queue')
+      .insert(meets.map(m => ({ workspace_id: wsId, source: 'estrategos_meeting' as const, source_id: m.id, operation: 'create' as const })));
+  }
+  const { data: impls } = await admin.from('estrategos_implementations').select('id').eq('workspace_id', wsId).not('status', 'in', '(cancelled,completed)');
+  if (impls?.length) {
+    await admin
+      .from('calendar_sync_queue')
+      .insert(impls.map(i => ({ workspace_id: wsId, source: 'estrategos_implementation' as const, source_id: i.id, operation: 'create' as const })));
   }
 }
 Deno.serve(async req => {
@@ -113,15 +128,15 @@ Deno.serve(async req => {
     if (!allowed) return json(403, { error: 'Sem acesso a este workspace' });
   }
 
-  // Migration 021/022: resolução consciente de papel.
-  //   global (time)        -> linha pessoal (workspace_id NULL + user_id)
-  //   workspace + time     -> linha da agência (W + user_id NULL)
+  // Migration 021/022/023: resolução consciente de papel.
+  //   global (staff)       -> linha pessoal (workspace_id NULL + user_id)
+  //   workspace + staff    -> linha da agência (W + user_id NULL)
   //   workspace + cliente  -> linha pessoal do cliente (W + user_id)
   const { data: me } = await admin.from('users').select('role').eq('id', userData.user.id).maybeSingle();
-  const isSharksUser = me?.role === 'admin_sharks' || me?.role === 'sharks_team';
+  const isStaffUser = me?.role === 'oracullo_admin' || me?.role === 'admin_sharks' || me?.role === 'sharks_team';
 
-  // Global mode: only admin_sharks and sharks_team allowed
-  if (isGlobal && !isSharksUser) {
+  // Global mode: only staff allowed
+  if (isGlobal && !isStaffUser) {
     return json(403, { error: 'Sem acesso ao modo global' });
   }
 
@@ -132,7 +147,7 @@ Deno.serve(async req => {
         .is('workspace_id', null)
         .eq('user_id', userData.user.id)
         .maybeSingle()
-    : isSharksUser
+    : isStaffUser
       ? await admin
           .from('calendar_integrations')
           .select('*')
@@ -221,6 +236,47 @@ Deno.serve(async req => {
         return json(200, { ok: true, calendar_id: cal.id, calendar_name: summary });
       }
 
+      case 'set_env_sync': {
+        // Migration 025: liga/desliga o sync de UM ambiente
+        // nesta integracao (apenas a linha do caller).
+        if (!integ?.is_connected) return json(400, { error: 'Integracao nao conectada' });
+        const env = body.env === 'estrategos' ? 'estrategos' : 'sharks_company';
+        const enabled = !!body.enabled;
+        const flags = { ...(integ.env_auto_sync ?? {}), [env]: enabled };
+        await admin.from('calendar_integrations').update({ env_auto_sync: flags }).eq('id', integ.id);
+        return json(200, { ok: true, env, enabled, env_auto_sync: flags });
+      }
+
+      case 'change_sync_mode': {
+        // Migration 025: alterna unified <-> split.
+        // Para split cria as agendas por ambiente se faltarem.
+        if (!integ?.is_connected) return json(400, { error: 'Integracao nao conectada' });
+        const mode = body.mode === 'split' ? 'split' : 'unified';
+        const patch: Record<string, unknown> = { sync_mode: mode };
+
+        if (mode === 'split') {
+          const t = await getValidToken(admin, integ);
+          const ids = { ...(integ.env_calendar_ids ?? {}) };
+          for (const [env, summary] of [['sharks_company', 'Sharks'], ['estrategos', 'Estrategos']] as const) {
+            if (ids[env]) continue;
+            const res = await fetch(`${CAL_API}/calendars`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ summary, timeZone: 'America/Sao_Paulo' }),
+            });
+            if (res.ok) {
+              ids[env] = (await res.json()).id;
+            } else {
+              return json(502, { error: `Falha ao criar agenda ${summary}: Google ${res.status}` });
+            }
+          }
+          patch.env_calendar_ids = ids;
+        }
+
+        await admin.from('calendar_integrations').update(patch).eq('id', integ.id);
+        return json(200, { ok: true, sync_mode: mode, ...(patch.env_calendar_ids ? { env_calendar_ids: patch.env_calendar_ids } : {}) });
+      }
+
       case 'disconnect': {
         const wipe = {
           is_connected: false,
@@ -254,16 +310,28 @@ Deno.serve(async req => {
           await admin.from('calendar_integrations').update(wipe).eq('id', integ.id);
           // Remove apenas os links DESSA integracao (agencia ou do cliente)
           await admin.from('calendar_event_links').delete().eq('integration_id', integ.id);
-          // Acoes sem nenhum link restante voltam a not_synced
+          // Registros SEM nenhum link restante voltam a not_synced
+          // (actions + meetings/impl estrategos — migration 025)
           const { data: remainingWs } = await admin
             .from('calendar_event_links')
-            .select('action_id')
+            .select('source, source_id, action_id')
             .eq('workspace_id', wsId)
             .or(`integration_id.neq.${integ.id},integration_id.is.null`);
-          const keepIds = [...new Set((remainingWs ?? []).map(r => r.action_id))];
-          const resetWsQuery = admin.from('actions').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).neq('sync_status', 'not_synced');
-          if (keepIds.length) await resetWsQuery.not('id', 'in', `(${keepIds.join(',')})`);
-          else await resetWsQuery;
+          const keepAct = [...new Set((remainingWs ?? []).filter(r => r.action_id).map(r => r.action_id))];
+          const keepMeet = [...new Set((remainingWs ?? []).filter(r => r.source === 'estrategos_meeting' && r.source_id).map(r => r.source_id))];
+          const keepImpl = [...new Set((remainingWs ?? []).filter(r => r.source === 'estrategos_implementation' && r.source_id).map(r => r.source_id))];
+
+          const resetActions = admin.from('actions').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).neq('sync_status', 'not_synced');
+          if (keepAct.length) await resetActions.not('id', 'in', `(${keepAct.join(',')})`);
+          else await resetActions;
+
+          const resetMeetings = admin.from('estrategos_meetings').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).neq('sync_status', 'not_synced');
+          if (keepMeet.length) await resetMeetings.not('id', 'in', `(${keepMeet.join(',')})`);
+          else await resetMeetings;
+
+          const resetImpls = admin.from('estrategos_implementations').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).neq('sync_status', 'not_synced');
+          if (keepImpl.length) await resetImpls.not('id', 'in', `(${keepImpl.join(',')})`);
+          else await resetImpls;
           // Fila permanece: outras integracoes (pessoais/agencia) ainda cobrem o workspace
         }
         return json(200, { ok: true });

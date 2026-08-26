@@ -11,14 +11,28 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { signIn, signInWithGoogle, user, isSharks } = useAuth();
+  const { signIn, signInWithGoogle, user, isSharks, isOracullo, environments } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) {
-      navigate(isSharks ? '/sharks' : '/client', { replace: true });
+    if (!user) return;
+    // Redirect inteligente multi-ambiente:
+    //   oracullo      -> /oracullo (govanca)
+    //   sem ambiente  -> /auth-gate (acesso pendente)
+    //   1 ambiente    -> home do ambiente
+    //   2+ ambientes  -> seletor
+    if (isOracullo) {
+      navigate('/oracullo', { replace: true });
+    } else if (environments.length === 0) {
+      navigate('/auth-gate', { replace: true });
+    } else if (environments.length === 1) {
+      const env = environments[0];
+      const isStaff = env.role !== 'client';
+      navigate(env.environment === 'sharks_company' ? (isStaff ? '/sharks' : '/client') : (isStaff ? '/estrategos' : '/client'), { replace: true });
+    } else {
+      navigate('/select-environment', { replace: true });
     }
-  }, [user, isSharks, navigate]);
+  }, [user, isSharks, isOracullo, environments, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,11 +63,13 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <img
             src={logoUrl}
-            alt="Sharks Company"
+            alt="Oracullo Calendar"
             className="h-16 mx-auto mb-4 object-contain drop-shadow-lg"
           />
-          <h1 className="text-2xl font-bold text-white">Sharks Editorial Calendar</h1>
-          <p className="text-primary-200 text-sm mt-1">Planejamento editorial centralizado</p>
+          <h1 className="text-2xl font-bold text-white">Oracullo Calendar</h1>
+          <p className="text-primary-200 text-sm mt-1">
+            Sharks Company <span className="mx-1 opacity-50">·</span> Estrategos
+          </p>
         </div>
 
         {/* Card */}

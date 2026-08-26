@@ -1,11 +1,13 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Workspace } from '@/types';
+import { Workspace, EnvironmentType } from '@/types';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/lib/supabase';
 
 interface WorkspaceContextType {
   currentWorkspace: Workspace | null;
   workspaces: Workspace[];
+  /** Workspaces filtrados por ambiente da organizacao. */
+  workspacesByEnv: (env: EnvironmentType) => Workspace[];
   setCurrentWorkspace: (workspace: Workspace | null) => void;
   refreshWorkspaces: () => Promise<void>;
   loading: boolean;
@@ -14,16 +16,17 @@ interface WorkspaceContextType {
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const { user, isClient } = useAuth();
+  const { user, isClient, environments } = useAuth();
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadWorkspaces = useCallback(async () => {
-    // RLS returns only workspaces the user can see
+    // RLS entrega apenas workspaces acessiveis; o join traz o
+    // ambiente da organizacao para filtragem multi-ambiente.
     const { data, error } = await supabase
       .from('workspaces')
-      .select('*')
+      .select('*, organizations(environment)')
       .eq('is_active', true)
       .order('name');
 
@@ -31,9 +34,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       console.error('[workspaces] load error:', error.message);
     }
 
-    const ws = (data as unknown as Workspace[]) || [];
-    setWorkspaces(ws);
-    return ws;
+    const rows = ((data ?? []) as unknown as Array<Workspace & { organizations: { environment: EnvironmentType } | null }>)
+      .map(({ organizations, ...ws }) => ({ ...ws, environment: organizations?.environment ?? 'sharks_company' }));
+    setWorkspaces(rows);
+    return rows;
   }, []);
 
   useEffect(() => {
@@ -52,10 +56,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
 
       if (isClient) {
-        // Client: auto-select their workspace
+        // Client: auto-select their workspace (primeiro do seu ambiente)
         setCurrentWorkspace(ws[0] || null);
       } else {
-        // Sharks: null = "Todos os clientes"
+        // Staff: null = "Todos os clientes"
         setCurrentWorkspace(null);
       }
       setLoading(false);
@@ -64,15 +68,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [user?.id, isClient]);
+  }, [user?.id, isClient, environments.length, loadWorkspaces]);
 
   const refreshWorkspaces = async () => {
     await loadWorkspaces();
   };
 
+  const workspacesByEnv = (env: EnvironmentType) => workspaces.filter(w => w.environment === env);
+
   return (
     <WorkspaceContext.Provider
-      value={{ currentWorkspace, workspaces, setCurrentWorkspace, refreshWorkspaces, loading }}
+      value={{ currentWorkspace, workspaces, workspacesByEnv, setCurrentWorkspace, refreshWorkspaces, loading }}
     >
       {children}
     </WorkspaceContext.Provider>

@@ -9,10 +9,11 @@ import { loadActions } from '@/lib/actionService';
 import { loadCampaigns } from '@/hooks/useCampaigns';
 import { loadEditorial } from '@/hooks/useEditorial';
 import { useIntegration } from '@/hooks/useIntegration';
-import { SharksLayout, ClientLayout } from '@/components/layout/AppLayout';
+import { SharksLayout, ClientLayout, EstrategosLayout, OraculloLayout } from '@/components/layout/AppLayout';
 import LoginPage from '@/pages/auth/LoginPage';
 import RequestAccess from '@/pages/auth/RequestAccess';
 import AuthGate from '@/pages/auth/AuthGate';
+import EnvironmentSelector from '@/pages/auth/EnvironmentSelector';
 import SharksDashboard from '@/pages/sharks/SharksDashboard';
 import SharksCalendarPage from '@/pages/sharks/SharksCalendar';
 import SharksClients from '@/pages/sharks/SharksClients';
@@ -30,6 +31,16 @@ import ClientCalendar from '@/pages/client/ClientCalendar';
 import ClientHistory from '@/pages/client/ClientHistory';
 import ClientChat from '@/pages/client/ClientChat';
 import ClientIntegrations from '@/pages/client/ClientIntegrations';
+import EstrategosDashboard from '@/pages/estrategos/EstrategosDashboard';
+import EstrategosProjects from '@/pages/estrategos/EstrategosProjects';
+import EstrategosMeetings from '@/pages/estrategos/EstrategosMeetings';
+import EstrategosImplementations from '@/pages/estrategos/EstrategosImplementations';
+import EstrategosChat from '@/pages/estrategos/EstrategosChat';
+import EstrategosClients from '@/pages/estrategos/EstrategosClients';
+import EstrategosIntegrations from '@/pages/estrategos/EstrategosIntegrations';
+import OraculloDashboard from '@/pages/oracullo/OraculloDashboard';
+import OraculloAccess from '@/pages/oracullo/OraculloAccess';
+import OraculloUsers from '@/pages/oracullo/OraculloUsers';
 
 function DataSync() {
   const { user } = useAuth();
@@ -49,8 +60,21 @@ function DataSync() {
   return null;
 }
 
+/** Home inteligente multi-ambiente (migration 023). */
+function useHomePath(): string {
+  const { isOracullo, isSharks, hasAccess, environments, user } = useAuth();
+  if (!user) return '/login';
+  if (isOracullo) return '/oracullo';
+  if (environments.length === 0) return '/auth-gate';
+  if (environments.length > 1) return '/select-environment';
+  if (hasAccess('estrategos', ['admin', 'team'])) return '/estrategos';
+  if (isSharks) return '/sharks';
+  return '/client';
+}
+
 function AppRoutes() {
   const { user, authUser, loading, isSharks, isClient } = useAuth();
+  const homePath = useHomePath();
 
   if (loading) {
     return (
@@ -85,11 +109,15 @@ function AppRoutes() {
     );
   }
 
-  const homePath = isSharks ? '/sharks' : '/client';
-
   return (
     <Routes>
       <Route path="/login" element={<Navigate to={homePath} replace />} />
+      <Route path="/select-environment" element={<EnvironmentSelector />} />
+
+      {/* Oracullo (governança multi-ambiente) */}
+      <Route path="/oracullo" element={<OraculloLayout><OraculloDashboard /></OraculloLayout>} />
+      <Route path="/oracullo/access" element={<OraculloLayout><OraculloAccess /></OraculloLayout>} />
+      <Route path="/oracullo/users" element={<OraculloLayout><OraculloUsers /></OraculloLayout>} />
 
       {/* Sharks routes */}
       <Route path="/sharks" element={<SharksLayout><SharksDashboard /></SharksLayout>} />
@@ -112,14 +140,17 @@ function AppRoutes() {
       <Route path="/client/chat" element={<ClientLayout><ClientChat /></ClientLayout>} />
       <Route path="/client/integrations" element={<ClientLayout><ClientIntegrations /></ClientLayout>} />
 
+      {/* Estrategos routes */}
+      <Route path="/estrategos" element={<EstrategosLayout><EstrategosDashboard /></EstrategosLayout>} />
+      <Route path="/estrategos/projects" element={<EstrategosLayout><EstrategosProjects /></EstrategosLayout>} />
+      <Route path="/estrategos/meetings" element={<EstrategosLayout><EstrategosMeetings /></EstrategosLayout>} />
+      <Route path="/estrategos/implementations" element={<EstrategosLayout><EstrategosImplementations /></EstrategosLayout>} />
+      <Route path="/estrategos/chat" element={<EstrategosLayout><EstrategosChat /></EstrategosLayout>} />
+      <Route path="/estrategos/clients" element={<EstrategosLayout><EstrategosClients /></EstrategosLayout>} />
+      <Route path="/estrategos/integrations" element={<EstrategosLayout><EstrategosIntegrations /></EstrategosLayout>} />
+
       {/* Fallback */}
-      <Route path="*" element={
-        isClient
-          ? <Navigate to="/client" replace />
-          : isSharks
-            ? <Navigate to="/sharks" replace />
-            : <Navigate to="/login" replace />
-      } />
+      <Route path="*" element={<Navigate to={homePath} replace />} />
     </Routes>
   );
 }

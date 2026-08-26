@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import SyncModeSelector, { EnvSyncToggles } from '@/components/integrations/SyncModeSelector';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIntegration } from '@/hooks/useIntegration';
@@ -11,9 +12,12 @@ import {
   setTargetCalendar,
   disconnectCalendar,
   setAutoSync,
+  setEnvSync,
+  changeSyncMode,
   type GoogleCalendarOption,
 } from '@/lib/googleSync';
 import { toast } from 'sonner';
+import type { SyncMode, EnvironmentType } from '@/types';
 import {
   Calendar,
   CheckCircle2,
@@ -27,6 +31,7 @@ import {
   Unlink,
   ChevronRight,
   Mail,
+  Repeat,
 } from 'lucide-react';
 
 function formatDateTime(iso: string | null): string {
@@ -44,6 +49,8 @@ export default function ClientIntegrations() {
   const [showCalendars, setShowCalendars] = useState(false);
   const [calendars, setCalendars] = useState<GoogleCalendarOption[] | null>(null);
   const [loadingCalendars, setLoadingCalendars] = useState(false);
+  const [syncMode, setSyncMode] = useState<SyncMode>('split');
+  const [switchingMode, setSwitchingMode] = useState(false);
 
   // Resultado do redirect do OAuth
   useEffect(() => {
@@ -84,7 +91,32 @@ export default function ClientIntegrations() {
 
   const handleConnect = () => {
     if (!user) return;
-    startGoogleConnect(currentWorkspace.id, user.id, '/client/integrations');
+    startGoogleConnect(currentWorkspace.id, user.id, '/client/integrations', syncMode);
+  };
+
+  const handleToggleEnv = async (env: EnvironmentType, enabled: boolean) => {
+    try {
+      await setEnvSync(currentWorkspace.id, env, enabled);
+      toast.success(enabled ? 'Sincronização ativada.' : 'Sincronização pausada.');
+    } catch (e) {
+      toast.error(`Erro: ${(e as Error).message}`);
+    }
+  };
+
+  const handleSwitchMode = async () => {
+    if (switchingMode) return;
+    setSwitchingMode(true);
+    const next = integration?.sync_mode === 'split' ? 'unified' : 'split';
+    try {
+      await changeSyncMode(currentWorkspace.id, next);
+      toast.success(next === 'split'
+        ? 'Modo separado: agendas "Sharks" e "Estrategos" criadas no seu Google.'
+        : 'Modo único agenda: novos eventos passam a usar a agenda principal.');
+    } catch (e) {
+      toast.error(`Erro: ${(e as Error).message}`);
+    } finally {
+      setSwitchingMode(false);
+    }
   };
 
   const handleSyncNow = async () => {
@@ -202,6 +234,9 @@ export default function ClientIntegrations() {
                 do Google Calendar, em tempo quase real.
               </p>
             </div>
+            <div className="mb-4">
+              <SyncModeSelector value={syncMode} onChange={setSyncMode} />
+            </div>
             <Button onClick={handleConnect}>
               <LinkIcon className="w-4 h-4" />
               Conectar minha conta Google
@@ -209,6 +244,12 @@ export default function ClientIntegrations() {
           </>
         ) : (
           <div className="space-y-4">
+            {integration?.sync_mode === 'split' && (
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-400 font-medium mb-2">Sync por empresa</p>
+                <EnvSyncToggles envAutoSync={integration?.env_auto_sync} onToggle={handleToggleEnv} />
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                 <Mail className="w-4 h-4 text-gray-400 shrink-0" />
@@ -305,6 +346,10 @@ export default function ClientIntegrations() {
               <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing}>
                 {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                 Sincronizar agora
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleSwitchMode} disabled={switchingMode}>
+                {switchingMode ? <Loader2 className="w-4 h-4 animate-spin" /> : <Repeat className="w-4 h-4" />}
+                {integration?.sync_mode === 'split' ? 'Usar uma agenda só' : 'Separar por empresa'}
               </Button>
               {confirmDisconnect ? (
                 <span className="flex items-center gap-2">

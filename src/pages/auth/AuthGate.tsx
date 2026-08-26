@@ -153,7 +153,7 @@ function Shell({ email, onSignOut, children }: { email: string; onSignOut: () =>
     <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-gray-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
-          <img src={logoUrl} alt="Sharks Company" className="h-14 mx-auto mb-3 object-contain drop-shadow-lg" />
+          <img src={logoUrl} alt="Oracullo Calendar" className="h-14 mx-auto mb-3 object-contain drop-shadow-lg" />
         </div>
         <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 text-center">
           {children}

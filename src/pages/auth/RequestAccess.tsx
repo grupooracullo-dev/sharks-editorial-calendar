@@ -41,6 +41,7 @@ export default function RequestAccess({ authUser = null, onSubmitted }: RequestA
     company: '',
     phone: '',
     workspace_id: '',
+    requested_environment: 'sharks_company',
     message: '',
   });
 
@@ -71,6 +72,7 @@ export default function RequestAccess({ authUser = null, onSubmitted }: RequestA
         company: form.company.trim() || null,
         phone: form.phone.trim() || null,
         workspace_id: form.workspace_id || null,
+        requested_environment: form.requested_environment,
         message: form.message.trim() || null,
         requested_role: 'client',
       };
@@ -105,7 +107,7 @@ export default function RequestAccess({ authUser = null, onSubmitted }: RequestA
     <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-gray-900 flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
         <div className="text-center mb-8">
-          <img src={logoUrl} alt="Sharks Company" className="h-16 mx-auto mb-4 object-contain drop-shadow-lg" />
+          <img src={logoUrl} alt="Oracullo Calendar" className="h-16 mx-auto mb-4 object-contain drop-shadow-lg" />
           <h1 className="text-2xl font-bold text-white">Solicitar Acesso</h1>
           <p className="text-primary-200 text-sm mt-1">
             {isGoogleFlow
@@ -203,6 +205,16 @@ export default function RequestAccess({ authUser = null, onSubmitted }: RequestA
                     />
                   </div>
                 )}
+
+                <Select
+                  label="Ambiente que deseja acessar"
+                  value={form.requested_environment}
+                  onChange={e => setForm(p => ({ ...p, requested_environment: e.target.value }))}
+                  options={[
+                    { value: 'sharks_company', label: '🦈 Sharks Company — Marketing' },
+                    { value: 'estrategos', label: '📊 Estrategos — Gestão Empresarial' },
+                  ]}
+                />
 
                 {workspaces.length > 0 && (
                   <Select

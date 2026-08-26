@@ -60,3 +60,23 @@ export function ClientLayout({ children }: { children: ReactNode }) {
 
   return <AppLayout>{children}</AppLayout>;
 }
+
+// Layout for Estrategos pages (staff do ambiente estrategos)
+export function EstrategosLayout({ children }: { children: ReactNode }) {
+  const { hasAccess, loading } = useAuth();
+
+  if (loading) return null;
+  if (!hasAccess('estrategos', ['admin', 'team'])) return <Navigate to="/sharks" replace />;
+
+  return <AppLayout>{children}</AppLayout>;
+}
+
+// Layout for Oracullo pages (admin global apenas)
+export function OraculloLayout({ children }: { children: ReactNode }) {
+  const { isOracullo, loading } = useAuth();
+
+  if (loading) return null;
+  if (!isOracullo) return <Navigate to="/sharks" replace />;
+
+  return <AppLayout>{children}</AppLayout>;
+}

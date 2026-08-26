@@ -2,12 +2,21 @@
 // SHARED: Google Calendar helpers
 // OAuth state signing, token management,
 // event mapping and efficient queue processing
+// Multi-ambiente (migration 023/025):
+//   sync_mode unified | split, env_calendar_ids,
+//   fila generalizada por source.
 // ==========================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 export const CAL_API = 'https://www.googleapis.com/calendar/v3';
 export const TOKEN_API = 'https://oauth2.googleapis.com/token';
+
+export type EnvType = 'sharks_company' | 'estrategos';
+export const ENV_LABEL: Record<EnvType, string> = {
+  sharks_company: 'Sharks',
+  estrategos: 'Estrategos',
+};
 
 export interface IntegrationRow {
   id: string;
@@ -23,17 +32,26 @@ export interface IntegrationRow {
   auto_sync: boolean;
   last_synced_at: string | null;
   sync_error: string | null;
+  sync_mode: 'unified' | 'split';
+  env_calendar_ids: Record<string, string> | null;
+  env_auto_sync: Record<string, boolean> | null;
 }
+
+export type QueueSource = 'sharks_action' | 'estrategos_meeting' | 'estrategos_implementation';
 
 export interface QueueItem {
   id: string;
   workspace_id: string;
   action_id: string | null;
+  source: QueueSource;
+  source_id: string | null;
   operation: 'create' | 'update' | 'delete';
   attempts: number;
   google_event_id?: string | null;
   integration_id?: string | null;
   action: Record<string, unknown> | null;
+  meeting: Record<string, unknown> | null;
+  implementation: Record<string, unknown> | null;
 }
 
 // ---------- base64url ----------
@@ -86,13 +104,18 @@ async function hmacBytes(payload: string): Promise<Uint8Array> {
   return new Uint8Array(sig);
 }
 
-export async function createState(workspaceId: string, userId: string, returnTo: string): Promise<string> {
-  const payload = b64UrlEncode(JSON.stringify({ ws: workspaceId, u: userId, r: returnTo, t: Date.now() }));
+export async function createState(
+  workspaceId: string,
+  userId: string,
+  returnTo: string,
+  syncMode: 'unified' | 'split' = 'unified',
+): Promise<string> {
+  const payload = b64UrlEncode(JSON.stringify({ ws: workspaceId, u: userId, r: returnTo, m: syncMode, t: Date.now() }));
   const sig = bytesToB64Url(await hmacBytes(payload));
   return `${payload}.${sig}`;
 }
 
-export async function verifyState(state: string): Promise<{ ws: string; u: string; r: string } | null> {
+export async function verifyState(state: string): Promise<{ ws: string; u: string; r: string; m: 'unified' | 'split' } | null> {
   const dot = state.indexOf('.');
   if (dot <= 0) return null;
   const payload = state.slice(0, dot);
@@ -107,7 +130,12 @@ export async function verifyState(state: string): Promise<{ ws: string; u: strin
       Uint8Array.from(atob(payload.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
     ));
     if (!json.ws || !json.u || Date.now() - json.t > 600_000) return null;
-    return { ws: json.ws, u: json.u, r: typeof json.r === 'string' ? json.r : '/sharks/integrations' };
+    return {
+      ws: json.ws,
+      u: json.u,
+      r: typeof json.r === 'string' ? json.r : '/sharks/integrations',
+      m: json.m === 'split' ? 'split' : 'unified',
+    };
   } catch {
     return null;
   }
@@ -129,7 +157,7 @@ export async function verifyWorkspaceAccess(
   workspaceId: string,
 ): Promise<boolean> {
   const { data: u } = await admin.from('users').select('role').eq('id', userId).maybeSingle();
-  if (u && (u.role === 'admin_sharks' || u.role === 'sharks_team')) return true;
+  if (u && (u.role === 'oracullo_admin' || u.role === 'admin_sharks' || u.role === 'sharks_team')) return true;
   const { data: m } = await admin
     .from('memberships')
     .select('id')
@@ -187,9 +215,25 @@ export async function getValidToken(admin: ReturnType<typeof serviceClient>, int
   return refreshAccessToken(admin, integ);
 }
 
+// ---------- Roteamento por ambiente ----------
+
+/** Agenda destino da integracao para o ambiente do item. */
+export function targetCalendarFor(integ: IntegrationRow, env: EnvType): string {
+  if (integ.sync_mode === 'split') {
+    const ids = integ.env_calendar_ids ?? {};
+    return ids[env] || integ.google_calendar_id || 'primary';
+  }
+  return integ.google_calendar_id || 'primary';
+}
+
+/** Toggle por ambiente (ausente = ativo). */
+export function envSyncEnabled(integ: IntegrationRow, env: EnvType): boolean {
+  const flags = integ.env_auto_sync ?? {};
+  return flags[env] !== false;
+}
+
 // ---------- Event mapping ----------
 
-const LONG_TYPES = new Set(['event', 'meeting', 'recording', 'photo_session', 'live']);
 const TZ = '-03:00';
 
 function fmtLocal(ms: number): string {
@@ -202,7 +246,52 @@ function pretty(v: unknown): string {
   return v ? String(v).replace(/_/g, ' ') : '';
 }
 
-export function buildEventBody(action: Record<string, any>): Record<string, unknown> {
+function envPrefix(source: QueueSource, unified: boolean): string {
+  if (!unified) return '';
+  return source === 'sharks_action' ? '[Sharks] ' : '[Estrategos] ';
+}
+
+export function buildEventBody(
+  source: QueueSource,
+  row: Record<string, any>,
+  integ: IntegrationRow,
+): Record<string, unknown> {
+  const unified = integ.sync_mode !== 'split';
+  const prefix = envPrefix(source, unified);
+
+  if (source === 'estrategos_meeting' || source === 'estrategos_implementation') {
+    const lines: string[] = [];
+    if (source === 'estrategos_implementation' && row.system_name) {
+      lines.push(`Sistema: ${row.system_name}`);
+    }
+    if (row.description) lines.push(`Descricao:\n${row.description}`);
+    if (source === 'estrategos_meeting' && Array.isArray(row.attendees) && row.attendees.length) {
+      lines.push(`Participantes: ${row.attendees.join(', ')}`);
+    }
+    if (row.location) lines.push(`Local: ${row.location}`);
+    lines.push('');
+    lines.push('Sincronizado automaticamente pelo Oracullo Calendar');
+
+    const date = source === 'estrategos_meeting' ? row.meeting_date : row.target_date;
+    const time = source === 'estrategos_meeting' ? row.meeting_time : null;
+    let start: Record<string, string>;
+    let end: Record<string, string>;
+    if (time) {
+      const [hh, mm] = String(time).slice(0, 5).split(':');
+      const startMs = Date.parse(`${date}T${hh}:${mm}:00${TZ}`);
+      const dur = source === 'estrategos_meeting' ? (row.duration_minutes ?? 60) * 60_000 : 60 * 60_000;
+      start = { dateTime: fmtLocal(startMs), timeZone: 'America/Sao_Paulo' };
+      end = { dateTime: fmtLocal(startMs + dur), timeZone: 'America/Sao_Paulo' };
+    } else {
+      const nextDay = new Date(Date.parse(`${date}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+      start = { date };
+      end = { date: nextDay };
+    }
+    return { summary: `${prefix}${row.title ?? row.name ?? ''}`, description: lines.join('\n'), start, end };
+  }
+
+  // sharks_action (formato historico validado)
+  const action = row;
   const pillar = action.editorial_pillar as { name?: string } | null;
   const campaign = action.campaign as { name?: string; objective?: string } | null;
 
@@ -222,8 +311,9 @@ export function buildEventBody(action: Record<string, any>): Record<string, unkn
   if (action.description) lines.push(`Descricao:\n${action.description}`);
   if (action.observations) lines.push(`Observacoes:\n${action.observations}`);
   lines.push('');
-  lines.push('Sincronizado automaticamente pelo Sharks Calendario Editorial');
+  lines.push('Sincronizado automaticamente pelo Oracullo Calendar');
 
+  const LONG_TYPES = new Set(['event', 'meeting', 'recording', 'photo_session', 'live']);
   let start: Record<string, string>;
   let end: Record<string, string>;
   if (action.action_time) {
@@ -238,7 +328,7 @@ export function buildEventBody(action: Record<string, any>): Record<string, unkn
     end = { date: nextDay };
   }
 
-  return { summary: action.title, description: lines.join('\n'), start, end };
+  return { summary: `${prefix}${action.title}`, description: lines.join('\n'), start, end };
 }
 
 // ---------- Queue processing ----------
@@ -262,10 +352,15 @@ export async function processWorkspace(
   if (!locked) return { ...stat, skipped_lock: true } as typeof stat & { skipped_lock: boolean };
 
   try {
-    // Integracoes que cobrem este workspace:
-    //  a) linha por cliente (workspace_id = ws)
-    //  b) linhas pessoais globais (workspace_id IS NULL, user_id NOT NULL)
-    // Cada usuario conecta a PROPRIA conta Google (migration 021).
+    // Integracoes que cobrem este workspace (por-cliente OU
+    // pessoais globais), filtradas por ambiente do workspace.
+    const { data: wsRow } = await admin
+      .from('workspaces')
+      .select('organization_id, organizations(environment)')
+      .eq('id', workspaceId)
+      .maybeSingle();
+    const env = ((wsRow as { organizations?: { environment?: EnvType } } | null)?.organizations?.environment ?? 'sharks_company') as EnvType;
+
     const [{ data: wsRows }, { data: personalRows }] = await Promise.all([
       admin
         .from('calendar_integrations')
@@ -281,11 +376,16 @@ export async function processWorkspace(
         .eq('is_connected', true)
         .eq('auto_sync', true),
     ]);
-    const integs = [...(wsRows ?? []), ...(personalRows ?? [])] as unknown as IntegrationRow[];
+    // Toggle por ambiente: pausado sai do fan-out
+    const integs = ([...(wsRows ?? []), ...(personalRows ?? [])] as unknown as IntegrationRow[])
+      .filter(i => envSyncEnabled(i, env));
 
     const { data: queue } = await admin
       .from('calendar_sync_queue')
-      .select('id, workspace_id, action_id, operation, attempts, google_event_id, integration_id, action:actions(*, campaign:campaigns(name,objective), editorial_pillar:editorial_pillars(name))')
+      .select(
+        'id, workspace_id, action_id, source, source_id, operation, attempts, google_event_id, integration_id, ' +
+        'action:actions(*, campaign:campaigns(name,objective), editorial_pillar:editorial_pillars(name))',
+      )
       .eq('workspace_id', workspaceId)
       .eq('status', 'pending')
       .order('created_at')
@@ -303,16 +403,41 @@ export async function processWorkspace(
       return stat;
     }
 
-    // Links existentes por (acao:integracao) + legado (integration_id NULL)
-    const actionIds = queue.map(q => q.action_id).filter(Boolean);
-    const { data: links } = await admin
-      .from('calendar_event_links')
-      .select('action_id, google_event_id, workspace_id, integration_id')
-      .in('action_id', actionIds.length ? actionIds : [NULL_UUID]);
+    // Fetch meetings/implementations dos itens correspondentes
+    const meetingIds = (queue as QueueItem[]).filter(q => q.source === 'estrategos_meeting' && q.source_id).map(q => q.source_id!) as string[];
+    const implIds = (queue as QueueItem[]).filter(q => q.source === 'estrategos_implementation' && q.source_id).map(q => q.source_id!) as string[];
+    const meetingMap = new Map<string, Record<string, any>>();
+    const implMap = new Map<string, Record<string, any>>();
+    if (meetingIds.length) {
+      const { data: ms } = await admin.from('estrategos_meetings').select('*').in('id', meetingIds);
+      for (const m of (ms ?? []) as Record<string, any>[]) meetingMap.set(m.id, m);
+    }
+    if (implIds.length) {
+      const { data: is } = await admin.from('estrategos_implementations').select('*').in('id', implIds);
+      for (const i of (is ?? []) as Record<string, any>[]) implMap.set(i.id, i);
+    }
+
+    // Links existentes por (source:source_id:integracao) + legado por action
+    const sourceKeys = (queue as QueueItem[]).filter(q => q.source_id).map(q => `${q.source}:${q.source_id}`) as string[];
+    const actionIds = queue.map(q => q.action_id).filter(Boolean) as string[];
     const linkMap = new Map<string, string>();
-    for (const l of links ?? []) {
-      if (l.integration_id) linkMap.set(`${l.action_id}:${l.integration_id}`, l.google_event_id);
-      else if (!linkMap.has(`${l.action_id}:legacy`)) linkMap.set(`${l.action_id}:legacy`, l.google_event_id);
+    {
+      const { data: links } = await admin
+        .from('calendar_event_links')
+        .select('action_id, source, source_id, google_event_id, workspace_id, integration_id')
+        .or(
+          [
+            actionIds.length ? `action_id.in.(${actionIds.join(',')})` : null,
+            sourceKeys.length ? `and(source.in.(${queue.filter(q => q.source).map(q => q.source).join(',')}),source_id.in.(${(queue as QueueItem[]).filter(q => q.source_id).map(q => q.source_id).join(',')}))` : null,
+          ].filter(Boolean).join(',') || `action_id.eq.${NULL_UUID}`,
+        );
+      for (const l of links ?? []) {
+        if (l.source && l.source_id) {
+          linkMap.set(`${l.source}:${l.source_id}:${l.integration_id}`, l.google_event_id);
+        } else if (l.action_id && l.integration_id) {
+          linkMap.set(`sharks_action:${l.action_id}:${l.integration_id}`, l.google_event_id);
+        }
+      }
     }
 
     // Cache de token por integracao (evita refresh repetido no fan-out)
@@ -335,12 +460,24 @@ export async function processWorkspace(
 
     const usedIntegIds = new Set<string>();
 
+    const syncStatusTable: Record<QueueSource, string> = {
+      sharks_action: 'actions',
+      estrategos_meeting: 'estrategos_meetings',
+      estrategos_implementation: 'estrategos_implementations',
+    };
+    const setSyncStatus = async (item: QueueItem, value: string) => {
+      const src = item.source;
+      const sid = item.source_id ?? item.action_id;
+      if (!sid) return;
+      await admin.from(syncStatusTable[src]).update({ sync_status: value }).eq('id', sid);
+    };
+
     for (const item of queue as unknown as QueueItem[]) {
       stat.processed++;
       try {
-        // Delete embutido (migration 014/021): a action ja foi removida;
-        // integration_id diz EM QUAL agenda apagar o evento.
-        if (item.operation === 'delete' && !item.action_id) {
+        // Delete embutido (migration 014/025): o registro origem ja
+        // foi removido; integration_id diz EM QUAL agenda apagar.
+        if (item.operation === 'delete' && !item.source_id && !item.action_id) {
           let target: IntegrationRow | null = null;
           if (item.integration_id) {
             const { data: t } = await admin
@@ -355,7 +492,7 @@ export async function processWorkspace(
           if (target) {
             usedIntegIds.add(target.id);
             const token = await tokenFor(target);
-            const calId = target.google_calendar_id || 'primary';
+            const calId = targetCalendarFor(target, env);
             const eventId = item.google_event_id;
             if (eventId) {
               const res = await gFetch(
@@ -373,7 +510,9 @@ export async function processWorkspace(
           continue;
         }
 
-        if (!item.action_id) {
+        const src = item.source;
+        const sid = item.source_id ?? item.action_id;
+        if (!sid) {
           await admin.from('calendar_sync_queue').update({ status: 'done', processed_at: now() }).eq('id', item.id);
           continue;
         }
@@ -388,16 +527,16 @@ export async function processWorkspace(
         }
 
         if (item.operation === 'delete') {
-          // Acao cancelada / voltou a draft: remove o evento de TODAS as agendas
+          // Registro cancelado: remove o evento de TODAS as agendas
           const errs: string[] = [];
           let anyOk = false;
           for (const integ of integs) {
             usedIntegIds.add(integ.id);
             try {
-              const eventId = linkMap.get(`${item.action_id}:${integ.id}`) ?? linkMap.get(`${item.action_id}:legacy`);
+              const eventId = linkMap.get(`${src}:${sid}:${integ.id}`);
               if (eventId) {
                 const token = await tokenFor(integ);
-                const calId = integ.google_calendar_id || 'primary';
+                const calId = targetCalendarFor(integ, env);
                 const res = await gFetch(
                   `${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`,
                   { method: 'DELETE' },
@@ -413,7 +552,8 @@ export async function processWorkspace(
             }
           }
           if (!anyOk) throw new Error(errs.join(' | ').slice(0, 380));
-          await admin.from('calendar_event_links').delete().eq('action_id', item.action_id);
+          await admin.from('calendar_event_links').delete().match({ source: src, source_id: sid });
+          await setSyncStatus(item, 'not_synced');
           await admin
             .from('calendar_sync_queue')
             .update({ status: 'done', processed_at: now(), last_error: errs.length ? `parcial: ${errs.join(' | ').slice(0, 200)}` : null })
@@ -421,21 +561,24 @@ export async function processWorkspace(
           stat.ok++;
         } else {
           // create/update: fan-out para TODAS as integracoes ativas
-          const action = item.action as Record<string, any> | null;
-          if (!action) {
-            await admin.from('calendar_sync_queue').update({ status: 'done', processed_at: now(), last_error: 'acao removida antes do sync' }).eq('id', item.id);
+          const row =
+            src === 'estrategos_meeting' ? meetingMap.get(sid) :
+            src === 'estrategos_implementation' ? implMap.get(sid) :
+            (item.action as Record<string, any> | null);
+          if (!row) {
+            await admin.from('calendar_sync_queue').update({ status: 'done', processed_at: now(), last_error: 'registro removido antes do sync' }).eq('id', item.id);
             stat.ok++;
             continue;
           }
-          const bodyJson = JSON.stringify(buildEventBody(action));
           const errs: string[] = [];
           let anyOk = false;
           for (const integ of integs) {
             usedIntegIds.add(integ.id);
             try {
               const token = await tokenFor(integ);
-              const calId = integ.google_calendar_id || 'primary';
-              const eventId = linkMap.get(`${item.action_id}:${integ.id}`);
+              const calId = targetCalendarFor(integ, env);
+              const bodyJson = JSON.stringify(buildEventBody(src, row, integ));
+              const eventId = linkMap.get(`${src}:${sid}:${integ.id}`);
               let res: Response;
               if (eventId) {
                 res = await gFetch(
@@ -453,19 +596,21 @@ export async function processWorkspace(
               const ev = await res.json();
 
               await admin.from('calendar_event_links').upsert({
-                action_id: item.action_id,
+                action_id: src === 'sharks_action' ? sid : null,
+                source: src,
+                source_id: sid,
                 workspace_id: workspaceId,
                 integration_id: integ.id,
                 google_event_id: ev.id,
                 last_synced_at: now(),
                 sync_status: 'synced',
-              }, { onConflict: 'action_id,integration_id' });
+              }, { onConflict: 'source,source_id,integration_id' });
               anyOk = true;
             } catch (e) {
               errs.push(`${integ.google_account_email ?? integ.id}: ${String((e as Error).message).slice(0, 120)}`);
             }
           }
-          await admin.from('actions').update({ sync_status: anyOk ? 'synced' : 'sync_error' }).eq('id', item.action_id);
+          await setSyncStatus(item, anyOk ? 'synced' : 'sync_error');
           if (!anyOk) throw new Error(errs.join(' | ').slice(0, 380));
           await admin
             .from('calendar_sync_queue')

@@ -90,33 +90,64 @@ Deno.serve(async req => {
     const wsId = isGlobal ? null : verified.ws;
 
     const { data: requester } = await admin.from('users').select('role').eq('id', verified.u).maybeSingle();
-    const isSharksUser = requester?.role === 'admin_sharks' || requester?.role === 'sharks_team';
+    const isStaffUser = requester?.role === 'oracullo_admin' || requester?.role === 'admin_sharks' || requester?.role === 'sharks_team';
 
     if (!isGlobal) {
       const allowed = await verifyWorkspaceAccess(admin, verified.u, verified.ws);
       if (!allowed) return back('google=error&reason=sem_acesso');
     }
 
-    // Global mode: only admin_sharks and sharks_team allowed
-    if (isGlobal && !isSharksUser) {
+    // Global mode: only staff (oracullo/admin/team) allowed
+    if (isGlobal && !isStaffUser) {
       return back('google=error&reason=sem_acesso_global');
     }
 
     // Merge refresh token (Google omits it on re-consent)
-    // Migration 021/022: quem conecta define a linha alvo —
-    //   global (time)   -> linha pessoal (workspace_id NULL + user_id)
-    //   workspace + time -> linha da agência (workspace_id W + user_id NULL)
+    // Migration 021/022/025: quem conecta define a linha alvo —
+    //   global (staff)     -> linha pessoal (workspace_id NULL + user_id)
+    //   workspace + staff  -> linha da agência (workspace_id W + user_id NULL)
     //   workspace + cliente -> linha pessoal do cliente (W + user_id)
+    // Modo split (025): cria 1 agenda Google por ambiente e grava
+    // o mapa env_calendar_ids.
     const existingQuery = isGlobal
-      ? await admin.from('calendar_integrations').select('id, refresh_token').is('workspace_id', null).eq('user_id', verified.u).maybeSingle()
-      : isSharksUser
-        ? await admin.from('calendar_integrations').select('id, refresh_token').eq('workspace_id', verified.ws).is('user_id', null).maybeSingle()
-        : await admin.from('calendar_integrations').select('id, refresh_token').eq('workspace_id', verified.ws).eq('user_id', verified.u).maybeSingle();
+      ? await admin.from('calendar_integrations').select('id, refresh_token, env_calendar_ids').is('workspace_id', null).eq('user_id', verified.u).maybeSingle()
+      : isStaffUser
+        ? await admin.from('calendar_integrations').select('id, refresh_token, env_calendar_ids').eq('workspace_id', verified.ws).is('user_id', null).maybeSingle()
+        : await admin.from('calendar_integrations').select('id, refresh_token, env_calendar_ids').eq('workspace_id', verified.ws).eq('user_id', verified.u).maybeSingle();
     const existing = existingQuery.data;
 
-    const row = {
+    // Modo split: criar as agendas por ambiente (idempotente por
+    // nome — se ja existirem no mapa, reutiliza)
+    let envCalendarIds: Record<string, string> = {};
+    if (verified.m === 'split') {
+      const existingMap = (existing?.env_calendar_ids as Record<string, string> | null) ?? {};
+      const wanted: Array<{ env: string; summary: string }> = [
+        { env: 'sharks_company', summary: 'Sharks' },
+        { env: 'estrategos', summary: 'Estrategos' },
+      ];
+      for (const w of wanted) {
+        if (existingMap[w.env]) {
+          envCalendarIds[w.env] = existingMap[w.env];
+          continue;
+        }
+        const created = await fetch('https://www.googleapis.com/calendar/v3/calendars', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${tokens.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ summary: w.summary, timeZone: 'America/Sao_Paulo' }),
+        });
+        if (created.ok) {
+          const cal = await created.json();
+          envCalendarIds[w.env] = cal.id;
+          console.log('[callback] agenda criada:', w.summary, cal.id);
+        } else {
+          console.warn('[callback] falha ao criar agenda', w.summary, created.status, (await created.text()).slice(0, 200));
+        }
+      }
+    }
+
+    const row: Record<string, unknown> = {
       workspace_id: wsId,
-      user_id: isGlobal ? verified.u : (isSharksUser ? null : verified.u),
+      user_id: isGlobal ? verified.u : (isStaffUser ? null : verified.u),
       google_calendar_id: calId,
       google_calendar_name: calName,
       google_account_email: email,
@@ -125,7 +156,11 @@ Deno.serve(async req => {
       token_expires_at: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
       is_connected: true,
       sync_error: null,
+      sync_mode: verified.m,
     };
+    if (verified.m === 'split' && Object.keys(envCalendarIds).length > 0) {
+      row.env_calendar_ids = envCalendarIds;
+    }
 
     if (existing) {
       const { error } = await admin.from('calendar_integrations').update(row).eq('id', existing.id);

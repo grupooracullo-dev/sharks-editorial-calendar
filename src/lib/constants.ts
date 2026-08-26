@@ -4,11 +4,12 @@ import { ContentFormat, FormatFrequencyZone, Objective, ActionType, ActionStatus
 // SHARKS EDITORIAL CALENDAR - CONSTANTS
 // ==========================================
 
-export const APP_NAME = 'Sharks Editorial Calendar';
-export const COMPANY_NAME = 'Sharks Company';
+export const APP_NAME = 'Oracullo Calendar';
+export const COMPANY_NAME = 'Oracullo';
 
 // User Roles
 export const USER_ROLES: Record<UserRole, string> = {
+  oracullo_admin: 'Administrador Oracullo',
   admin_sharks: 'Admin Sharks',
   sharks_team: 'Equipe Sharks',
   client: 'Cliente',

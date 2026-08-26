@@ -3,7 +3,24 @@
 // ==========================================
 
 // User & Auth
-export type UserRole = 'admin_sharks' | 'sharks_team' | 'client';
+export type UserRole = 'oracullo_admin' | 'admin_sharks' | 'sharks_team' | 'client';
+
+// Multi-ambiente (migration 023)
+export type EnvironmentType = 'sharks_company' | 'estrategos';
+export type EnvironmentRole = 'admin' | 'team' | 'client';
+
+export interface UserEnvironment {
+  user_id: string;
+  environment: EnvironmentType;
+  role: EnvironmentRole;
+  created_at: string;
+  updated_at: string;
+}
+
+export const ENVIRONMENT_META: Record<EnvironmentType, { label: string; short: string; color: string; emoji: string; home: string }> = {
+  sharks_company: { label: 'Sharks Company', short: 'Sharks', color: 'blue', emoji: '🦈', home: '/sharks' },
+  estrategos: { label: 'Estrategos', short: 'Estrategos', color: 'green', emoji: '📊', home: '/estrategos' },
+};
 
 export interface User {
   id: string;
@@ -13,6 +30,7 @@ export interface User {
   role: UserRole;
   created_at: string;
   updated_at: string;
+  environments?: UserEnvironment[];
 }
 
 // Workspace
@@ -29,6 +47,8 @@ export interface Workspace {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  /** Ambiente da organizacao (join organizations.environment). */
+  environment?: EnvironmentType;
 }
 
 // Membership
@@ -232,6 +252,66 @@ export interface CalendarIntegration {
   token_expires_at: string | null;
   is_connected: boolean;
   last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+  sync_mode?: 'unified' | 'split';
+  env_calendar_ids?: Record<string, string> | null;
+  env_auto_sync?: Record<string, boolean> | null;
+}
+
+// Multi-ambiente sync (migration 025)
+export type SyncMode = 'unified' | 'split';
+export type QueueSource = 'sharks_action' | 'estrategos_meeting' | 'estrategos_implementation';
+
+// Estrategos (migration 024)
+export type EstrategosProjectStatus = 'planning' | 'active' | 'paused' | 'completed' | 'cancelled';
+export type EstrategosMeetingStatus = 'scheduled' | 'completed' | 'cancelled';
+export type EstrategosImplementationStatus = 'pending' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
+
+export interface EstrategosProject {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string | null;
+  status: EstrategosProjectStatus;
+  start_date: string | null;
+  end_date: string | null;
+  responsible_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EstrategosMeeting {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  title: string;
+  description: string | null;
+  meeting_date: string;
+  meeting_time: string | null;
+  duration_minutes: number;
+  location: string | null;
+  attendees: string[];
+  status: EstrategosMeetingStatus;
+  sync_status: SyncStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EstrategosImplementation {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  name: string;
+  description: string | null;
+  system_name: string | null;
+  status: EstrategosImplementationStatus;
+  target_date: string | null;
+  completed_at: string | null;
+  sync_status: SyncStatus;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
 }

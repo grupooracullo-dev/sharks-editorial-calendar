@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/lib/supabase';
 import Avatar from '@/components/ui/Avatar';
+import { ENVIRONMENT_META, type EnvironmentType } from '@/types';
 import {
   LayoutDashboard,
   Calendar,
@@ -19,9 +20,14 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Menu,
   UserCog,
   UserPlus,
+  Briefcase,
+  Presentation,
+  Rocket,
+  ShieldCheck,
 } from 'lucide-react';
 import logoUrl from '/logo.png?url';
 
@@ -48,15 +54,61 @@ const clientNavItems = [
   { icon: Link2, label: 'Integrações', path: '/client/integrations' },
 ];
 
+const estrategosNavItems = [
+  { icon: LayoutDashboard, label: 'Visão Geral', path: '/estrategos' },
+  { icon: Briefcase, label: 'Projetos', path: '/estrategos/projects' },
+  { icon: Presentation, label: 'Reuniões', path: '/estrategos/meetings' },
+  { icon: Rocket, label: 'Implantações', path: '/estrategos/implementations' },
+  { icon: MessageSquare, label: 'Chat', path: '/estrategos/chat' },
+  { icon: Users, label: 'Clientes', path: '/estrategos/clients' },
+  { icon: Link2, label: 'Integrações', path: '/estrategos/integrations' },
+];
+
+const oraculloNavItems = [
+  { icon: LayoutDashboard, label: 'Visão Geral', path: '/oracullo' },
+  { icon: ShieldCheck, label: 'Acessos', path: '/oracullo/access' },
+  { icon: Users, label: 'Usuários', path: '/oracullo/users' },
+];
+
+type SidebarEnv = 'sharks' | 'client' | 'estrategos' | 'oracullo';
+
+function detectEnv(pathname: string): SidebarEnv {
+  if (pathname.startsWith('/estrategos')) return 'estrategos';
+  if (pathname.startsWith('/oracullo')) return 'oracullo';
+  if (pathname.startsWith('/client')) return 'client';
+  return 'sharks';
+}
+
 export default function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, signOut, isSharks, isAdmin } = useAuth();
+  const [envMenuOpen, setEnvMenuOpen] = useState(false);
+  const { user, signOut, isSharks, isAdmin, isOracullo, environments, hasAccess } = useAuth();
   const { currentWorkspace } = useWorkspace();
+  const location = useLocation();
   const navigate = useNavigate();
   const [pendingRequests, setPendingRequests] = useState(0);
 
-  // Badge: contagem de solicitações de acesso pendentes (admin only)
+  const env = detectEnv(location.pathname);
+
+  // Ambientes disponiveis para o switcher (staff ve area staff;
+  // cliente so ve o seu portal por ambiente)
+  const switcherTargets: Array<{ id: EnvironmentType; label: string; emoji: string; home: string }> = [];
+  if (hasAccess('sharks_company', ['admin', 'team'])) {
+    switcherTargets.push({ id: 'sharks_company', label: 'Sharks Company', emoji: '🦈', home: '/sharks' });
+  } else if (hasAccess('sharks_company')) {
+    switcherTargets.push({ id: 'sharks_company', label: 'Sharks Company', emoji: '🦈', home: '/client' });
+  }
+  if (hasAccess('estrategos', ['admin', 'team'])) {
+    switcherTargets.push({ id: 'estrategos', label: 'Estrategos', emoji: '📊', home: '/estrategos' });
+  } else if (hasAccess('estrategos')) {
+    switcherTargets.push({ id: 'estrategos', label: 'Estrategos', emoji: '📊', home: '/client/estrategos' });
+  }
+  if (isOracullo) {
+    switcherTargets.unshift({ id: 'sharks_company', label: 'Oracullo', emoji: '🛡️', home: '/oracullo' });
+  }
+
+  // Badge: contagem de solicitacoes de acesso pendentes (admin only)
   useEffect(() => {
     if (!isAdmin) return;
 
@@ -80,9 +132,27 @@ export default function AppSidebar() {
     return () => { supabase.removeChannel(channel); };
   }, [isAdmin]);
 
-  const navItems = isSharks
-    ? sharksNavItems.filter(i => !i.adminOnly || isAdmin)
+  const baseItems =
+    env === 'estrategos' ? estrategosNavItems
+    : env === 'oracullo' ? oraculloNavItems
+    : isSharks ? sharksNavItems.filter(i => !i.adminOnly || isAdmin)
     : clientNavItems;
+
+  // No portal do cliente dentro do contexto estrategos, reutiliza os itens do client
+  const navItems = env === 'client' && location.pathname.startsWith('/client/estrategos')
+    ? clientNavItems
+    : baseItems;
+
+  const brandTitle =
+    env === 'estrategos' ? 'Estrategos'
+    : env === 'oracullo' ? 'Oracullo Calendar'
+    : isSharks ? 'Sharks Company'
+    : 'Sharks Company';
+
+  const currentEnvLabel =
+    env === 'estrategos' ? '📊 Estrategos'
+    : env === 'oracullo' ? '🛡️ Oracullo'
+    : '🦈 Sharks';
 
   const handleSignOut = async () => {
     await signOut();
@@ -115,25 +185,61 @@ export default function AppSidebar() {
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
-        {/* Logo */}
-        <div className={cn('flex items-center gap-3 px-4 py-5 border-b border-gray-100', collapsed && 'justify-center px-2')}>
-          <img
-            src={logoUrl}
-            alt="Sharks Company"
-            className={cn('object-contain', collapsed ? 'w-8 h-8' : 'w-10 h-10')}
-          />
-          {!collapsed && (
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-gray-900 truncate">Sharks Company</p>
-              {currentWorkspace && (
-                <p className="text-xs text-gray-500 truncate">
-                  {isSharks ? `Workspace: ${currentWorkspace.name}` : currentWorkspace.name}
-                </p>
-              )}
-              {!currentWorkspace && isSharks && (
-                <p className="text-xs text-gray-500">Todos os clientes</p>
+        {/* Logo + environment switcher */}
+        <div className={cn('px-4 py-4 border-b border-gray-100', collapsed && 'px-2')}>
+          <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
+            <img
+              src={logoUrl}
+              alt="Oracullo Calendar"
+              className={cn('object-contain', collapsed ? 'w-8 h-8' : 'w-9 h-9')}
+            />
+            {!collapsed && (
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-gray-900 truncate">{brandTitle}</p>
+                <p className="text-[11px] text-gray-400 truncate">Oracullo Calendar</p>
+              </div>
+            )}
+          </div>
+
+          {/* Switcher (2+ opcoes) */}
+          {!collapsed && switcherTargets.length > 1 && (
+            <div className="relative mt-3">
+              <button
+                onClick={() => setEnvMenuOpen(v => !v)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 text-sm font-medium text-gray-700 transition-colors"
+              >
+                <span className="truncate">{currentEnvLabel}</span>
+                <ChevronDown className={cn('w-4 h-4 text-gray-400 transition-transform', envMenuOpen && 'rotate-180')} />
+              </button>
+              {envMenuOpen && (
+                <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-50">
+                  {switcherTargets.map(t => (
+                    <button
+                      key={`${t.id}-${t.home}`}
+                      onClick={() => {
+                        setEnvMenuOpen(false);
+                        setMobileOpen(false);
+                        navigate(t.home);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left transition-colors"
+                    >
+                      <span className="text-base leading-none">{t.emoji}</span>
+                      <span className="truncate">{t.label}</span>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
+          )}
+
+          {/* Workspace atual (contexto sharks/estrategos) */}
+          {!collapsed && currentWorkspace && env !== 'oracullo' && (
+            <p className="mt-2 text-xs text-gray-500 truncate">
+              {env === 'estrategos' || !isSharks ? currentWorkspace.name : `Workspace: ${currentWorkspace.name}`}
+            </p>
+          )}
+          {!collapsed && !currentWorkspace && (isSharks || env === 'estrategos') && (
+            <p className="mt-2 text-xs text-gray-500">Todos os clientes</p>
           )}
         </div>
 
@@ -144,7 +250,7 @@ export default function AppSidebar() {
               <li key={item.path}>
                 <NavLink
                   to={item.path}
-                  end={item.path === '/sharks' || item.path === '/client'}
+                  end={item.path === '/sharks' || item.path === '/client' || item.path === '/estrategos' || item.path === '/oracullo'}
                   onClick={() => setMobileOpen(false)}
                   className={({ isActive }) =>
                     cn(

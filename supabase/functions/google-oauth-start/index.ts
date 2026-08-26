@@ -13,6 +13,7 @@ Deno.serve(async req => {
   const wsId = url.searchParams.get('workspace_id');
   const userId = url.searchParams.get('user_id');
   const returnTo = url.searchParams.get('return_to') ?? '/sharks/integrations';
+  const syncMode = url.searchParams.get('sync_mode') === 'split' ? 'split' : 'unified';
 
   if (!wsId || !userId) {
     return Response.redirect(`${appUrl}${returnTo}?google=error&reason=parametros_ausentes`, 302);
@@ -23,7 +24,7 @@ Deno.serve(async req => {
     return Response.redirect(`${appUrl}${returnTo}?google=error&reason=credenciais_nao_configuradas`, 302);
   }
 
-  const state = await createState(wsId, userId, returnTo);
+  const state = await createState(wsId, userId, returnTo, syncMode);
   const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-oauth-callback`;
 
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');

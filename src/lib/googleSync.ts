@@ -1,9 +1,13 @@
 import { supabase } from '@/lib/supabase';
+import type { SyncMode, EnvironmentType } from '@/types';
 
 // ==========================================
 // GOOGLE SYNC CLIENT
 // Bridge between frontend mutations and the
 // Edge Function sync engine (queue-based).
+// Multi-ambiente (migration 025): sync_mode
+// unified | split escolhido pelo usuario na
+// conexao; toggle por ambiente.
 // ==========================================
 
 const FN_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
@@ -18,6 +22,9 @@ export interface GoogleIntegration {
   auto_sync: boolean;
   last_synced_at: string | null;
   sync_error: string | null;
+  sync_mode?: SyncMode;
+  env_calendar_ids?: Record<string, string> | null;
+  env_auto_sync?: Record<string, boolean> | null;
 }
 
 export interface GoogleCalendarOption {
@@ -87,13 +94,19 @@ async function callFn<T>(body: Record<string, unknown>): Promise<T> {
 
 // ---------- public API ----------
 
-export function startGoogleConnect(workspaceId: string | null, userId: string, returnTo = '/sharks/integrations'): void {
+export function startGoogleConnect(
+  workspaceId: string | null,
+  userId: string,
+  returnTo = '/sharks/integrations',
+  syncMode: SyncMode = 'unified',
+): void {
   const wsParam = workspaceId ?? 'global';
   window.location.href =
     `${FN_BASE}/google-oauth-start` +
     `?workspace_id=${encodeURIComponent(wsParam)}` +
     `&user_id=${encodeURIComponent(userId)}` +
-    `&return_to=${encodeURIComponent(returnTo)}`;
+    `&return_to=${encodeURIComponent(returnTo)}` +
+    `&sync_mode=${syncMode}`;
 }
 
 export interface SyncResult {
@@ -150,4 +163,25 @@ export async function setAutoSync(workspaceId: string | null, value: boolean): P
     ? await (uid ? q.is('workspace_id', null).eq('user_id', uid) : q.is('workspace_id', null))
     : await q.eq('workspace_id', workspaceId);
   if (error) throw error;
+}
+
+// ---------- Multi-ambiente (migration 025) ----------
+
+/** Liga/desliga o sync de UM ambiente nesta integracao. */
+export function setEnvSync(workspaceId: string | null, env: EnvironmentType, enabled: boolean): Promise<{ ok: boolean }> {
+  return callFn<{ ok: boolean }>({
+    ...(workspaceId ? { workspace_id: workspaceId } : {}),
+    op: 'set_env_sync',
+    env,
+    enabled,
+  });
+}
+
+/** Alterna unified <-> split (split cria agendas por ambiente no Google). */
+export function changeSyncMode(workspaceId: string | null, mode: SyncMode): Promise<{ ok: boolean; sync_mode: SyncMode; env_calendar_ids?: Record<string, string> }> {
+  return callFn<{ ok: boolean; sync_mode: SyncMode; env_calendar_ids?: Record<string, string> }>({
+    ...(workspaceId ? { workspace_id: workspaceId } : {}),
+    op: 'change_sync_mode',
+    mode,
+  });
 }
