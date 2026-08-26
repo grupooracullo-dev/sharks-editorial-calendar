@@ -29,6 +29,8 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import logoUrl from '/logo.png?url';
+import logoSharksUrl from '/logo-sharks.png?url';
+import logoEstrategosUrl from '/logo-estrategos.png?url';
 
 const sharksNavItems = [
   { icon: LayoutDashboard, label: 'Visão Geral', path: '/sharks' },
@@ -157,6 +159,14 @@ export default function AppSidebar() {
     : env === 'oracullo' ? '🛡️ Oracullo'
     : '🦈 Sharks';
 
+  const envLogo: Record<string, string> = {
+    sharks_company: logoSharksUrl,
+    sharks: logoSharksUrl,
+    estrategos: logoEstrategosUrl,
+    oracullo: logoUrl,
+    client: logoUrl,
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/login');
@@ -192,7 +202,7 @@ export default function AppSidebar() {
         <div className={cn('px-4 py-4 border-b border-gray-100', collapsed && 'px-2')}>
           <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
             <img
-              src={logoUrl}
+              src={envLogo[env] || logoUrl}
               alt="Oracullo Calendar"
               className={cn('object-contain', collapsed ? 'w-8 h-8' : 'w-9 h-9')}
             />

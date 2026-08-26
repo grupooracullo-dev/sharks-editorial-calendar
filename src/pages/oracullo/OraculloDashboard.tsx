@@ -6,20 +6,14 @@ import Avatar from '@/components/ui/Avatar';
 import MiniCalendar from '@/components/dashboard/MiniCalendar';
 import StatusBadge from '@/components/actions/StatusBadge';
 import { supabase } from '@/lib/supabase';
-import { ENVIRONMENT_META, type User, type EnvironmentType, type Action } from '@/types';
+import { type User, type EnvironmentType, type Action } from '@/types';
 import { formatCalendarDate, parseISO, format, ptBR } from '@/lib/dateUtils';
 import { formatDate, cn } from '@/lib/utils';
-import { Users, Building2, Briefcase, Link2, ArrowRight, CalendarDays, Clock } from 'lucide-react';
-
-interface EnvAccess {
-  user_id: string;
-  environment: EnvironmentType;
-}
+import { Users, Building2, Briefcase, Link2, CalendarDays } from 'lucide-react';
 
 export default function OraculloDashboard() {
   const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
-  const [access, setAccess] = useState<EnvAccess[]>([]);
   const [wsCount, setWsCount] = useState<{ sharks: number; estrategos: number }>({ sharks: 0, estrategos: 0 });
   const [actions, setActions] = useState<Action[]>([]);
   const today = new Date();
@@ -28,14 +22,12 @@ export default function OraculloDashboard() {
 
   useEffect(() => {
     const load = async () => {
-      const [u, a, w, ac] = await Promise.all([
+      const [u, w, ac] = await Promise.all([
         supabase.from('users').select('id, email, full_name, role'),
-        supabase.from('user_environments').select('user_id, environment'),
         supabase.from('workspaces').select('id, organizations(environment)'),
         supabase.from('actions').select('*, workspace:workspaces(name)').order('action_date'),
       ]);
       setUsers((u.data as unknown as User[]) ?? []);
-      setAccess((a.data as unknown as EnvAccess[]) ?? []);
       const wsRows = (w.data ?? []) as unknown as Array<{ organizations: { environment: EnvironmentType } | null }>;
       setWsCount({
         sharks: wsRows.filter(r => r.organizations?.environment === 'sharks_company').length,
@@ -51,11 +43,6 @@ export default function OraculloDashboard() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
-
-  const envUsers = (env: EnvironmentType) => {
-    const ids = new Set(access.filter(a => a.environment === env).map(a => a.user_id));
-    return users.filter(u => ids.has(u.id) || u.role === 'oracullo_admin');
-  };
 
   const selectedDayActions = useMemo(() =>
     actions
@@ -169,49 +156,47 @@ export default function OraculloDashboard() {
         </Card>
 
         <div className="space-y-6">
-          {(['sharks_company', 'estrategos'] as EnvironmentType[]).map(env => {
-            const meta = ENVIRONMENT_META[env];
-            const list = envUsers(env);
-            return (
-              <Card key={env} hover onClick={() => navigate(env === 'sharks_company' ? '/sharks' : '/estrategos')}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <span className="text-xl leading-none">{meta.emoji}</span>
-                    {meta.label}
-                  </CardTitle>
-                  <span className="flex items-center gap-1 text-xs text-primary-600">
-                    Entrar <ArrowRight className="w-3 h-3" />
-                  </span>
-                </CardHeader>
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div className="bg-gray-50 rounded-lg p-3 text-center">
-                    <p className="text-xl font-bold text-gray-900">{env === 'sharks_company' ? wsCount.sharks : wsCount.estrategos}</p>
-                    <p className="text-[11px] text-gray-400">Clientes</p>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <span className="text-xl leading-none">🌐</span>
+                Ambientes
+              </CardTitle>
+              <span className="text-xs text-gray-400">visao consolidada</span>
+            </CardHeader>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="bg-gray-50 rounded-lg p-3 text-center">
+                <p className="text-xl font-bold text-gray-900">{wsCount.sharks + wsCount.estrategos}</p>
+                <p className="text-[11px] text-gray-400">Clientes total</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3 text-center">
+                <p className="text-xl font-bold text-gray-900">{users.length}</p>
+                <p className="text-[11px] text-gray-400">Usuarios</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {users.slice(0, 5).map(u => (
+                <div key={u.id} className="flex items-center gap-2.5">
+                  <Avatar name={u.full_name} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-gray-900 truncate">{u.full_name}</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-3 text-center">
-                    <p className="text-xl font-bold text-gray-900">{list.length}</p>
-                    <p className="text-[11px] text-gray-400">Com acesso</p>
-                  </div>
+                  <Badge variant={u.role === 'oracullo_admin' ? 'purple' : 'default'} size="sm">
+                    {u.role === 'oracullo_admin' ? 'Oracullo' : u.role === 'admin_sharks' ? 'Admin Sharks' : u.role === 'sharks_team' ? 'Time Sharks' : 'Cliente'}
+                  </Badge>
                 </div>
-                <div className="space-y-2">
-                  {list.slice(0, 3).map(u => (
-                    <div key={u.id} className="flex items-center gap-2.5">
-                      <Avatar name={u.full_name} size="sm" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm text-gray-900 truncate">{u.full_name}</p>
-                      </div>
-                      <Badge variant={u.role === 'oracullo_admin' ? 'purple' : 'default'} size="sm">
-                        {u.role === 'oracullo_admin' ? 'Oracullo' : u.role === 'admin_sharks' ? 'Admin' : u.role === 'sharks_team' ? 'Time' : 'Cliente'}
-                      </Badge>
-                    </div>
-                  ))}
-                  {list.length > 3 && (
-                    <p className="text-xs text-gray-400 text-center pt-1">+{list.length - 3} outros</p>
-                  )}
-                </div>
-              </Card>
-            );
-          })}
+              ))}
+              {users.length > 5 && (
+                <p className="text-xs text-gray-400 text-center pt-1">+{users.length - 5} outros</p>
+              )}
+            </div>
+            <button
+              onClick={() => navigate('/oracullo/access')}
+              className="mt-4 w-full text-center text-sm text-primary-600 hover:text-primary-700 transition-colors"
+            >
+              Ver todos os acessos →
+            </button>
+          </Card>
         </div>
       </div>
 
