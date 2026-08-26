@@ -9,7 +9,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false,
+    // Required for OAuth (Google) redirects: captures the tokens
+    // Supabase appends to the URL on return from the provider.
+    detectSessionInUrl: true,
+    flowType: 'pkce',
   },
 });
 

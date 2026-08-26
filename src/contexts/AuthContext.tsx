@@ -1,13 +1,18 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from '@/types';
+import { User } from '@supabase/supabase-js';
+import { User as Profile } from '@/types';
 import { supabase, authState } from '@/lib/supabase';
 
 interface AuthContextType {
-  user: User | null;
+  /** Profile row (public.users). Null when not approved yet. */
+  user: Profile | null;
+  /** Supabase Auth identity. Null when signed out. */
+  authUser: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  refreshProfile: () => Promise<boolean>;
   isSharks: boolean;
   isAdmin: boolean;
   isClient: boolean;
@@ -15,59 +20,60 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-async function fetchProfile(userId: string): Promise<User | null> {
+async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('users')
     .select('*')
     .eq('id', userId)
-    .single();
+    .maybeSingle();
 
-  if (error || !data) {
-    console.error('[auth] profile load error:', error?.message);
+  if (error) {
+    console.error('[auth] profile load error:', error.message);
     return null;
   }
-  return data as unknown as User;
+  return (data as unknown as Profile) ?? null;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [user, setUser] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
 
-    // Initial session check
+    const applySession = async (sessionUser: User | null) => {
+      if (!sessionUser) {
+        authState.userId = null;
+        setAuthUser(null);
+        setUser(null);
+        return;
+      }
+      authState.userId = sessionUser.id;
+      setAuthUser(sessionUser);
+      // Profile may not exist yet (access request pending) — that is
+      // a valid state handled by the AuthGate screen, NOT a fallback user.
+      const profile = await fetchProfile(sessionUser.id);
+      if (!mounted) return;
+      setUser(profile);
+    };
+
+    // Initial session check (also consumes OAuth redirect tokens
+    // because detectSessionInUrl is enabled).
     supabase.auth.getSession().then(async ({ data }) => {
       if (!mounted) return;
-      const sessionUser = data.session?.user;
-      if (sessionUser) {
-        authState.userId = sessionUser.id;
-        const profile = await fetchProfile(sessionUser.id);
-        if (!mounted) return;
-        if (profile) {
-          setUser(profile);
-        } else {
-          // Fallback: build from metadata
-          const meta = sessionUser.user_metadata || {};
-          setUser({
-            id: sessionUser.id,
-            email: sessionUser.email || '',
-            full_name: meta.full_name || sessionUser.email || '',
-            avatar_url: null,
-            role: meta.role || 'client',
-            created_at: sessionUser.created_at || new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-        }
-      }
-      setLoading(false);
+      await applySession(data.session?.user ?? null);
+      if (mounted) setLoading(false);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
       if (event === 'SIGNED_OUT') {
-        authState.userId = null;
-        setUser(null);
+        applySession(null);
+      } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        applySession(session?.user ?? null);
       }
+      // TOKEN_REFRESHED / USER_UPDATED: identity and profile unchanged.
     });
 
     return () => {
@@ -90,34 +96,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (data.user) {
       authState.userId = data.user.id;
+      setAuthUser(data.user);
       const profile = await fetchProfile(data.user.id);
-      if (profile) {
-        setUser(profile);
-      } else {
-        const meta = data.user.user_metadata || {};
-        setUser({
-          id: data.user.id,
-          email: data.user.email || '',
-          full_name: meta.full_name || data.user.email || '',
-          avatar_url: null,
-          role: meta.role || 'client',
-          created_at: data.user.created_at || new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-      }
+      setUser(profile);
     }
+  };
+
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/login`,
+      },
+    });
+    // On success the browser leaves the page — nothing else to do.
+    if (error) throw new Error(error.message);
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
     authState.userId = null;
+    setAuthUser(null);
     setUser(null);
   };
 
-  const refreshProfile = async () => {
-    if (!authState.userId) return;
+  const refreshProfile = async (): Promise<boolean> => {
+    if (!authState.userId) return false;
     const profile = await fetchProfile(authState.userId);
-    if (profile) setUser(profile);
+    setUser(profile);
+    return !!profile;
   };
 
   const isSharks = user?.role === 'admin_sharks' || user?.role === 'sharks_team';
@@ -125,7 +132,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isClient = user?.role === 'client';
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOut, refreshProfile, isSharks, isAdmin, isClient }}>
+    <AuthContext.Provider
+      value={{ user, authUser, loading, signIn, signInWithGoogle, signOut, refreshProfile, isSharks, isAdmin, isClient }}
+    >
       {children}
     </AuthContext.Provider>
   );

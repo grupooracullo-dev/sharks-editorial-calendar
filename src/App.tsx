@@ -12,6 +12,7 @@ import { useIntegration } from '@/hooks/useIntegration';
 import { SharksLayout, ClientLayout } from '@/components/layout/AppLayout';
 import LoginPage from '@/pages/auth/LoginPage';
 import RequestAccess from '@/pages/auth/RequestAccess';
+import AuthGate from '@/pages/auth/AuthGate';
 import SharksDashboard from '@/pages/sharks/SharksDashboard';
 import SharksCalendarPage from '@/pages/sharks/SharksCalendar';
 import SharksClients from '@/pages/sharks/SharksClients';
@@ -48,7 +49,7 @@ function DataSync() {
 }
 
 function AppRoutes() {
-  const { user, loading, isSharks, isClient } = useAuth();
+  const { user, authUser, loading, isSharks, isClient } = useAuth();
 
   if (loading) {
     return (
@@ -58,12 +59,27 @@ function AppRoutes() {
     );
   }
 
-  if (!user) {
+  // Not signed in at all — show login/request-access only
+  if (!authUser) {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/request-access" element={<RequestAccess />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
+
+  // Signed in via Google (or password) but no profile row yet —
+  // the admin hasn't approved the access request. AuthGate
+  // handles the pending/rejected realtime flow or shows the form.
+  if (!user) {
+    return (
+      <Routes>
+        {/* Allow direct access to the request page if a specific
+            workspace was requested by the admin before approval */}
+        <Route path="/request-access" element={<RequestAccess authUser={authUser} onSubmitted={() => {}} />} />
+        <Route path="*" element={<AuthGate />} />
       </Routes>
     );
   }

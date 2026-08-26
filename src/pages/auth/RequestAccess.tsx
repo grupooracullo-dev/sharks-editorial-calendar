@@ -7,23 +7,37 @@ import Textarea from '@/components/ui/Textarea';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import logoUrl from '/logo.png?url';
-import { ArrowLeft, Send, CheckCircle2, MailQuestion, Loader2 } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle2, MailQuestion, Loader2, ShieldCheck } from 'lucide-react';
+import { User } from '@supabase/supabase-js';
 
 interface Workspace {
   id: string;
   name: string;
 }
 
-export default function RequestAccess() {
+interface RequestAccessProps {
+  /** When present, we are in the Google-first flow: pre-fill + verified badge. */
+  authUser?: User | null;
+  /** AuthGate sets this so it can react to the new pending state. */
+  onSubmitted?: () => void;
+}
+
+export default function RequestAccess({ authUser = null, onSubmitted }: RequestAccessProps) {
   const navigate = useNavigate();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  const authEmail = authUser?.email ?? '';
+  const authName =
+    authUser?.user_metadata?.full_name
+    || authUser?.user_metadata?.name
+    || '';
+
   const [form, setForm] = useState({
-    full_name: '',
-    email: '',
+    full_name: authName,
+    email: authEmail,
     company: '',
     phone: '',
     workspace_id: '',
@@ -60,6 +74,13 @@ export default function RequestAccess() {
         message: form.message.trim() || null,
         requested_role: 'client',
       };
+
+      // Google-first: mark auth_provider so the RLS INSERT policy
+      // (which checks session email == request email) allows the row.
+      if (authUser) {
+        payload.auth_provider = 'google';
+      }
+
       const { error } = await supabase.from('access_requests').insert(payload);
       if (error) {
         if (error.code === '23505' || error.message.includes('duplicate') || error.message.includes('unique')) {
@@ -70,6 +91,7 @@ export default function RequestAccess() {
         return;
       }
       setSubmitted(true);
+      onSubmitted?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao enviar solicitação');
     } finally {
@@ -77,13 +99,19 @@ export default function RequestAccess() {
     }
   };
 
+  const isGoogleFlow = !!authUser;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-gray-900 flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
         <div className="text-center mb-8">
           <img src={logoUrl} alt="Sharks Company" className="h-16 mx-auto mb-4 object-contain drop-shadow-lg" />
           <h1 className="text-2xl font-bold text-white">Solicitar Acesso</h1>
-          <p className="text-primary-200 text-sm mt-1">Preencha o formulário para solicitar acesso à plataforma</p>
+          <p className="text-primary-200 text-sm mt-1">
+            {isGoogleFlow
+              ? 'Confirme os dados da sua conta Google para continuar'
+              : 'Preencha o formulário para solicitar acesso à plataforma'}
+          </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8">
@@ -101,15 +129,17 @@ export default function RequestAccess() {
                 Sua solicitação foi enviada para análise do administrador.
               </p>
               <p className="text-sm text-gray-600 mb-6">
-                Você receberá um e-mail com as instruções de acesso assim que for aprovada.
+                Assim que for aprovada, você será conectado automaticamente.
               </p>
-              <Link
-                to="/login"
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Voltar para o login
-              </Link>
+              {!isGoogleFlow && (
+                <Link
+                  to="/login"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Voltar para o login
+                </Link>
+              )}
             </div>
           ) : (
             <>
@@ -118,8 +148,15 @@ export default function RequestAccess() {
                 <h2 className="text-lg font-semibold text-gray-900">Novo acesso</h2>
               </div>
               <p className="text-sm text-gray-500 mb-6">
-                Após análise, o administrador criará sua conta e enviará uma senha temporária por e-mail.
+                Após análise, o administrador liberará seu acesso à plataforma.
               </p>
+
+              {isGoogleFlow && (
+                <div className="flex items-center gap-2 bg-blue-50 text-blue-700 text-xs font-medium px-3 py-2 rounded-lg mb-4">
+                  <ShieldCheck className="w-4 h-4 shrink-0" />
+                  E-mail verificado via Google — os campos preenchidos automaticamente não podem ser alterados.
+                </div>
+              )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -128,32 +165,44 @@ export default function RequestAccess() {
                     value={form.full_name}
                     onChange={(e) => setForm(p => ({ ...p, full_name: e.target.value }))}
                     placeholder="Seu nome"
+                    disabled={isGoogleFlow && !!authName}
                     required
                   />
-                  <Input
-                    label="E-mail *"
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))}
-                    placeholder="voce@empresa.com"
-                    required
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">E-mail *</label>
+                    {isGoogleFlow ? (
+                      <div className="w-full border border-gray-200 bg-gray-50 text-gray-600 text-sm rounded-lg px-3 py-2.5 flex items-center gap-2">
+                        <span className="truncate">{form.email}</span>
+                        <ShieldCheck className="w-4 h-4 text-blue-500 shrink-0" />
+                      </div>
+                    ) : (
+                      <Input
+                        type="email"
+                        value={form.email}
+                        onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))}
+                        placeholder="voce@empresa.com"
+                        required
+                      />
+                    )}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input
-                    label="Empresa"
-                    value={form.company}
-                    onChange={(e) => setForm(p => ({ ...p, company: e.target.value }))}
-                    placeholder="Sua empresa"
-                  />
-                  <Input
-                    label="Telefone"
-                    value={form.phone}
-                    onChange={(e) => setForm(p => ({ ...p, phone: e.target.value }))}
-                    placeholder="(11) 99999-9999"
-                  />
-                </div>
+                {!isGoogleFlow && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input
+                      label="Empresa"
+                      value={form.company}
+                      onChange={(e) => setForm(p => ({ ...p, company: e.target.value }))}
+                      placeholder="Sua empresa"
+                    />
+                    <Input
+                      label="Telefone"
+                      value={form.phone}
+                      onChange={(e) => setForm(p => ({ ...p, phone: e.target.value }))}
+                      placeholder="(11) 99999-9999"
+                    />
+                  </div>
+                )}
 
                 {workspaces.length > 0 && (
                   <Select
@@ -180,7 +229,7 @@ export default function RequestAccess() {
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => navigate('/login')}
+                    onClick={() => (isGoogleFlow ? window.history.back() : navigate('/login'))}
                     className="flex-1"
                   >
                     <ArrowLeft className="w-4 h-4" />

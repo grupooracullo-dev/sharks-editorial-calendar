@@ -10,9 +10,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 function generateTempPassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   let pwd = '';
-  for (let i = 0; i < 12; i++) {
-    pwd += chars[Math.floor(Math.random() * chars.length)];
-  }
+  for (let i = 0; i < 12; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
   return pwd;
 }
 
@@ -51,55 +49,89 @@ Deno.serve(async req => {
   if (reqErr || !reqRow) return json(404, { error: 'Solicitacao nao encontrada' });
   if (reqRow.status !== 'pending') return json(400, { error: `Solicitacao ja foi ${reqRow.status}` });
 
-  // 2. Check if email already exists in auth.users
-  const { data: { users: existingUsers } } = await admin.auth.admin.listUsers();
-  const existing = existingUsers?.find((u: { email?: string }) => u.email?.toLowerCase() === reqRow.email.toLowerCase());
-  if (existing) return json(400, { error: 'Ja existe um usuario com esse e-mail no sistema' });
+  // 2. Does an auth user already exist for this email?
+  //    (Google-first flow: user signed in with Google BEFORE approval)
+  const { data: existingAuthId, error: rpcErr } = await admin
+    .rpc('admin_find_auth_user_by_email', { p_email: reqRow.email });
 
-  // 3. Generate temp password
-  const tempPassword = generateTempPassword();
+  if (rpcErr) return json(500, { error: `Lookup auth: ${rpcErr.message}` });
 
-  // 4. Create auth user
-  const { data: authUser, error: createErr } = await admin.auth.admin.createUser({
-    email: reqRow.email,
-    password: tempPassword,
-    email_confirm: true,
-    user_metadata: {
+  let userId: string;
+  let tempPassword: string | null = null;
+  let authProvider: 'google' | 'password';
+
+  if (existingAuthId) {
+    // ---- Google-first: attach profile/membership to the existing identity.
+    // No password is generated — the user already authenticates via Google.
+    userId = existingAuthId;
+    authProvider = 'google';
+
+    const { data: existingProfile } = await admin
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (existingProfile) {
+      return json(400, { error: 'Este e-mail ja possui conta completa no sistema. Verifique o usuario ou rejeite a solicitacao.' });
+    }
+
+    // Pull the name from Google metadata when the form name is empty
+    const fullName = (reqRow.full_name || '').trim()
+      || (await admin.auth.admin.getUserById(userId)).data?.user?.user_metadata?.full_name
+      || reqRow.email;
+
+    const { error: profileErr } = await admin.from('users').insert({
+      id: userId,
+      email: reqRow.email,
+      full_name: fullName,
+      role: reqRow.requested_role,
+    });
+    if (profileErr) return json(500, { error: `Perfil: ${profileErr.message}` });
+  } else {
+    // ---- Classic flow: no auth user yet — create one with a temp password.
+    authProvider = 'password';
+    tempPassword = generateTempPassword();
+
+    const { data: authUser, error: createErr } = await admin.auth.admin.createUser({
+      email: reqRow.email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { full_name: reqRow.full_name, role: reqRow.requested_role },
+    });
+    if (createErr || !authUser?.user) {
+      return json(500, { error: `Falha ao criar auth: ${createErr?.message}` });
+    }
+    userId = authUser.user.id;
+
+    const { error: profileErr } = await admin.from('users').insert({
+      id: userId,
+      email: reqRow.email,
       full_name: reqRow.full_name,
       role: reqRow.requested_role,
-    },
-  });
-  if (createErr || !authUser?.user) {
-    return json(500, { error: `Falha ao criar auth: ${createErr?.message}` });
+    });
+    if (profileErr) {
+      await admin.auth.admin.deleteUser(userId).catch(() => {});
+      return json(500, { error: `Perfil: ${profileErr.message}` });
+    }
   }
 
-  // 5. Create profile row
-  const { error: profileErr } = await admin.from('users').insert({
-    id: authUser.user.id,
-    email: reqRow.email,
-    full_name: reqRow.full_name,
-    role: reqRow.requested_role,
-  });
-  if (profileErr) {
-    await admin.auth.admin.deleteUser(authUser.user.id).catch(() => {});
-    return json(500, { error: `Perfil: ${profileErr.message}` });
-  }
-
-  // 6. Create membership if workspace specified
+  // 3. Membership when a workspace was requested
   if (reqRow.workspace_id) {
     const { error: memErr } = await admin.from('memberships').upsert(
-      { user_id: authUser.user.id, workspace_id: reqRow.workspace_id, role: 'member' },
+      { user_id: userId, workspace_id: reqRow.workspace_id, role: 'member' },
       { onConflict: 'user_id,workspace_id' }
     );
     if (memErr) console.warn('[approve] membership warning:', memErr.message);
   }
 
-  // 7. Update request status
+  // 4. Mark the request approved
   const { error: updErr } = await admin
     .from('access_requests')
     .update({
       status: 'approved',
-      temp_password: tempPassword,
+      temp_password: tempPassword, // null for Google-first
+      auth_provider: authProvider === 'google' ? 'google' : null,
       approved_by: userData.user.id,
       approved_at: new Date().toISOString(),
       processed_at: new Date().toISOString(),
@@ -110,7 +142,8 @@ Deno.serve(async req => {
 
   return json(200, {
     ok: true,
-    user_id: authUser.user.id,
+    user_id: userId,
+    auth_provider: authProvider,
     temp_password: tempPassword,
     email: reqRow.email,
   });

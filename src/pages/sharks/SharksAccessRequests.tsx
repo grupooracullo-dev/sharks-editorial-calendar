@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import {
   UserPlus, Check, X, Mail, Building2, Phone,
   MessageSquare, Calendar, Eye, EyeOff, Copy,
-  Loader2, Inbox,
+  Loader2, Inbox, ShieldCheck,
 } from 'lucide-react';
 
 interface AccessRequest {
@@ -24,6 +24,7 @@ interface AccessRequest {
   status: 'pending' | 'approved' | 'rejected';
   requested_role: string;
   temp_password: string | null;
+  auth_provider: string | null;
   approved_by: string | null;
   approved_at: string | null;
   rejected_reason: string | null;
@@ -99,8 +100,12 @@ export default function SharksAccessRequests() {
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(data.error);
 
-      toast.success(`Acesso aprovado! Senha temporária: ${data.temp_password}`);
-      setShowPassword(true);
+      if (data.auth_provider === 'google') {
+        toast.success(`Acesso aprovado! ${data.email} já possui conta Google ativa.`);
+      } else {
+        toast.success(`Acesso aprovado! Senha temporária: ${data.temp_password}`);
+        setShowPassword(true);
+      }
       setApproveModal(null);
       await load();
     } catch (err) {
@@ -218,6 +223,12 @@ export default function SharksAccessRequests() {
                       {req.status === 'pending' ? 'Pendente' :
                        req.status === 'approved' ? 'Aprovado' : 'Rejeitado'}
                     </Badge>
+                    {req.auth_provider === 'google' && (
+                      <Badge variant="info" className="bg-blue-100 text-blue-700">
+                        <ShieldCheck className="w-3 h-3 inline mr-1" />
+                        Google
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-gray-500">
                     <span className="flex items-center gap-1"><Mail className="w-3 h-3" /> {req.email}</span>
@@ -269,6 +280,12 @@ export default function SharksAccessRequests() {
                       <Copy className="w-4 h-4" />
                     </button>
                   )}
+                  {req.status === 'approved' && req.auth_provider === 'google' && (
+                    <span className="inline-flex items-center gap-1 text-xs text-blue-600 font-medium px-2">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      SSO
+                    </span>
+                  )}
                 </div>
               </div>
             </Card>
@@ -286,14 +303,21 @@ export default function SharksAccessRequests() {
         <p className="text-sm text-gray-600">
           Aprovar <strong>{approveModal?.full_name}</strong> ({approveModal?.email})?
         </p>
-        <p className="text-xs text-gray-500 mt-2">
-          Será criado um usuário com uma senha temporária que você deverá enviar ao solicitante.
-        </p>
+        {approveModal?.auth_provider === 'google' ? (
+          <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2 mt-2">
+            Este usuário já possui conta Google autenticada. O acesso será liberado imediatamente —
+            nenhuma senha temporária será gerada.
+          </p>
+        ) : (
+          <p className="text-xs text-gray-500 mt-2">
+            Será criado um usuário com uma senha temporária que você deverá enviar ao solicitante.
+          </p>
+        )}
         <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100">
           <Button variant="ghost" onClick={() => setApproveModal(null)}>Cancelar</Button>
           <Button onClick={handleApprove} loading={processing}>
             <Check className="w-4 h-4" />
-            Aprovar e gerar senha
+            {approveModal?.auth_provider === 'google' ? 'Aprovar acesso' : 'Aprovar e gerar senha'}
           </Button>
         </div>
       </Modal>
@@ -347,6 +371,14 @@ export default function SharksAccessRequests() {
               label="Solicitado em"
               value={new Date(viewModal.created_at).toLocaleString('pt-BR')}
             />
+            {viewModal.auth_provider === 'google' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs font-semibold text-blue-700 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4" />
+                  Autenticado via Google — nenhuma senha temporária necessária
+                </p>
+              </div>
+            )}
             {viewModal.message && (
               <div className="bg-gray-50 rounded-lg p-3">
                 <p className="text-xs font-semibold text-gray-500 mb-1">Mensagem</p>
