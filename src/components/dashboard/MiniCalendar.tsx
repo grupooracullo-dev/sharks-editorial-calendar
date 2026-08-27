@@ -225,8 +225,8 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate, camp
                     isSelected && 'ring-2 ring-primary-400 ring-inset bg-primary-50/30 z-10'
                   )}
                 >
-                  {/* Numero do dia + contagem */}
-                  <div className="flex items-center justify-between gap-1">
+                  {/* Numero do dia */}
+                  <div className="flex items-center gap-1">
                     <span
                       className={cn(
                         'w-6 h-6 flex items-center justify-center rounded-full text-xs font-medium leading-none',
@@ -239,16 +239,6 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate, camp
                     >
                       {day.getDate()}
                     </span>
-                    {dayActions.length > 0 && (
-                      <span
-                        className={cn(
-                          'rounded-full px-1.5 min-w-[18px] text-[9px] font-bold text-center leading-4',
-                          isSelected ? 'bg-primary-500 text-white' : 'bg-primary-100 text-primary-700'
-                        )}
-                      >
-                        {dayActions.length}
-                      </span>
-                    )}
                   </div>
 
                   {/* Faixas de campanha (all-day blocks) + data estrategica */}
@@ -286,12 +276,26 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate, camp
                         </span>
                       );
                     })}
-                    {dayActions.length > 3 && (
-                      <span className="text-[9px] text-gray-400 px-0.5 leading-none">
-                        +{dayActions.length - 3} mais
-                      </span>
-                    )}
                   </div>
+
+                  {/* Contagem de acoes — centralizada na base da celula */}
+                  {dayActions.length > 0 && (
+                    <div className="flex justify-center pt-1 shrink-0">
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-[9px] font-bold leading-none ring-1',
+                          isSelected
+                            ? 'bg-primary-500 text-white ring-primary-500'
+                            : 'bg-primary-100/80 text-primary-700 ring-primary-200/50'
+                        )}
+                      >
+                        <span className="sm:hidden">{dayActions.length}</span>
+                        <span className="hidden sm:inline">
+                          {dayActions.length} {dayActions.length === 1 ? 'ação' : 'ações'}
+                        </span>
+                      </span>
+                    </div>
+                  )}
 
                   {/* Hover/tap: indicador de nova acao quando o dia esta vazio */}
                   {dayActions.length === 0 && inMonth && (
