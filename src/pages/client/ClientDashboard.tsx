@@ -7,7 +7,7 @@ import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
 import StatusBadge from '@/components/actions/StatusBadge';
 import MiniCalendar from '@/components/dashboard/MiniCalendar';
 import MonthSummaryCard from '@/components/dashboard/MonthSummaryCard';
-import { CONTENT_FORMATS } from '@/lib/constants';
+import { CONTENT_FORMATS, ACTION_TYPES } from '@/lib/constants';
 import { formatDate, formatTime, cn } from '@/lib/utils';
 import { formatCalendarDate, parseISO, format, ptBR } from '@/lib/dateUtils';
 import { CalendarDays, Sparkles, Megaphone, ArrowRight } from 'lucide-react';
@@ -45,6 +45,35 @@ export default function ClientDashboard() {
 
   if (!currentWorkspace) return null;
 
+  // Quick insights derivados
+  const nextActionDate = data.nextAction ? new Date(data.nextAction.action_date + 'T00:00:00') : new Date();
+  const nextActionRelative = (() => {
+    if (!data.nextAction) return '';
+    const days = Math.round((nextActionDate.getTime() - new Date(todayStr + 'T00:00:00').getTime()) / 86400000);
+    return days <= 0 ? 'Hoje' : days === 1 ? 'Amanhã' : `Em ${days} dias`;
+  })();
+  const nextActionChip = data.nextAction
+    ? data.nextAction.format && data.nextAction.format !== 'other'
+      ? CONTENT_FORMATS[data.nextAction.format]
+      : data.nextAction.action_type && data.nextAction.action_type !== 'other'
+        ? ACTION_TYPES[data.nextAction.action_type]
+        : null
+    : null;
+  const campaignDaysLeft = data.activeCampaign?.end_date
+    ? Math.ceil(
+        (new Date(data.activeCampaign.end_date + 'T00:00:00').getTime() - new Date(todayStr + 'T00:00:00').getTime()) /
+          86400000
+      )
+    : null;
+  const campaignProgress = (() => {
+    const c = data.activeCampaign;
+    if (!c?.start_date || !c.end_date) return null;
+    const start = new Date(c.start_date + 'T00:00:00').getTime();
+    const end = new Date(c.end_date + 'T00:00:00').getTime();
+    if (end <= start) return null;
+    return Math.min(100, Math.max(0, ((Date.now() - start) / (end - start)) * 100));
+  })();
+
   return (
     <div className="space-y-6">
       {/* Greeting */}
@@ -62,20 +91,38 @@ export default function ClientDashboard() {
               <Sparkles className="w-4 h-4 text-primary-500" />
               PRÓXIMA PUBLICAÇÃO
             </CardTitle>
+            {data.nextAction && (
+              <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-primary-50 text-primary-700 uppercase tracking-wide">
+                {nextActionRelative}
+              </span>
+            )}
           </CardHeader>
           {data.nextAction ? (
-            <>
-              <p className="font-semibold text-gray-900">{CONTENT_FORMATS[data.nextAction.format || 'other']}</p>
-              <p className="text-sm text-gray-700 mt-1">{data.nextAction.title}</p>
-              <div className="flex items-center justify-between gap-2 mt-2">
-                <p className="text-xs text-gray-400">
-                  {new Date(data.nextAction.action_date + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long' })}
-                  {' · '}
-                  {formatTime(data.nextAction.action_time)}
-                </p>
-                <StatusBadge status={data.nextAction.status} size="sm" />
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 text-white flex flex-col items-center justify-center shrink-0 shadow-sm">
+                <span className="text-[10px] uppercase font-medium opacity-80 leading-none">
+                  {nextActionDate.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}
+                </span>
+                <span className="text-2xl font-bold leading-tight">{nextActionDate.getDate()}</span>
+                <span className="text-[10px] capitalize opacity-80 leading-none">
+                  {format(nextActionDate, 'MMM', { locale: ptBR })}
+                </span>
               </div>
-            </>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-gray-900 truncate">{data.nextAction.title}</p>
+                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  {nextActionChip && (
+                    <span className="px-2 py-0.5 bg-gray-100 rounded-full text-[10px] font-medium text-gray-600">
+                      {nextActionChip}
+                    </span>
+                  )}
+                  {data.nextAction.action_time && (
+                    <span className="text-xs text-gray-400">{formatTime(data.nextAction.action_time)}</span>
+                  )}
+                </div>
+                <StatusBadge status={data.nextAction.status} size="sm" className="mt-2 inline-flex" />
+              </div>
+            </div>
           ) : (
             <p className="text-sm text-gray-500">Nenhuma publicação agendada</p>
           )}
@@ -88,19 +135,43 @@ export default function ClientDashboard() {
               <Megaphone className="w-4 h-4 text-primary-500" />
               CAMPANHA ATIVA
             </CardTitle>
+            {data.activeCampaign && campaignDaysLeft !== null && (
+              <span
+                className={cn(
+                  'text-[10px] font-semibold px-2 py-1 rounded-full uppercase tracking-wide',
+                  campaignDaysLeft >= 0 ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-gray-400'
+                )}
+              >
+                {campaignDaysLeft >= 0 ? `${campaignDaysLeft}d restantes` : 'Encerrada'}
+              </span>
+            )}
           </CardHeader>
           {data.activeCampaign ? (
             <>
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: data.activeCampaign.color || '#3B82F6' }} />
+                <span
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: data.activeCampaign.color || '#3B82F6' }}
+                />
                 <p className="font-semibold text-gray-900 truncate">{data.activeCampaign.name}</p>
               </div>
               {data.activeCampaign.objective && (
-                <p className="text-sm text-gray-500 mt-1">{data.activeCampaign.objective}</p>
+                <p className="text-sm text-gray-500 mt-1 truncate">{data.activeCampaign.objective}</p>
               )}
-              <p className="text-xs text-gray-400 mt-3">
-                Até {data.activeCampaign.end_date ? formatDate(data.activeCampaign.end_date) : '—'}
-              </p>
+              {campaignProgress !== null && (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-[11px] text-gray-400 mb-1">
+                    <span>{formatDate(data.activeCampaign.start_date!)}</span>
+                    <span>{data.activeCampaign.end_date ? formatDate(data.activeCampaign.end_date) : '—'}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${campaignProgress}%`, backgroundColor: data.activeCampaign.color || '#3B82F6' }}
+                    />
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <p className="text-sm text-gray-500">Nenhuma campanha ativa no momento</p>

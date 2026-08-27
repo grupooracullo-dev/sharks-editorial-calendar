@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Action } from '@/types';
 import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
 import { CONTENT_FORMATS } from '@/lib/constants';
+import { cn } from '@/lib/utils';
 import { formatCalendarDate, startOfMonth, endOfMonth, format, ptBR } from '@/lib/dateUtils';
 import { CalendarRange } from 'lucide-react';
 
@@ -28,7 +29,6 @@ export default function MonthSummaryCard({ actions }: MonthSummaryCardProps) {
     return {
       total: monthActions.length,
       published,
-      production: count(['in_production']),
       scheduled: count(['scheduled']),
       pending: count(['draft', 'briefing', 'sharks_review']),
       progress,
@@ -42,7 +42,6 @@ export default function MonthSummaryCard({ actions }: MonthSummaryCardProps) {
   const boxes = [
     { label: 'Total', value: stats.total, cls: 'bg-gray-50 text-gray-900' },
     { label: 'Publicadas', value: stats.published, cls: 'bg-emerald-50 text-emerald-600' },
-    { label: 'Em produção', value: stats.production, cls: 'bg-amber-50 text-amber-600' },
     { label: 'Agendadas', value: stats.scheduled, cls: 'bg-indigo-50 text-indigo-600' },
     { label: 'Pendentes', value: stats.pending, cls: 'bg-orange-50 text-orange-600' },
   ];
@@ -59,11 +58,12 @@ export default function MonthSummaryCard({ actions }: MonthSummaryCardProps) {
         <span className="text-xs text-gray-400 capitalize">{capitalized}</span>
       </CardHeader>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      {/* Mobile: grade 2x2 | Desktop: 4 numa linha */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
         {boxes.map(b => (
-          <div key={b.label} className={`rounded-xl p-3 text-center ${b.cls}`}>
-            <p className="text-2xl font-bold leading-tight">{b.value}</p>
-            <p className="text-[11px] mt-0.5 opacity-80">{b.label}</p>
+          <div key={b.label} className={`rounded-xl p-2.5 sm:p-3 text-center ${b.cls}`}>
+            <p className="text-xl sm:text-2xl font-bold leading-tight">{b.value}</p>
+            <p className="text-[10px] sm:text-[11px] mt-0.5 opacity-80">{b.label}</p>
           </div>
         ))}
       </div>
@@ -73,8 +73,14 @@ export default function MonthSummaryCard({ actions }: MonthSummaryCardProps) {
           {Object.entries(stats.byFormat)
             .sort((a, b) => b[1] - a[1])
             .slice(0, 6)
-            .map(([fmt, count]) => (
-              <span key={fmt} className="px-2 py-1 bg-gray-100 rounded-full text-xs text-gray-600">
+            .map(([fmt, count], i) => (
+              <span
+                key={fmt}
+                className={cn(
+                  'px-2 py-1 bg-gray-100 rounded-full text-xs text-gray-600',
+                  i >= 3 && 'hidden sm:inline-flex'
+                )}
+              >
                 {count}× {CONTENT_FORMATS[fmt as keyof typeof CONTENT_FORMATS] || fmt}
               </span>
             ))}
