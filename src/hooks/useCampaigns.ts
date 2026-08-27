@@ -145,5 +145,5 @@ export function useCampaigns(workspaceId?: string) {
 
 export function useActiveCampaigns(workspaceId?: string) {
   const { campaigns } = useCampaigns(workspaceId);
-  return campaigns.filter(c => c.status === 'active');
+  return campaigns.filter(c => c.status === 'active' || c.status === 'draft');
 }
