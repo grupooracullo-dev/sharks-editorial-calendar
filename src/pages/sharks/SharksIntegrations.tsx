@@ -13,10 +13,14 @@ import {
   createClientCalendar,
   disconnectCalendar,
   setAutoSync,
+  setEnvSync,
+  changeSyncMode,
   type GoogleIntegration,
   type GoogleCalendarOption,
 } from '@/lib/googleSync';
+import SyncModeSelector, { EnvSyncToggles } from '@/components/integrations/SyncModeSelector';
 import { toast } from 'sonner';
+import type { SyncMode, EnvironmentType } from '@/types';
 import {
   Calendar,
   CheckCircle2,
@@ -31,6 +35,7 @@ import {
   ChevronRight,
   Mail,
   CalendarPlus,
+  Repeat,
 } from 'lucide-react';
 
 function formatDateTime(iso: string | null): string {  if (!iso) return 'Nunca';
@@ -52,6 +57,8 @@ export default function SharksIntegrations() {
   const [calendars, setCalendars] = useState<GoogleCalendarOption[] | null>(null);
   const [loadingCalendars, setLoadingCalendars] = useState(false);
   const [creatingCalendar, setCreatingCalendar] = useState(false);
+  const [syncMode, setSyncMode] = useState<SyncMode>('split');
+  const [switchingMode, setSwitchingMode] = useState(false);
 
   // Modo "Todos os clientes": status de integracao de cada workspace
   const [allIntegrations, setAllIntegrations] = useState<Record<string, GoogleIntegration>>({});
@@ -115,7 +122,32 @@ export default function SharksIntegrations() {
   const handleConnect = () => {
     if (!user) return;
     // Global mode when no workspace selected
-    startGoogleConnect(sharksWs?.id ?? null, user.id);
+    startGoogleConnect(sharksWs?.id ?? null, user.id, '/sharks/integrations', syncMode);
+  };
+
+  const handleToggleEnv = async (env: EnvironmentType, enabled: boolean) => {
+    try {
+      await setEnvSync(sharksWs?.id ?? null, env, enabled);
+      toast.success(enabled ? 'Sincronização ativada.' : 'Sincronização pausada.');
+    } catch (e) {
+      toast.error(`Erro: ${(e as Error).message}`);
+    }
+  };
+
+  const handleSwitchMode = async () => {
+    if (switchingMode) return;
+    setSwitchingMode(true);
+    const next = integration?.sync_mode === 'split' ? 'unified' : 'split';
+    try {
+      await changeSyncMode(sharksWs?.id ?? null, next);
+      toast.success(next === 'split'
+        ? 'Modo separado: agendas "Sharks" e "Estrategos" criadas no Google.'
+        : 'Modo única agenda: novos eventos usam a agenda principal.');
+    } catch (e) {
+      toast.error(`Erro: ${(e as Error).message}`);
+    } finally {
+      setSwitchingMode(false);
+    }
   };
 
   const handleSyncNow = async () => {
@@ -328,6 +360,16 @@ export default function SharksIntegrations() {
                         {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                         Sincronizar agora
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSwitchMode}
+                        disabled={switchingMode}
+                        className="bg-white border-green-300 text-green-700 hover:bg-green-100"
+                      >
+                        {switchingMode ? <Loader2 className="w-4 h-4 animate-spin" /> : <Repeat className="w-4 h-4" />}
+                        {globalInteg?.sync_mode === 'split' ? 'Usar uma agenda só' : 'Separar por ambiente'}
+                      </Button>
                       <span className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded-full">
                         <Zap className="w-3 h-3" /> Ativa
                       </span>
@@ -341,6 +383,9 @@ export default function SharksIntegrations() {
                     Conecte a <strong>sua</strong> conta Google — o cronograma de todos os clientes é
                     importado automaticamente para a sua agenda. Cada membro do time conecta a própria conta.
                   </p>
+                  <div className="mb-3">
+                    <SyncModeSelector value={syncMode} onChange={setSyncMode} />
+                  </div>
                   <Button onClick={handleConnect} size="sm">
                     <LinkIcon className="w-4 h-4" /> Conectar minha conta Google
                   </Button>
@@ -400,6 +445,9 @@ export default function SharksIntegrations() {
                 reprocessamento e mapeamento por ID de evento.
               </p>
             </div>
+            <div className="mb-4">
+              <SyncModeSelector value={syncMode} onChange={setSyncMode} />
+            </div>
             <Button onClick={handleConnect} disabled={!sharksWs}>
               <LinkIcon className="w-4 h-4" />
               Conectar Google Calendar
@@ -407,6 +455,12 @@ export default function SharksIntegrations() {
           </>
         ) : (
           <div className="space-y-4">
+            {integration?.sync_mode === 'split' && (
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-400 font-medium mb-2">Sync por ambiente</p>
+                <EnvSyncToggles envAutoSync={integration?.env_auto_sync} onToggle={handleToggleEnv} />
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                 <Mail className="w-4 h-4 text-gray-400 shrink-0" />
@@ -504,6 +558,10 @@ export default function SharksIntegrations() {
               <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing}>
                 {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                 Sincronizar agora
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleSwitchMode} disabled={switchingMode}>
+                {switchingMode ? <Loader2 className="w-4 h-4 animate-spin" /> : <Repeat className="w-4 h-4" />}
+                {integration?.sync_mode === 'split' ? 'Usar uma agenda só' : 'Separar por ambiente'}
               </Button>
               <Button
                 variant="secondary"

@@ -246,7 +246,7 @@ export default function ClientIntegrations() {
           <div className="space-y-4">
             {integration?.sync_mode === 'split' && (
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-400 font-medium mb-2">Sync por empresa</p>
+                <p className="text-xs uppercase tracking-wide text-gray-400 font-medium mb-2">Sync por ambiente</p>
                 <EnvSyncToggles envAutoSync={integration?.env_auto_sync} onToggle={handleToggleEnv} />
               </div>
             )}
@@ -349,7 +349,7 @@ export default function ClientIntegrations() {
               </Button>
               <Button variant="outline" size="sm" onClick={handleSwitchMode} disabled={switchingMode}>
                 {switchingMode ? <Loader2 className="w-4 h-4 animate-spin" /> : <Repeat className="w-4 h-4" />}
-                {integration?.sync_mode === 'split' ? 'Usar uma agenda só' : 'Separar por empresa'}
+                {integration?.sync_mode === 'split' ? 'Usar uma agenda só' : 'Separar por ambiente'}
               </Button>
               {confirmDisconnect ? (
                 <span className="flex items-center gap-2">

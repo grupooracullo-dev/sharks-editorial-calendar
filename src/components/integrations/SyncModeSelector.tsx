@@ -13,7 +13,7 @@ export default function SyncModeSelector({ value, onChange }: SyncModeSelectorPr
     {
       id: 'split',
       icon: SplitSquareHorizontal,
-      title: 'Agendas separadas por empresa',
+      title: 'Agendas separadas por ambiente',
       desc: 'Criamos "Sharks" e "Estrategos" no seu Google Calendar — ligue, desligue e colore cada um à vontade.',
       badge: 'Recomendado',
     },
@@ -71,7 +71,7 @@ export default function SyncModeSelector({ value, onChange }: SyncModeSelectorPr
       </div>
       <div className="flex items-start gap-2 text-xs text-gray-400">
         <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-        <p>Você pode trocar o modo depois em "Trocar modo". Eventos já criados permanecem; os novos seguem o modo atual.</p>
+        <p>Você pode trocar o modo depois pelo botão "Usar uma agenda só" / "Separar por ambiente". Eventos já criados permanecem; os novos seguem o modo atual.</p>
       </div>
       <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
         <Calendar className="w-3 h-3" />
