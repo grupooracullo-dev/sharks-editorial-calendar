@@ -279,7 +279,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                       backgroundImage: `linear-gradient(${dayCampaigns[0].color || '#3B82F6'}0F, ${dayCampaigns[0].color || '#3B82F6'}0F)`,
                     } : undefined}
                     className={cn(
-                      'min-h-[70px] sm:min-h-[100px] md:min-h-[120px] border-r border-b last:border-r-0 p-1 sm:p-1.5 transition-colors',
+                      'min-h-[90px] sm:min-h-[130px] md:min-h-[150px] border-r border-b last:border-r-0 p-1 sm:p-1.5 transition-colors',
                       !isCurrentMonth && 'bg-gray-50/50',
                       isToday && 'bg-primary-50/30',
                       dayActions.length === 0 && 'cursor-pointer',
@@ -345,7 +345,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                       </div>
                     )}
                     <div className="space-y-0.5 sm:space-y-1">
-                      {dayActions.slice(0, isMobile ? 2 : 3).map(action => (
+                      {dayActions.slice(0, isMobile ? 2 : 4).map(action => (
                         <CalendarEvent
                           key={action.id}
                           action={action}
@@ -355,8 +355,8 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                           showClient={isAdmin}
                         />
                       ))}
-                      {dayActions.length > (isMobile ? 2 : 3) && (
-                        <p className="text-[9px] sm:text-[10px] text-gray-400 text-center">+{dayActions.length - (isMobile ? 2 : 3)}</p>
+                      {dayActions.length > (isMobile ? 2 : 4) && (
+                        <p className="text-[9px] sm:text-[10px] text-gray-400 text-center">+{dayActions.length - (isMobile ? 2 : 4)}</p>
                       )}
                     </div>
                   </div>
@@ -404,7 +404,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
               ))}
             </div>
             <div className={cn(
-              'grid min-h-[400px] sm:min-h-[500px]',
+              'grid min-h-[500px] sm:min-h-[600px]',
               isMobile ? 'grid-cols-3' : 'grid-cols-7'
             )}>
               {(isMobile ? calendarDays.slice(0, 3) : calendarDays.slice(0, 7)).map((day, i) => {

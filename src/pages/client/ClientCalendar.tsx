@@ -94,7 +94,7 @@ export default function ClientCalendar() {
                     backgroundImage: `linear-gradient(${dayCampaigns[0].color || '#3B82F6'}0F, ${dayCampaigns[0].color || '#3B82F6'}0F)`,
                   } : undefined}
                   className={cn(
-                    'min-h-[90px] sm:min-h-[110px] border-r border-b last:border-r-0 p-1.5',
+                    'min-h-[110px] sm:min-h-[140px] md:min-h-[150px] border-r border-b last:border-r-0 p-1.5',
                     !isCurrentMonth && 'bg-gray-50/50',
                     isToday && 'bg-primary-50/30'
                   )}
@@ -142,11 +142,11 @@ export default function ClientCalendar() {
                     </div>
                   )}
                   <div className="space-y-1">
-                    {dayActions.slice(0, 2).map(action => (
+                    {dayActions.slice(0, 3).map(action => (
                       <CalendarEvent key={action.id} action={action} onClick={() => handleActionClick(action)} compact />
                     ))}
-                    {dayActions.length > 2 && (
-                      <p className="text-[10px] text-gray-400">+{dayActions.length - 2}</p>
+                    {dayActions.length > 3 && (
+                      <p className="text-[10px] text-gray-400">+{dayActions.length - 3}</p>
                     )}
                   </div>
                 </div>
@@ -171,7 +171,7 @@ export default function ClientCalendar() {
       {/* Week view (read-only) */}
       {view === 'week' && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="grid grid-cols-7 min-h-[400px]">
+          <div className="grid grid-cols-7 min-h-[500px] sm:min-h-[600px]">
             {calendarDays.slice(0, 7).map((day, i) => {
               const dateStr = formatCalendarDate(day);
               const dayActions = actions.filter(a => a.action_date === dateStr);
