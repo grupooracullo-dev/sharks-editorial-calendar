@@ -71,7 +71,7 @@ export function subscribeToActions(listener: () => void): () => void {
   };
 }
 
-const SELECT_WITH_JOINS = '*, campaign:campaigns(*), editorial_pillar:editorial_pillars(*), workspace:workspaces(name)';
+const SELECT_WITH_JOINS = '*, campaign:campaigns(*), editorial_pillar:editorial_pillars(*), workspace:workspaces(name), responsible:users!actions_responsible_id_fkey(id, full_name, avatar_url)';
 
 export async function loadActions(workspaceId?: string | null, environment?: string | null): Promise<void> {
   currentScope = workspaceId ?? null;

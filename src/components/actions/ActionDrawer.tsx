@@ -28,6 +28,7 @@ export default function ActionDrawer({ action, isOpen, onClose, onEdit, onDelete
 
   const pillar = action.editorial_pillar;
   const campaign = action.campaign;
+  const responsible = action.responsible;
 
   return (
     <Drawer isOpen={isOpen} onClose={onClose} title="Detalhes da Ação" width="lg">
@@ -90,6 +91,17 @@ export default function ActionDrawer({ action, isOpen, onClose, onEdit, onDelete
             <div className="space-y-1">
               <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Canal</p>
               <p className="text-sm text-gray-900">{action.channel}</p>
+            </div>
+          )}
+          {responsible && (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Responsável</p>
+              <p className="text-sm text-gray-900 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold">
+                  {responsible.full_name?.charAt(0)?.toUpperCase() || '?'}
+                </span>
+                {responsible.full_name}
+              </p>
             </div>
           )}
         </div>

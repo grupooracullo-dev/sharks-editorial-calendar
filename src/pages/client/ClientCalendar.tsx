@@ -288,6 +288,17 @@ export default function ClientCalendar() {
                   <p className="text-sm text-gray-900">{selectedAction.channel}</p>
                 </div>
               )}
+              {selectedAction.responsible && (
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Responsável</p>
+                  <p className="text-sm text-gray-900 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-[10px] font-bold">
+                      {selectedAction.responsible.full_name?.charAt(0)?.toUpperCase() || '?'}
+                    </span>
+                    {selectedAction.responsible.full_name}
+                  </p>
+                </div>
+              )}
               {selectedAction.objective && (
                 <div className="col-span-2">
                   <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Objetivo</p>

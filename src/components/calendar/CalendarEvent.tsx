@@ -39,6 +39,7 @@ export default function CalendarEvent({ action, onClick, onQuickStatus, compact,
   const formatLabel = action.format || action.action_type;
   const clientName = action.workspace?.name;
   const campaign = action.campaign;
+  const responsible = action.responsible;
   const overdue = isOverdue(action.action_date, action.status);
   const statusConf = ACTION_STATUSES[action.status] || ACTION_STATUSES.draft;
   const next = NEXT_STATUS[action.status];
@@ -95,6 +96,15 @@ export default function CalendarEvent({ action, onClick, onQuickStatus, compact,
                 {campaign.name}
               </span>
             )}
+            {/* Responsável */}
+            {responsible && !compact && (
+              <span className="inline-flex items-center gap-0.5 text-[9px] text-gray-500 mt-0.5">
+                <span className="w-3 h-3 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-[7px] font-bold">
+                  {responsible.full_name?.charAt(0)?.toUpperCase() || '?'}
+                </span>
+                {responsible.full_name}
+              </span>
+            )}
             {showClient && clientName && (
               <span className={cn(
                 'font-medium opacity-80 block leading-tight truncate text-primary-600',
@@ -135,6 +145,14 @@ export default function CalendarEvent({ action, onClick, onQuickStatus, compact,
               <div className="flex items-center gap-1.5">
                 <Megaphone className="w-3 h-3" style={{ color: campaign.color || '#3B82F6' }} />
                 <span style={{ color: campaign.color || '#3B82F6' }}>{campaign.name}</span>
+              </div>
+            )}
+            {responsible && (
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-[8px] font-bold">
+                  {responsible.full_name?.charAt(0)?.toUpperCase() || '?'}
+                </span>
+                <span>{responsible.full_name}</span>
               </div>
             )}
           </div>

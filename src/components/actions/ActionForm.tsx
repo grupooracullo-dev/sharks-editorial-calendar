@@ -37,20 +37,23 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
   const campaigns = useActiveCampaigns(workspaceId);
   const { create, update, remove } = useActions({});
 
-  // Team members (admin + sharks_team) for responsible selector
+  // Team members (admin + team) for responsible selector — filtered by environment
   const [teamMembers, setTeamMembers] = useState<Array<{ id: string; full_name: string }>>([]);
 
   useEffect(() => {
     if (!isOpen) return;
     supabase
-      .from('users')
-      .select('id, full_name')
-      .in('role', ['admin_sharks', 'sharks_team'])
-      .order('full_name')
+      .from('user_environments')
+      .select('user_id, users!inner(id, full_name)')
+      .eq('environment', environment)
+      .in('role', ['admin', 'team'])
+      .order('full_name', { foreignTable: 'users' })
       .then(({ data }) => {
-        if (data) setTeamMembers(data as Array<{ id: string; full_name: string }>);
+        if (data) setTeamMembers(
+          data.map((ue: any) => ({ id: ue.users.id, full_name: ue.users.full_name }))
+        );
       });
-  }, [isOpen]);
+  }, [isOpen, environment]);
 
   // Form state
   const [formData, setFormData] = useState({
