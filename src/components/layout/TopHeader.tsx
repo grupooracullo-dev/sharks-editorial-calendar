@@ -2,13 +2,13 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useNotifications } from '@/contexts/NotificationContext';
-import { ChevronDown, Bell, Search, Check, X } from 'lucide-react';
+import { ChevronDown, Bell, Search, Check, X, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Avatar from '@/components/ui/Avatar';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { EnvironmentType } from '@/types';
 
-export default function TopHeader() {
+export default function TopHeader({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
   const { user, isSharks } = useAuth();
   const { currentWorkspace, workspacesByEnv, setCurrentWorkspace } = useWorkspace();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
@@ -47,11 +47,23 @@ export default function TopHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-4 lg:px-6 py-3">
-      <div className="flex items-center justify-between gap-4 pl-14 lg:pl-0">
-        {/* Workspace Selector (Sharks only) */}
-        {isSharks && (
-          <div ref={wsRef} className="relative">
+    <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-3 sm:px-4 lg:px-6 py-3">
+      <div className="flex items-center justify-between gap-3">
+        {/* Left: menu (mobile) + workspace selector */}
+        <div className="flex items-center gap-1 min-w-0">
+          {onOpenMobileNav && (
+            <button
+              onClick={onOpenMobileNav}
+              className="lg:hidden p-2 -ml-1 rounded-lg text-gray-600 hover:bg-gray-100 active:bg-gray-200 transition-colors"
+              aria-label="Abrir menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
+
+          {/* Workspace Selector (Sharks only) */}
+          {isSharks && (
+            <div ref={wsRef} className="relative">
             <button
               onClick={() => setWsDropdownOpen(!wsDropdownOpen)}
               className="flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-sm font-medium text-gray-700"
@@ -104,8 +116,9 @@ export default function TopHeader() {
                 ))}
               </div>
             )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
 
         {/* Search (Sharks only) */}
         {isSharks && (

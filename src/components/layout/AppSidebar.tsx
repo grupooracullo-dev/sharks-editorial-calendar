@@ -21,7 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  Menu,
+  X,
   UserCog,
   UserPlus,
   Briefcase,
@@ -81,9 +81,13 @@ function detectEnv(pathname: string): SidebarEnv {
   return 'sharks';
 }
 
-export default function AppSidebar() {
+interface AppSidebarProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+export default function AppSidebar({ open, onClose }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [envMenuOpen, setEnvMenuOpen] = useState(false);
   const { user, signOut, isSharks, isAdmin, isOracullo, environments, hasAccess } = useAuth();
   const { currentWorkspace } = useWorkspace();
@@ -172,39 +176,57 @@ export default function AppSidebar() {
     navigate('/login');
   };
 
+  // Drawer mobile: fecha com Escape e trava o scroll do body
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [open, onClose]);
+
   return (
     <>
-      {/* Mobile menu button */}
-      <button
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-md"
-        onClick={() => setMobileOpen(!mobileOpen)}
-      >
-        <Menu className="w-5 h-5" />
-      </button>
+      {/* Overlay mobile com blur */}
+      <div
+        onClick={onClose}
+        className={cn(
+          'lg:hidden fixed inset-0 bg-black/40 backdrop-blur-[2px] z-40 transition-opacity duration-300',
+          open ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        )}
+      />
 
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black/30 z-40"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
+      {/* Sidebar: drawer professional no mobile, fixa no desktop */}
       <aside
         className={cn(
-          'fixed left-0 top-0 h-full bg-white border-r border-gray-200 z-40 flex flex-col transition-all duration-300',
-          collapsed ? 'w-[68px]' : 'w-[240px]',
-          mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          'fixed left-0 top-0 h-full bg-white border-r border-gray-200 z-50 flex flex-col transition-all duration-300 ease-out',
+          // Mobile: drawer com cantos arredondados, sombra e safe area
+          'w-[288px] max-w-[85vw] rounded-r-2xl shadow-2xl pb-[env(safe-area-inset-bottom)]',
+          // Desktop: barra fixa padrao (sem sombra/cantos)
+          'lg:rounded-none lg:shadow-none lg:w-[240px] lg:max-w-none lg:pb-0 lg:translate-x-0',
+          collapsed ? 'lg:w-[68px]' : 'lg:w-[240px]',
+          open ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        {/* Logo + environment switcher */}
-        <div className={cn('px-4 py-4 border-b border-gray-100', collapsed && 'px-2')}>
-          <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
+        {/* Logo + environment switcher + fechar (mobile) */}
+        <div className={cn('px-4 py-4 border-b border-gray-100 relative', collapsed && 'lg:px-2')}>
+          <button
+            onClick={onClose}
+            className="lg:hidden absolute right-3 top-4 p-2 -mr-1 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            aria-label="Fechar menu"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          <div className={cn('flex items-center gap-3 pr-9 lg:pr-0', collapsed && 'lg:justify-center')}>
             <img
               src={envLogo[env] || logoUrl}
               alt="Oracullo Calendar"
-              className={cn('object-contain', collapsed ? 'w-8 h-8' : 'w-9 h-9')}
+              className={cn('object-contain', collapsed ? 'lg:w-8 lg:h-8' : 'w-9 h-9')}
             />
             {!collapsed && (
               <div className="min-w-0 flex-1">
@@ -231,7 +253,7 @@ export default function AppSidebar() {
                       key={`${t.id}-${t.home}`}
                       onClick={() => {
                         setEnvMenuOpen(false);
-                        setMobileOpen(false);
+                        onClose();
                         navigate(t.home);
                       }}
                       className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left transition-colors"
@@ -264,7 +286,7 @@ export default function AppSidebar() {
                 <NavLink
                   to={item.path}
                   end={item.path === '/sharks' || item.path === '/client' || item.path === '/estrategos' || item.path === '/oracullo'}
-                  onClick={() => setMobileOpen(false)}
+                  onClick={onClose}
                   className={({ isActive }) =>
                     cn(
                       'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',

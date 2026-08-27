@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import AppSidebar from './AppSidebar';
 import TopHeader from './TopHeader';
 import BottomNav from './BottomNav';
@@ -11,6 +11,7 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const { user, loading, isSharks } = useAuth();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   if (loading) {
     return (
@@ -29,9 +30,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AppSidebar />
+      <AppSidebar open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
       <div className="lg:ml-[240px] transition-all duration-300">
-        <TopHeader />
+        <TopHeader onOpenMobileNav={() => setMobileNavOpen(true)} />
         <main className="p-4 pb-20 lg:pb-6">
           {children}
         </main>
