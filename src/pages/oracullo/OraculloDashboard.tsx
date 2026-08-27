@@ -5,6 +5,7 @@ import Badge from '@/components/ui/Badge';
 import Avatar from '@/components/ui/Avatar';
 import MiniCalendar from '@/components/dashboard/MiniCalendar';
 import StatusBadge from '@/components/actions/StatusBadge';
+import ActionDrawer from '@/components/actions/ActionDrawer';
 import { supabase } from '@/lib/supabase';
 import { type User, type EnvironmentType, type Action } from '@/types';
 import { formatCalendarDate, parseISO, format, ptBR } from '@/lib/dateUtils';
@@ -16,6 +17,7 @@ export default function OraculloDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [wsCount, setWsCount] = useState<{ sharks: number; estrategos: number }>({ sharks: 0, estrategos: 0 });
   const [actions, setActions] = useState<Action[]>([]);
+  const [detailAction, setDetailAction] = useState<Action | null>(null);
   const today = new Date();
   const todayStr = formatCalendarDate(today);
   const [selectedDate, setSelectedDate] = useState(todayStr);
@@ -133,13 +135,14 @@ export default function OraculloDashboard() {
                 return (
                   <div
                     key={action.id}
-                    onClick={() => navigate(env === 'sharks_company' ? '/sharks/calendar' : '/estrategos/calendar')}
+                    onClick={() => setDetailAction(action)}
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{action.title}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500 truncate">
                         {action.action_time?.slice(0, 5) || '—'} · {envLabel(env)}
+                        {action.workspace?.name ? ` · ${action.workspace.name}` : ''}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -216,6 +219,17 @@ export default function OraculloDashboard() {
           </button>
         </div>
       </Card>
+
+      {/* Detalhes da ação (clique na ação do dia) */}
+      <ActionDrawer
+        action={detailAction}
+        isOpen={!!detailAction}
+        onClose={() => setDetailAction(null)}
+        onEdit={a => {
+          setDetailAction(null);
+          navigate(a.environment === 'estrategos' ? '/estrategos/calendar' : '/sharks/calendar');
+        }}
+      />
     </div>
   );
 }

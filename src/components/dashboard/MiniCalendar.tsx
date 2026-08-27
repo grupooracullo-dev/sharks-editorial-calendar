@@ -4,21 +4,6 @@ import { cn } from '@/lib/utils';
 import { getCalendarDays, isSameMonth, isSameDay, isToday, format, formatCalendarDate, ptBR } from '@/lib/dateUtils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-// Cores dos indicadores por status da acao
-const STATUS_DOT: Record<string, string> = {
-  draft: 'bg-gray-400',
-  briefing: 'bg-blue-400',
-  in_production: 'bg-yellow-400',
-  sharks_review: 'bg-purple-400',
-  scheduled: 'bg-indigo-400',
-  published: 'bg-green-400',
-  completed: 'bg-emerald-400',
-  cancelled: 'bg-red-300',
-  overdue: 'bg-orange-400',
-};
-
-const MAX_DOTS = 3;
-
 interface MiniCalendarProps {
   actions: Action[];
   selectedDate: string;
@@ -110,15 +95,14 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate }: Mi
           const inMonth = isSameMonth(day, currentMonth);
           const isTodayFlag = isToday(day);
           const isSelected = isSameDay(day, selected);
-          const dots = dayActions.slice(0, MAX_DOTS);
-          const extra = dayActions.length - dots.length;
 
           return (
             <button
               key={dateStr}
               onClick={() => onSelectDate(dateStr)}
+              title={dayActions.length > 0 ? dayActions.map(a => a.title).join('\n') : undefined}
               className={cn(
-                'relative flex flex-col items-center justify-center rounded-lg mx-auto w-9 h-10 mb-0.5 transition-all duration-150',
+                'relative flex flex-col items-center justify-center rounded-lg mx-auto w-9 h-11 mb-0.5 transition-all duration-150',
                 inMonth ? 'text-gray-700 hover:bg-primary-50' : 'text-gray-300 hover:bg-gray-50',
                 isTodayFlag && !isSelected && 'ring-1 ring-primary-400',
                 isSelected && 'bg-primary-500 text-white shadow-sm hover:bg-primary-600'
@@ -134,32 +118,19 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate }: Mi
                 {day.getDate()}
               </span>
 
-              {/* Indicadores de acoes */}
-              {(dots.length > 0 || extra > 0) && (
-                <span className="flex items-center gap-0.5 mt-1 h-1">
-                  {dots.map((a, i) => (
-                    <span
-                      key={a.id}
-                      className={cn(
-                        'w-1 h-1 rounded-full',
-                        isSelected
-                          ? 'bg-white/90'
-                          : inMonth
-                          ? STATUS_DOT[a.status] || 'bg-gray-400'
-                          : 'bg-gray-200'
-                      )}
-                    />
-                  ))}
-                  {extra > 0 && (
-                    <span
-                      className={cn(
-                        'text-[8px] leading-none font-semibold',
-                        isSelected ? 'text-white/90' : inMonth ? 'text-gray-400' : 'text-gray-200'
-                      )}
-                    >
-                      +{extra}
-                    </span>
+              {/* Contagem visivel de acoes no dia */}
+              {dayActions.length > 0 && (
+                <span
+                  className={cn(
+                    'mt-1 rounded-full text-[9px] font-bold leading-none px-1.5 py-[3px] min-w-[16px] text-center',
+                    isSelected
+                      ? 'bg-white/90 text-primary-700'
+                      : inMonth
+                      ? 'bg-primary-100 text-primary-700'
+                      : 'bg-gray-100 text-gray-300'
                   )}
+                >
+                  {dayActions.length}
                 </span>
               )}
             </button>
@@ -169,17 +140,10 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate }: Mi
 
       {/* Legenda */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 pt-3 border-t border-gray-100">
-        {[
-          ['Programado', 'bg-indigo-400'],
-          ['Em produção', 'bg-yellow-400'],
-          ['Publicado', 'bg-green-400'],
-          ['Pendente', 'bg-gray-400'],
-        ].map(([label, dot]) => (
-          <span key={label} className="flex items-center gap-1.5 text-[10px] text-gray-500">
-            <span className={cn('w-1.5 h-1.5 rounded-full', dot)} />
-            {label}
-          </span>
-        ))}
+        <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
+          <span className="rounded-full bg-primary-100 text-primary-700 text-[9px] font-bold px-1.5 py-[3px]">3</span>
+          ações no dia — clique para ver a lista
+        </span>
       </div>
     </div>
   );
