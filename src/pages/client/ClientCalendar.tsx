@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useActions } from '@/hooks/useActions';
+import { useActiveCampaigns } from '@/hooks/useCampaigns';
 import { Action, CalendarViewType } from '@/types';
 import CalendarEvent from '@/components/calendar/CalendarEvent';
 import Drawer from '@/components/ui/Drawer';
@@ -22,6 +23,7 @@ export default function ClientCalendar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const { actions } = useActions(currentWorkspace ? { workspaceId: currentWorkspace.id } : {});
+  const activeCampaigns = useActiveCampaigns(currentWorkspace?.id);
 
   const calendarDays = getCalendarDays(currentDate);
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -79,9 +81,18 @@ export default function ClientCalendar() {
               const isCurrentMonth = isSameMonth(day, currentDate);
               const isToday = isSameDay(day, new Date());
 
+              // Campanhas ativas neste dia
+              const dayCampaigns = activeCampaigns.filter(c => {
+                if (!c.start_date) return false;
+                return dateStr >= c.start_date && dateStr <= (c.end_date || c.start_date);
+              });
+
               return (
                 <div
                   key={i}
+                  style={dayCampaigns.length > 0 ? {
+                    backgroundImage: `linear-gradient(${dayCampaigns[0].color || '#3B82F6'}0F, ${dayCampaigns[0].color || '#3B82F6'}0F)`,
+                  } : undefined}
                   className={cn(
                     'min-h-[90px] sm:min-h-[110px] border-r border-b last:border-r-0 p-1.5',
                     !isCurrentMonth && 'bg-gray-50/50',
@@ -96,6 +107,40 @@ export default function ClientCalendar() {
                   )}>
                     {day.getDate()}
                   </span>
+                  {/* Faixa de campanha: continua entre dias, com label no inicio */}
+                  {dayCampaigns.length > 0 && (
+                    <div className="flex flex-col gap-0.5 mb-1">
+                      {dayCampaigns.slice(0, 2).map(c => {
+                        const rangeEnd = c.end_date || c.start_date!;
+                        const col = i % 7;
+                        const isStart = dateStr === c.start_date || col === 0;
+                        const isEnd = dateStr === rangeEnd || col === 6;
+                        const showLabel = dateStr === c.start_date || (col === 0 && c.start_date! < dateStr);
+                        const color = c.color || '#3B82F6';
+                        return (
+                          <div
+                            key={c.id}
+                            title={`${c.name}${c.start_date ? ` · ${c.start_date.split('-').reverse().join('/')} → ${rangeEnd.split('-').reverse().join('/')}` : ''}`}
+                            className={cn(
+                              'flex items-center overflow-hidden',
+                              showLabel ? 'h-[14px] px-1' : 'h-1.5',
+                              isStart && isEnd && 'rounded-full',
+                              isStart && !isEnd && 'rounded-l-full',
+                              !isStart && isEnd && 'rounded-r-full'
+                            )}
+                            style={{ backgroundColor: color }}
+                          >
+                            {showLabel && (
+                              <span className="text-[8px] font-semibold text-white truncate">🏁 {c.name}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {dayCampaigns.length > 2 && (
+                        <p className="text-[8px] text-gray-400 leading-none">+{dayCampaigns.length - 2} campanhas</p>
+                      )}
+                    </div>
+                  )}
                   <div className="space-y-1">
                     {dayActions.slice(0, 2).map(action => (
                       <CalendarEvent key={action.id} action={action} onClick={() => handleActionClick(action)} compact />
@@ -108,6 +153,18 @@ export default function ClientCalendar() {
               );
             })}
           </div>
+
+          {/* Legenda */}
+          {activeCampaigns.filter(c => c.start_date).length > 0 && (
+            <div className="flex flex-wrap items-center gap-3 px-3 py-2 border-t border-gray-100 bg-gray-50/50">
+              {activeCampaigns.filter(c => c.start_date).map(c => (
+                <span key={c.id} className="flex items-center gap-1.5 text-[11px] text-gray-600">
+                  <span className="w-3 h-1.5 rounded-full" style={{ backgroundColor: c.color || '#3B82F6' }} />
+                  🏁 {c.name}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -118,6 +175,10 @@ export default function ClientCalendar() {
             {calendarDays.slice(0, 7).map((day, i) => {
               const dateStr = formatCalendarDate(day);
               const dayActions = actions.filter(a => a.action_date === dateStr);
+              const dayCampaigns = activeCampaigns.filter(c => {
+                if (!c.start_date) return false;
+                return dateStr >= c.start_date && dateStr <= (c.end_date || c.start_date);
+              });
 
               return (
                 <div key={i} className="border-r last:border-r-0 p-2">
@@ -127,6 +188,23 @@ export default function ClientCalendar() {
                       {day.getDate()}
                     </p>
                   </div>
+                  {dayCampaigns.length > 0 && (
+                    <div className="flex flex-col gap-0.5 mb-2">
+                      {dayCampaigns.map(c => (
+                        <div
+                          key={c.id}
+                          className="flex items-center gap-1 px-1.5 py-0.5 rounded-md"
+                          style={{ backgroundColor: `${c.color || '#3B82F6'}1F` }}
+                          title={`${c.name}${c.start_date ? ` · ${c.start_date.split('-').reverse().join('/')} → ${(c.end_date || c.start_date).split('-').reverse().join('/')}` : ''}`}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.color || '#3B82F6' }} />
+                          <span className="text-[9px] font-semibold truncate" style={{ color: c.color || '#3B82F6' }}>
+                            🏁 {c.name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div className="space-y-2">
                     {dayActions.map(action => (
                       <CalendarEvent key={action.id} action={action} onClick={() => handleActionClick(action)} />

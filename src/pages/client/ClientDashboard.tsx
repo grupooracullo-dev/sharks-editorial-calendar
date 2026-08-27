@@ -64,7 +64,7 @@ export default function ClientDashboard() {
             </CardTitle>
             <span className="text-[10px] text-gray-400">clique em um dia</span>
           </CardHeader>
-          <MiniCalendar actions={actions} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+          <MiniCalendar actions={actions} selectedDate={selectedDate} onSelectDate={setSelectedDate} campaigns={campaigns} />
         </Card>
 
         {/* Dia selecionado */}
