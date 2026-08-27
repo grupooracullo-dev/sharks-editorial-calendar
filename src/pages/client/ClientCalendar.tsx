@@ -46,9 +46,9 @@ export default function ClientCalendar() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4 h-[calc(100dvh-9.5rem)] lg:h-[calc(100dvh-6.5rem)]">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shrink-0">
         <h1 className="text-xl font-bold text-gray-900 capitalize">Meu Calendário — {monthLabel}</h1>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
@@ -79,13 +79,13 @@ export default function ClientCalendar() {
 
       {/* Month view (read-only) */}
       {view === 'month' && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="grid grid-cols-7 border-b border-gray-200">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
+          <div className="grid grid-cols-7 border-b border-gray-200 shrink-0">
             {weekDays.map(day => (
               <div key={day} className="px-2 py-2 text-xs font-semibold text-gray-500 text-center">{day}</div>
             ))}
           </div>
-          <div className="grid grid-cols-7">
+          <div className="grid grid-cols-7 auto-rows-fr flex-1 min-h-0">
             {calendarDays.map((day, i) => {
               const dateStr = formatCalendarDate(day);
               const dayActions = actions.filter(a => a.action_date === dateStr);
@@ -105,7 +105,7 @@ export default function ClientCalendar() {
                     backgroundImage: `linear-gradient(${dayCampaigns[0].color || '#3B82F6'}0F, ${dayCampaigns[0].color || '#3B82F6'}0F)`,
                   } : undefined}
                   className={cn(
-                    'min-h-[110px] sm:min-h-[140px] md:min-h-[150px] border-r border-b last:border-r-0 p-1.5',
+                    'min-h-0 overflow-hidden border-r border-b last:border-r-0 p-1.5',
                     !isCurrentMonth && 'bg-gray-50/50',
                     isToday && 'bg-primary-50/30'
                   )}
@@ -181,8 +181,8 @@ export default function ClientCalendar() {
 
       {/* Week view (read-only) */}
       {view === 'week' && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className={cn('grid min-h-[420px] sm:min-h-[600px]', isMobile ? 'grid-cols-3' : 'grid-cols-7')}>
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
+          <div className={cn('grid flex-1 min-h-0', isMobile ? 'grid-cols-3' : 'grid-cols-7')}>
             {(isMobile ? calendarDays.slice(0, 3) : calendarDays.slice(0, 7)).map((day, i) => {
               const dateStr = formatCalendarDate(day);
               const dayActions = actions.filter(a => a.action_date === dateStr);
@@ -192,31 +192,31 @@ export default function ClientCalendar() {
               });
 
               return (
-                <div key={i} className="border-r last:border-r-0 p-2">
-                  <div className="text-center py-2 border-b border-gray-100 mb-2">
+                <div key={i} className="border-r last:border-r-0 p-2 min-h-0 flex flex-col">
+                  <div className="text-center py-2 border-b border-gray-100 mb-2 shrink-0">
                     <p className="text-xs text-gray-500">{isMobile ? format(day, 'EEE', { locale: ptBR }) : weekDays[i]}</p>
                     <p className={cn('font-semibold', isSameDay(day, new Date()) ? 'text-primary-600' : 'text-gray-900')}>
                       {day.getDate()}
                     </p>
                   </div>
-                  {dayCampaigns.length > 0 && (
-                    <div className="flex flex-col gap-0.5 mb-2">
-                      {dayCampaigns.map(c => (
-                        <div
-                          key={c.id}
-                          className="flex items-center gap-1 px-1.5 py-0.5 rounded-md"
-                          style={{ backgroundColor: `${c.color || '#3B82F6'}1F` }}
-                          title={`${c.name}${c.start_date ? ` · ${c.start_date.split('-').reverse().join('/')} → ${(c.end_date || c.start_date).split('-').reverse().join('/')}` : ''}`}
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.color || '#3B82F6' }} />
-                          <span className="text-[9px] font-semibold truncate" style={{ color: c.color || '#3B82F6' }}>
-                            🏁 {c.name}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="space-y-2">
+                  <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
+                    {dayCampaigns.length > 0 && (
+                      <div className="flex flex-col gap-0.5">
+                        {dayCampaigns.map(c => (
+                          <div
+                            key={c.id}
+                            className="flex items-center gap-1 px-1.5 py-0.5 rounded-md"
+                            style={{ backgroundColor: `${c.color || '#3B82F6'}1F` }}
+                            title={`${c.name}${c.start_date ? ` · ${c.start_date.split('-').reverse().join('/')} → ${(c.end_date || c.start_date).split('-').reverse().join('/')}` : ''}`}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.color || '#3B82F6' }} />
+                            <span className="text-[9px] font-semibold truncate" style={{ color: c.color || '#3B82F6' }}>
+                              🏁 {c.name}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {dayActions.map(action => (
                       <CalendarEvent key={action.id} action={action} onClick={() => handleActionClick(action)} />
                     ))}
@@ -230,7 +230,7 @@ export default function ClientCalendar() {
 
       {/* Agenda view (read-only) */}
       {view === 'agenda' && (
-        <Card padding="none">
+        <Card padding="none" className="flex-1 min-h-0 overflow-y-auto">
           {(() => {
             const daysWithActions = calendarDays.filter(d => actions.some(a => a.action_date === formatCalendarDate(d)));
             if (daysWithActions.length === 0) {

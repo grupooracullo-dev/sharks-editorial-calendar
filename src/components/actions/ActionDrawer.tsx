@@ -9,7 +9,7 @@ import Avatar from '@/components/ui/Avatar';
 import { CONTENT_FORMATS, OBJECTIVES, FUNNEL_STAGES, ACTION_TYPES, ACTION_STATUSES } from '@/lib/constants';
 import { formatDate, formatTime, cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { Pencil, Copy, Trash2, ExternalLink, MessageSquare, Calendar, Clock, Target, Megaphone, Send } from 'lucide-react';
+import { Pencil, Copy, Trash2, ExternalLink, MessageSquare, Calendar, Clock, Target, Megaphone, Send, CheckCircle2 } from 'lucide-react';
 
 interface ActionDrawerProps {
   action: Action | null;
@@ -18,17 +18,44 @@ interface ActionDrawerProps {
   onEdit: (action: Action) => void;
   onDelete?: (id: string) => Promise<boolean | { ok: boolean; error?: string }> | boolean | { ok: boolean; error?: string };
   onDuplicate?: (action: Action) => void;
+  onUpdate?: (id: string, patch: Partial<Action>) => Promise<{ ok: boolean; error?: string }>;
 }
 
-export default function ActionDrawer({ action, isOpen, onClose, onEdit, onDelete, onDuplicate }: ActionDrawerProps) {
+// Acoes de conteudo terminam em 'published'; tarefas em 'completed'
+const CONTENT_ACTION_TYPES = ['content', 'publication', 'campaign', 'ad'];
+
+export default function ActionDrawer({ action, isOpen, onClose, onEdit, onDelete, onDuplicate, onUpdate }: ActionDrawerProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   if (!action) return null;
 
   const pillar = action.editorial_pillar;
   const campaign = action.campaign;
   const responsible = action.responsible;
+
+  const isContent = !!action.format || CONTENT_ACTION_TYPES.includes(action.action_type);
+  const doneStatus: Action['status'] = isContent ? 'published' : 'completed';
+  const canComplete = !['published', 'completed', 'cancelled'].includes(action.status);
+
+  const applyStatus = async (newStatus: Action['status'], successMsg: string) => {
+    if (!onUpdate || updating) return;
+    const prev = action.status;
+    setUpdating(true);
+    const result = await onUpdate(action.id, { status: newStatus });
+    setUpdating(false);
+    if (result.ok) {
+      toast.success(successMsg, {
+        action: {
+          label: 'Desfazer',
+          onClick: () => { onUpdate(action.id, { status: prev }); },
+        },
+      });
+    } else {
+      toast.error(result.error || 'Erro ao alterar status');
+    }
+  };
 
   return (
     <Drawer isOpen={isOpen} onClose={onClose} title="Detalhes da Ação" width="lg">
@@ -43,6 +70,40 @@ export default function ActionDrawer({ action, isOpen, onClose, onEdit, onDelete
             <p className="text-sm text-gray-500">{action.description}</p>
           )}
         </div>
+
+        {/* Status — conclusao rapida + troca manual (somente quem tem permissao de edicao) */}
+        {onUpdate && (
+          <div className="space-y-2">
+            {canComplete && (
+              <Button
+                variant="success"
+                size="sm"
+                className="w-full"
+                loading={updating}
+                onClick={() => applyStatus(doneStatus, isContent ? 'Ação publicada!' : 'Ação concluída!')}
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                {isContent ? 'Publicar' : 'Concluir'}
+              </Button>
+            )}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider shrink-0">Status</span>
+              <select
+                value={action.status}
+                disabled={updating}
+                onChange={(e) => {
+                  const newStatus = e.target.value as Action['status'];
+                  if (newStatus !== action.status) applyStatus(newStatus, 'Status atualizado!');
+                }}
+                className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/20 disabled:opacity-50"
+              >
+                {Object.entries(ACTION_STATUSES).map(([value, conf]) => (
+                  <option key={value} value={value}>{conf.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
 
         {/* Sync Status */}
         {action.sync_status !== 'not_synced' && (

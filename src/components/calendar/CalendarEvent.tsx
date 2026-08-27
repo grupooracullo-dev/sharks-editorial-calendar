@@ -59,6 +59,7 @@ export default function CalendarEvent({ action, onClick, onQuickStatus, compact,
           compact && 'py-1 px-1.5 text-xs',
           isDragging && 'opacity-50 ring-2 ring-primary-400',
           overdue && !['published', 'completed', 'cancelled'].includes(action.status) && 'ring-2 ring-red-400 ring-offset-1',
+          ['published', 'completed'].includes(action.status) && 'opacity-55',
           'hover:shadow-sm'
         )}
       >
@@ -73,9 +74,16 @@ export default function CalendarEvent({ action, onClick, onQuickStatus, compact,
             <div className="flex items-center gap-1">
               {/* Status dot */}
               <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', STATUS_DOT_COLORS[action.status] || 'bg-gray-400')} />
-              <p className={cn('font-medium leading-tight truncate', compact ? 'text-[10px]' : 'text-xs')}>
+              <p className={cn(
+                'font-medium leading-tight truncate',
+                compact ? 'text-[10px]' : 'text-xs',
+                ['published', 'completed'].includes(action.status) && 'line-through decoration-1'
+              )}>
                 {action.title}
               </p>
+              {['published', 'completed'].includes(action.status) && (
+                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500 flex-shrink-0" />
+              )}
               {overdue && !['published', 'completed', 'cancelled'].includes(action.status) && (
                 <AlertTriangle className="w-2.5 h-2.5 text-red-500 flex-shrink-0 animate-pulse" />
               )}

@@ -177,10 +177,10 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
       ];
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4 h-[calc(100dvh-9.5rem)] lg:h-[calc(100dvh-6.5rem)]">
       <DndContext collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shrink-0">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-gray-900 capitalize">{monthLabel}</h1>
             <Button variant="ghost" size="sm" onClick={goToToday}>Hoje</Button>
@@ -245,15 +245,15 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
 
         {/* Month View */}
         {view === 'month' && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="grid grid-cols-7 border-b border-gray-200">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
+            <div className="grid grid-cols-7 border-b border-gray-200 shrink-0">
               {(isMobile ? ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'] : weekDays).map((day, i) => (
                 <div key={i} className="px-1 sm:px-3 py-2 text-xs font-semibold text-gray-500 text-center border-r last:border-r-0">
                   {day}
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-7">
+            <div className="grid grid-cols-7 auto-rows-fr flex-1 min-h-0">
               {calendarDays.map((day, i) => {
                 const dateStr = formatCalendarDate(day);
                 const dayActions = actions.filter(a => a.action_date === dateStr);
@@ -280,7 +280,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                       backgroundImage: `linear-gradient(${dayCampaigns[0].color || '#3B82F6'}0F, ${dayCampaigns[0].color || '#3B82F6'}0F)`,
                     } : undefined}
                     className={cn(
-                      'min-h-[90px] sm:min-h-[130px] md:min-h-[150px] border-r border-b last:border-r-0 p-1 sm:p-1.5 transition-colors',
+                      'min-h-0 overflow-hidden border-r border-b last:border-r-0 p-1 sm:p-1.5 transition-colors',
                       !isCurrentMonth && 'bg-gray-50/50',
                       isToday && 'bg-primary-50/30',
                       dayActions.length === 0 && 'cursor-pointer',
@@ -387,9 +387,9 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
 
         {/* Week View */}
         {view === 'week' && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
             <div className={cn(
-              'grid border-b border-gray-200',
+              'grid border-b border-gray-200 shrink-0',
               isMobile ? 'grid-cols-3' : 'grid-cols-7'
             )}>
               {(isMobile ? calendarDays.slice(0, 3) : calendarDays.slice(0, 7)).map((day, i) => (
@@ -405,7 +405,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
               ))}
             </div>
             <div className={cn(
-              'grid min-h-[500px] sm:min-h-[600px]',
+              'grid flex-1 min-h-0',
               isMobile ? 'grid-cols-3' : 'grid-cols-7'
             )}>
               {(isMobile ? calendarDays.slice(0, 3) : calendarDays.slice(0, 7)).map((day, i) => {
@@ -425,7 +425,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                     id={dateStr}
                     onClick={() => { if (dayActions.length === 0) handleCreateAtDate(dateStr); }}
                     className={cn(
-                      'border-r last:border-r-0 p-1.5 sm:p-2 space-y-1 sm:space-y-2',
+                      'border-r last:border-r-0 p-1.5 sm:p-2 space-y-1 sm:space-y-2 min-h-0 overflow-y-auto',
                       dayActions.length === 0 && 'cursor-pointer'
                     )}
                   >
@@ -474,8 +474,8 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
 
         {/* Day View (mobile-optimized) */}
         {view === 'day' && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50/50">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
+            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50/50 shrink-0">
               <p className="text-sm font-semibold text-gray-900 capitalize">
                 {format(currentDate, 'EEEE, dd MMMM yyyy', { locale: ptBR })}
               </p>
@@ -483,7 +483,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                 {actions.filter(a => a.action_date === formatCalendarDate(currentDate)).length} ação(ões) neste dia
               </p>
             </div>
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-gray-100 flex-1 min-h-0 overflow-y-auto">
               {(() => {
                 const dateStr = formatCalendarDate(currentDate);
                 const dayActions = actions.filter(a => a.action_date === dateStr);
@@ -513,7 +513,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
 
         {/* Agenda View */}
         {view === 'agenda' && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100 flex-1 min-h-0 overflow-y-auto">
             {calendarDays.filter(d => actions.some(a => a.action_date === formatCalendarDate(d))).length === 0 ? (
               <div className="p-8 text-center">
                 <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -558,12 +558,13 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
 
       {/* Action Drawer */}
       <ActionDrawer
-        action={selectedAction}
+        action={selectedAction ? actions.find(a => a.id === selectedAction.id) ?? selectedAction : null}
         isOpen={drawerOpen}
         onClose={() => { setDrawerOpen(false); setSelectedAction(null); }}
         onEdit={handleEdit}
         onDelete={remove}
         onDuplicate={handleDuplicate}
+        onUpdate={(id, patch) => update(id, patch)}
       />
 
       {/* Action Form */}
