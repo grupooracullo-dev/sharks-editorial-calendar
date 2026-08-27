@@ -121,6 +121,7 @@ export interface Campaign {
   product: string | null;
   priority: string;
   status: CampaignStatus;
+  color: string | null;
   created_at: string;
   updated_at: string;
 }

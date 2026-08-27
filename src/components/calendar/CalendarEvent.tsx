@@ -1,7 +1,7 @@
 import { Action } from '@/types';
 import { cn } from '@/lib/utils';
 import { FORMAT_COLORS } from '@/lib/constants';
-import { GripVertical, Users } from 'lucide-react';
+import { GripVertical, Users, Megaphone } from 'lucide-react';
 
 interface CalendarEventProps {
   action: Action;
@@ -14,6 +14,7 @@ interface CalendarEventProps {
 export default function CalendarEvent({ action, onClick, compact, showClient, isDragging }: CalendarEventProps) {
   const formatLabel = action.format || action.action_type;
   const clientName = action.workspace?.name;
+  const campaign = action.campaign;
 
   return (
     <button
@@ -38,6 +39,22 @@ export default function CalendarEvent({ action, onClick, compact, showClient, is
           <p className={cn('font-medium leading-tight truncate', compact ? 'text-[10px]' : 'text-xs')}>
             {action.title}
           </p>
+          {/* Badge de campanha */}
+          {campaign && (
+            <span
+              className={cn(
+                'inline-flex items-center gap-0.5 rounded-sm px-1 mt-0.5 leading-tight font-medium',
+                compact ? 'text-[8px]' : 'text-[9px]'
+              )}
+              style={{
+                backgroundColor: `${campaign.color || '#3B82F6'}20`,
+                color: campaign.color || '#3B82F6',
+              }}
+            >
+              <Megaphone className="w-2 h-2" />
+              {campaign.name}
+            </span>
+          )}
           {showClient && clientName && (
             <span className={cn(
               'font-medium opacity-80 block leading-tight truncate text-primary-600',

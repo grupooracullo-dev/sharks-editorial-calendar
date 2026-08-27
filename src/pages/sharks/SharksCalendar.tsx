@@ -244,6 +244,14 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                 const isCurrentMonth = isSameMonth(day, currentDate);
                 const isToday = isSameDay(day, new Date());
 
+                // Campanhas ativas neste dia
+                const dayCampaigns = activeCampaigns.filter(c => {
+                  if (!c.start_date) return false;
+                  const start = c.start_date;
+                  const end = c.end_date || c.start_date;
+                  return dateStr >= start && dateStr <= end;
+                });
+
                 return (
                   <div
                     key={i}
@@ -265,6 +273,19 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                         {day.getDate()}
                       </span>
                     </div>
+                    {/* Indicadores de campanha */}
+                    {dayCampaigns.length > 0 && (
+                      <div className="flex flex-col gap-0.5 mb-1">
+                        {dayCampaigns.map(c => (
+                          <div
+                            key={c.id}
+                            className="h-1.5 rounded-full opacity-80"
+                            style={{ backgroundColor: c.color || '#3B82F6' }}
+                            title={c.name}
+                          />
+                        ))}
+                      </div>
+                    )}
                     <div className="space-y-0.5 sm:space-y-1">
                       {dayActions.slice(0, isMobile ? 2 : 3).map(action => (
                         <CalendarEvent
@@ -283,6 +304,18 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                 );
               })}
             </div>
+
+            {/* Legenda de campanhas */}
+            {activeCampaigns.filter(c => c.start_date).length > 0 && (
+              <div className="flex flex-wrap items-center gap-3 px-3 py-2 border-t border-gray-100 bg-gray-50/50">
+                {activeCampaigns.filter(c => c.start_date).map(c => (
+                  <span key={c.id} className="flex items-center gap-1.5 text-[11px] text-gray-600">
+                    <span className="w-3 h-1.5 rounded-full" style={{ backgroundColor: c.color || '#3B82F6' }} />
+                    {c.name}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -312,9 +345,27 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
               {(isMobile ? calendarDays.slice(0, 3) : calendarDays.slice(0, 7)).map((day, i) => {
                 const dateStr = formatCalendarDate(day);
                 const dayActions = actions.filter(a => a.action_date === dateStr);
+                const dayCampaigns = activeCampaigns.filter(c => {
+                  if (!c.start_date) return false;
+                  const start = c.start_date;
+                  const end = c.end_date || c.start_date;
+                  return dateStr >= start && dateStr <= end;
+                });
 
                 return (
                   <div key={i} id={dateStr} className="border-r last:border-r-0 p-1.5 sm:p-2 space-y-1 sm:space-y-2">
+                    {dayCampaigns.length > 0 && (
+                      <div className="flex flex-col gap-0.5">
+                        {dayCampaigns.map(c => (
+                          <div
+                            key={c.id}
+                            className="h-1 rounded-full opacity-80"
+                            style={{ backgroundColor: c.color || '#3B82F6' }}
+                            title={c.name}
+                          />
+                        ))}
+                      </div>
+                    )}
                     {dayActions.map(action => (
                       <CalendarEvent
                         key={action.id}
