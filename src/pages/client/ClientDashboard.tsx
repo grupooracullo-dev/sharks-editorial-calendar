@@ -54,18 +54,25 @@ export default function ClientDashboard() {
         <p className="text-sm text-gray-500 mt-0.5">Aqui está o resumo do seu planejamento</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Calendario */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <CalendarDays className="w-4 h-4 text-primary-500" />
-              CALENDÁRIO
-            </CardTitle>
-            <span className="text-[10px] text-gray-400">clique em um dia</span>
-          </CardHeader>
-          <MiniCalendar actions={actions} selectedDate={selectedDate} onSelectDate={setSelectedDate} campaigns={campaigns} />
-        </Card>
+      {/* CALENDARIO - largura total da secao */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-primary-500" />
+            CALENDÁRIO
+          </CardTitle>
+          <button
+            onClick={() => navigate('/client/calendar')}
+            className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
+          >
+            Ver agenda completa <ArrowRight className="w-3 h-3" />
+          </button>
+        </CardHeader>
+        <MiniCalendar actions={actions} selectedDate={selectedDate} onSelectDate={setSelectedDate} campaigns={campaigns} />
+      </Card>
+
+      {/* CARDS ABAIXO DO CALENDARIO */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Dia selecionado */}
         <Card>

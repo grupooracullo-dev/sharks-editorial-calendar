@@ -92,20 +92,31 @@ export default function EstrategosDashboard() {
         <StatsCard icon={CalendarDays} label="Pendências" value={stats.pending} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Calendário</CardTitle>
-            <span className="text-xs text-gray-400">clique em um dia</span>
-          </CardHeader>
-          <MiniCalendar
-            actions={allActions.actions}
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-            campaigns={campaigns}
-            strategicDates={strategicDates}
-          />
-        </Card>
+      {/* CALENDARIO - largura total da secao */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-primary-500" />
+            Calendário
+          </CardTitle>
+          <button
+            onClick={() => navigate('/estrategos/calendar')}
+            className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
+          >
+            Ver calendário completo <ArrowRight className="w-3 h-3" />
+          </button>
+        </CardHeader>
+        <MiniCalendar
+          actions={allActions.actions}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          campaigns={campaigns}
+          strategicDates={strategicDates}
+        />
+      </Card>
+
+      {/* CARDS ABAIXO DO CALENDARIO */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         <Card>
           <CardHeader>

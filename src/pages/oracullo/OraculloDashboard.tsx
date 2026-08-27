@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { type User, type EnvironmentType, type Action, type Campaign, type StrategicDate } from '@/types';
 import { formatCalendarDate, parseISO, format, ptBR } from '@/lib/dateUtils';
 import { formatDate, cn } from '@/lib/utils';
-import { Users, Building2, Briefcase, Link2, CalendarDays } from 'lucide-react';
+import { Users, Building2, Briefcase, Link2, CalendarDays, ArrowRight } from 'lucide-react';
 
 export default function OraculloDashboard() {
   const navigate = useNavigate();
@@ -110,20 +110,28 @@ export default function OraculloDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Calendário</CardTitle>
-            <span className="text-xs text-gray-400">todos os ambientes</span>
-          </CardHeader>
-          <MiniCalendar
-            actions={actions}
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-            campaigns={campaigns}
-            strategicDates={strategicDates}
-          />
-        </Card>
+      {/* CALENDARIO - largura total da secao */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-primary-500" />
+            Calendário
+          </CardTitle>
+          <span className="text-xs text-gray-400 flex items-center gap-1">
+            todos os ambientes <ArrowRight className="w-3 h-3" />
+          </span>
+        </CardHeader>
+        <MiniCalendar
+          actions={actions}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          campaigns={campaigns}
+          strategicDates={strategicDates}
+        />
+      </Card>
+
+      {/* CARDS ABAIXO DO CALENDARIO */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         <Card>
           <CardHeader>
