@@ -4,6 +4,7 @@ import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Avatar from '@/components/ui/Avatar';
 import MiniCalendar from '@/components/dashboard/MiniCalendar';
+import MonthSummaryCard from '@/components/dashboard/MonthSummaryCard';
 import StatusBadge from '@/components/actions/StatusBadge';
 import ActionDrawer from '@/components/actions/ActionDrawer';
 import { supabase } from '@/lib/supabase';
@@ -110,6 +111,9 @@ export default function OraculloDashboard() {
         </div>
       </div>
 
+      {/* ESTE MÊS — acima do calendário */}
+      <MonthSummaryCard actions={actions} />
+
       {/* CALENDARIO - largura total da secao */}
       <Card>
         <CardHeader>
@@ -130,94 +134,97 @@ export default function OraculloDashboard() {
         />
       </Card>
 
-      {/* CARDS ABAIXO DO CALENDARIO */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{selectedDayLabel}</CardTitle>
-          </CardHeader>
-          {selectedDayActions.length === 0 ? (
-            <div className="py-8 text-center">
-              <CalendarDays className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">
-                {isSelectedToday ? 'Nenhuma ação para hoje' : 'Nenhuma ação neste dia'}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-[22rem] overflow-y-auto pr-1">
-              {selectedDayActions.map(action => {
-                const env = action.environment || 'sharks_company';
-                return (
-                  <div
-                    key={action.id}
-                    onClick={() => setDetailAction(action)}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{action.title}</p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {action.action_time?.slice(0, 5) || '—'} · {envLabel(env)}
-                        {action.workspace?.name ? ` · ${action.workspace.name}` : ''}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={env === 'sharks_company' ? 'info' : 'success'} size="sm">
-                        {envLabel(env)}
-                      </Badge>
-                      <StatusBadge status={action.status} size="sm" />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <span className="text-xl leading-none">🌐</span>
-                Ambientes
-              </CardTitle>
-              <span className="text-xs text-gray-400">visao consolidada</span>
-            </CardHeader>
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="bg-gray-50 rounded-lg p-3 text-center">
-                <p className="text-xl font-bold text-gray-900">{wsCount.sharks + wsCount.estrategos}</p>
-                <p className="text-[11px] text-gray-400">Clientes total</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3 text-center">
-                <p className="text-xl font-bold text-gray-900">{users.length}</p>
-                <p className="text-[11px] text-gray-400">Usuarios</p>
-              </div>
-            </div>
-            <div className="space-y-2">
-              {users.slice(0, 5).map(u => (
-                <div key={u.id} className="flex items-center gap-2.5">
-                  <Avatar name={u.full_name} size="sm" />
+      {/* VISÃO DO DIA — largura total */}
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>VISÃO DO DIA</CardTitle>
+            <p className="text-xs text-gray-400 mt-0.5">{selectedDayLabel}</p>
+          </div>
+        </CardHeader>
+        {selectedDayActions.length === 0 ? (
+          <div className="py-8 text-center">
+            <CalendarDays className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">
+              {isSelectedToday ? 'Nenhuma ação para hoje' : 'Nenhuma ação neste dia'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+            {selectedDayActions.map(action => {
+              const env = action.environment || 'sharks_company';
+              return (
+                <div
+                  key={action.id}
+                  onClick={() => setDetailAction(action)}
+                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                >
+                  <span className="text-sm font-bold text-gray-900 w-14 shrink-0">
+                    {action.action_time?.slice(0, 5) || '—'}
+                  </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-gray-900 truncate">{u.full_name}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">{action.title}</p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {envLabel(env)}
+                      {action.workspace?.name ? ` · ${action.workspace.name}` : ''}
+                    </p>
                   </div>
-                  <Badge variant={u.role === 'oracullo_admin' ? 'purple' : 'default'} size="sm">
-                    {u.role === 'oracullo_admin' ? 'Oracullo' : u.role === 'admin_sharks' ? 'Admin Sharks' : u.role === 'sharks_team' ? 'Time Sharks' : 'Cliente'}
-                  </Badge>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge variant={env === 'sharks_company' ? 'info' : 'success'} size="sm">
+                      {envLabel(env)}
+                    </Badge>
+                    <StatusBadge status={action.status} size="sm" />
+                  </div>
                 </div>
-              ))}
-              {users.length > 5 && (
-                <p className="text-xs text-gray-400 text-center pt-1">+{users.length - 5} outros</p>
-              )}
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <span className="text-xl leading-none">🌐</span>
+            Ambientes
+          </CardTitle>
+          <span className="text-xs text-gray-400">visao consolidada</span>
+        </CardHeader>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 gap-3 lg:col-span-1">
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-gray-900">{wsCount.sharks + wsCount.estrategos}</p>
+              <p className="text-[11px] text-gray-400">Clientes total</p>
             </div>
-            <button
-              onClick={() => navigate('/oracullo/access')}
-              className="mt-4 w-full text-center text-sm text-primary-600 hover:text-primary-700 transition-colors"
-            >
-              Ver todos os acessos →
-            </button>
-          </Card>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-gray-900">{users.length}</p>
+              <p className="text-[11px] text-gray-400">Usuarios</p>
+            </div>
+          </div>
+          <div className="space-y-2 lg:col-span-2">
+            {users.slice(0, 5).map(u => (
+              <div key={u.id} className="flex items-center gap-2.5">
+                <Avatar name={u.full_name} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-gray-900 truncate">{u.full_name}</p>
+                </div>
+                <Badge variant={u.role === 'oracullo_admin' ? 'purple' : 'default'} size="sm">
+                  {u.role === 'oracullo_admin' ? 'Oracullo' : u.role === 'admin_sharks' ? 'Admin Sharks' : u.role === 'sharks_team' ? 'Time Sharks' : 'Cliente'}
+                </Badge>
+              </div>
+            ))}
+            {users.length > 5 && (
+              <p className="text-xs text-gray-400 text-center pt-1">+{users.length - 5} outros</p>
+            )}
+          </div>
         </div>
-      </div>
+        <button
+          onClick={() => navigate('/oracullo/access')}
+          className="mt-4 w-full text-center text-sm text-primary-600 hover:text-primary-700 transition-colors"
+        >
+          Ver todos os acessos →
+        </button>
+      </Card>
 
       <Card>
         <CardHeader>

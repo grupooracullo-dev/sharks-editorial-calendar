@@ -5,6 +5,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import StatsCard from '@/components/dashboard/StatsCard';
 import AlertCard from '@/components/dashboard/AlertCard';
 import MiniCalendar from '@/components/dashboard/MiniCalendar';
+import MonthSummaryCard from '@/components/dashboard/MonthSummaryCard';
 import StatusBadge from '@/components/actions/StatusBadge';
 import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
 import { formatDate, cn } from '@/lib/utils';
@@ -92,6 +93,47 @@ export default function EstrategosDashboard() {
         <StatsCard icon={CalendarDays} label="Pendências" value={stats.pending} />
       </div>
 
+      {/* ALERTAS — quick insight acima do calendário */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500" />
+            Alertas
+          </CardTitle>
+          <button
+            onClick={() => navigate('/estrategos/calendar')}
+            className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
+          >
+            Resolver <ArrowRight className="w-3 h-3" />
+          </button>
+        </CardHeader>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
+          {overdue.slice(0, 2).map(action => (
+            <AlertCard
+              key={action.id}
+              type="danger"
+              title="Ação atrasada"
+              message={action.title}
+              onClick={() => navigate('/estrategos/calendar')}
+            />
+          ))}
+          {stats.pending > 0 && (
+            <AlertCard
+              type="warning"
+              title={`${stats.pending} pendências`}
+              message="Ações aguardando aprovação ou revisão"
+              onClick={() => navigate('/estrategos/calendar')}
+            />
+          )}
+          {overdue.length === 0 && stats.pending === 0 && (
+            <AlertCard type="success" title="Tudo em dia!" message="Nenhum alerta ativo no momento." />
+          )}
+        </div>
+      </Card>
+
+      {/* ESTE MÊS — acima do calendário */}
+      <MonthSummaryCard actions={allActions.actions} />
+
       {/* CALENDARIO - largura total da secao */}
       <Card>
         <CardHeader>
@@ -116,77 +158,53 @@ export default function EstrategosDashboard() {
         />
       </Card>
 
-      {/* CARDS ABAIXO DO CALENDARIO */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{selectedDayLabel}</CardTitle>
+      {/* VISÃO DO DIA — largura total */}
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>VISÃO DO DIA</CardTitle>
+            <p className="text-xs text-gray-400 mt-0.5">{selectedDayLabel}</p>
+          </div>
+          <button
+            onClick={() => navigate('/estrategos/calendar')}
+            className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
+          >
+            Ver calendário <ArrowRight className="w-3 h-3" />
+          </button>
+        </CardHeader>
+        {stats.selectedDayActions.length === 0 ? (
+          <div className="py-8 text-center">
+            <CalendarDays className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">
+              {isSelectedToday ? 'Nenhuma ação para hoje' : 'Nenhuma ação neste dia'}
+            </p>
             <button
               onClick={() => navigate('/estrategos/calendar')}
-              className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
+              className="mt-3 text-sm text-primary-600 hover:text-primary-700 font-medium"
             >
-              Ver calendário <ArrowRight className="w-3 h-3" />
+              + Nova ação
             </button>
-          </CardHeader>
-          {stats.selectedDayActions.length === 0 ? (
-            <div className="py-8 text-center">
-              <CalendarDays className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">
-                {isSelectedToday ? 'Nenhuma ação para hoje' : 'Nenhuma ação neste dia'}
-              </p>
-              <button
-                onClick={() => navigate('/estrategos/calendar')}
-                className="mt-3 text-sm text-primary-600 hover:text-primary-700 font-medium"
-              >
-                + Nova ação
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-[22rem] overflow-y-auto pr-1">
-              {stats.selectedDayActions.map(action => (
-                <div key={action.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{action.title}</p>
-                    <p className="text-xs text-gray-500">
-                      {action.action_time?.slice(0, 5) || '—'} · {workspaces.find(w => w.id === action.workspace_id)?.name}
-                    </p>
-                  </div>
-                  <StatusBadge status={action.status} size="sm" />
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Alertas</CardTitle>
-          </CardHeader>
-          <div className="space-y-2">
-            {overdue.slice(0, 3).map(action => (
-              <AlertCard
-                key={action.id}
-                type="danger"
-                title="Ação atrasada"
-                message={action.title}
-                onClick={() => navigate('/estrategos/calendar')}
-              />
-            ))}
-            {stats.pending > 0 && (
-              <AlertCard
-                type="warning"
-                title={`${stats.pending} pendências`}
-                message="Ações aguardando aprovação ou revisão"
-                onClick={() => navigate('/estrategos/calendar')}
-              />
-            )}
-            {overdue.length === 0 && stats.pending === 0 && (
-              <p className="text-sm text-gray-400 text-center py-6">Tudo em dia!</p>
-            )}
           </div>
-        </Card>
-      </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+            {stats.selectedDayActions.map(action => (
+              <div key={action.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm font-bold text-gray-900 w-14 shrink-0">
+                  {action.action_time?.slice(0, 5) || '—'}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900 truncate">{action.title}</p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {workspaces.find(w => w.id === action.workspace_id)?.name}
+                    {action.responsible?.full_name && ` · ${action.responsible.full_name}`}
+                  </p>
+                </div>
+                <StatusBadge status={action.status} size="sm" className="shrink-0" />
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {stats.next7Days.length > 0 && (
         <Card>
