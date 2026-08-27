@@ -63,20 +63,18 @@ export default function LoginPage() {
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary-500/5 rounded-full blur-3xl" />
 
       <div className="w-full max-w-md relative z-10">
-        {/* Logo + marca */}
+        {/* Logo */}
         <div className="text-center mb-8">
           <img
             src={logoUrl}
-            alt="Oracullo Calendar"
+            alt="Oracullo Agenda"
             className="h-40 mx-auto object-contain drop-shadow-2xl"
           />
-          <h1 className="text-2xl font-bold text-white mt-4">Oracullo Calendar</h1>
-          <p className="text-sm text-gray-400 mt-1">Calendário editorial e marketing</p>
         </div>
 
         {/* Card */}
         <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/20 p-6 sm:p-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-1">Entrar</h2>
+          <h1 className="text-xl font-bold text-gray-900 mb-1">Oracullo Agenda</h1>
           <p className="text-sm text-gray-500 mb-6">Acesse sua conta para continuar</p>
 
           {/* Google SSO */}
