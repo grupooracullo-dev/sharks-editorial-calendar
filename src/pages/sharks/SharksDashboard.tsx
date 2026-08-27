@@ -8,7 +8,7 @@ import MiniCalendar from '@/components/dashboard/MiniCalendar';
 import MonthSummaryCard from '@/components/dashboard/MonthSummaryCard';
 import StatusBadge from '@/components/actions/StatusBadge';
 import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
-import Avatar from '@/components/ui/Avatar';
+import WorkspaceLogo from '@/components/ui/WorkspaceLogo';
 import { formatDate, formatTime, cn } from '@/lib/utils';
 import { formatCalendarDate, startOfWeek, endOfWeek, parseISO, format, ptBR } from '@/lib/dateUtils';
 import { supabase } from '@/lib/supabase';
@@ -102,9 +102,9 @@ export default function SharksDashboard() {
       {/* ALERTAS — quick insight acima do calendário */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-sm">
             <AlertTriangle className="w-4 h-4 text-amber-500" />
-            Alertas
+            ALERTAS
           </CardTitle>
           <button
             onClick={() => navigate('/sharks/calendar')}
@@ -141,18 +141,26 @@ export default function SharksDashboard() {
       <MonthSummaryCard actions={allActions.actions} />
 
       {/* CALENDARIO - largura total da secao */}
-      <Card>
+      <Card className="border-t-4 border-t-primary-500">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CalendarDays className="w-4 h-4 text-primary-500" />
-            Calendário
+            <span className="w-8 h-8 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center">
+              <CalendarDays className="w-4 h-4" />
+            </span>
+            CALENDÁRIO
           </CardTitle>
-          <button
-            onClick={() => navigate('/sharks/calendar')}
-            className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
-          >
-            Ver calendário completo <ArrowRight className="w-3 h-3" />
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-50 text-primary-700 text-xs font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse" />
+              {stats.todayActions.length} ação{stats.todayActions.length !== 1 ? 'ões' : ''} hoje
+            </span>
+            <button
+              onClick={() => navigate('/sharks/calendar')}
+              className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
+            >
+              Ver calendário completo <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
         </CardHeader>
         <MiniCalendar
           actions={allActions.actions}
@@ -263,7 +271,7 @@ export default function SharksDashboard() {
             return (
               <Card key={ws.id} hover padding="md" onClick={() => navigate('/sharks/calendar')}>
                 <div className="flex items-start justify-between mb-3">
-                  <Avatar name={ws.name} size="md" />
+                  <WorkspaceLogo name={ws.name} logoUrl={ws.logo_url} size="md" />
                   <StatusBadge status={ws.is_active ? 'scheduled' : 'cancelled'} size="sm" />
                 </div>
                 <h3 className="font-semibold text-gray-900">{ws.name}</h3>

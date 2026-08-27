@@ -19,6 +19,7 @@ import {
   type GoogleCalendarOption,
 } from '@/lib/googleSync';
 import SyncModeSelector, { EnvSyncToggles } from '@/components/integrations/SyncModeSelector';
+import WorkspaceLogo from '@/components/ui/WorkspaceLogo';
 import { toast } from 'sonner';
 import type { SyncMode, EnvironmentType } from '@/types';
 import {
@@ -402,14 +403,17 @@ export default function SharksIntegrations() {
                   const connected = !!integ?.is_connected;
                   return (
                     <div key={ws.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3 min-w-0">
+                      <WorkspaceLogo name={ws.name} logoUrl={ws.logo_url} size="sm" />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{ws.name}</p>
+                        <p className="text-sm font-medium text-gray-900 truncate">{ws.name}</p>
                         <p className="text-xs text-gray-500 truncate">
                           {connected
                             ? `${integ.google_account_email ?? '—'} · ${integ.auto_sync ? 'sync em tempo real' : 'sync pausado'}`
                             : 'Google Calendar não conectado'}
                         </p>
                       </div>
+                    </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {connected && (
                           <span className="flex items-center gap-1 text-[11px] font-medium text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded-full">

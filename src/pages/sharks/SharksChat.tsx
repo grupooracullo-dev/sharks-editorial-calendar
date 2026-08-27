@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useChat } from '@/hooks/useChat';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import ChatPanel from '@/components/chat/ChatPanel';
-import Avatar from '@/components/ui/Avatar';
+import WorkspaceLogo from '@/components/ui/WorkspaceLogo';
 import Badge from '@/components/ui/Badge';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
@@ -52,7 +52,7 @@ export default function SharksChat() {
             <div className="flex items-center gap-2 min-w-0">
               {selectedWs ? (
                 <>
-                  <Avatar name={selectedWs.name} size="sm" />
+                  <WorkspaceLogo name={selectedWs.name} logoUrl={selectedWs.logo_url} size="sm" />
                   <span className="text-sm font-medium text-gray-900 truncate">{selectedWs.name}</span>
                 </>
               ) : (
@@ -71,7 +71,7 @@ export default function SharksChat() {
                     activeWsId === ws.id ? 'bg-primary-50' : ''
                   }`}
                 >
-                  <Avatar name={ws.name} size="sm" />
+                  <WorkspaceLogo name={ws.name} logoUrl={ws.logo_url} size="sm" />
                   <span className="text-sm font-medium text-gray-900 truncate">{ws.name}</span>
                 </button>
               ))}
@@ -97,7 +97,7 @@ export default function SharksChat() {
                       activeWsId === ws.id ? 'bg-primary-50 border border-primary-200' : 'hover:bg-gray-50 border border-transparent'
                     }`}
                   >
-                    <Avatar name={ws.name} size="md" />
+                    <WorkspaceLogo name={ws.name} logoUrl={ws.logo_url} size="md" />
                     <div className="flex-1 min-w-0 text-left">
                       <p className="text-sm font-medium text-gray-900 truncate">{ws.name}</p>
                       <p className="text-xs text-gray-500 truncate">

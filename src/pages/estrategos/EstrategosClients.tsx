@@ -6,7 +6,8 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
-import Avatar from '@/components/ui/Avatar';
+import WorkspaceLogo from '@/components/ui/WorkspaceLogo';
+import LogoUploader from '@/components/ui/LogoUploader';
 import Badge from '@/components/ui/Badge';
 import { SEGMENTS } from '@/lib/constants';
 import { BR_STATES } from '@/data/brDates';
@@ -71,12 +72,14 @@ export default function EstrategosClients() {
     segment: '',
     city: '',
     state: '',
+    logo_url: null as string | null,
   });
 
   // Edit state
   const [editOpen, setEditOpen] = useState(false);
   const [editingWs, setEditingWs] = useState<{ id: string; name: string; segment: string; city: string; state: string } | null>(null);
   const [editForm, setEditForm] = useState({ name: '', segment: '', city: '', state: '' });
+  const [editLogoUrl, setEditLogoUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Delete state
@@ -123,6 +126,7 @@ export default function EstrategosClients() {
           segment: formData.segment || null,
           city: formData.city || null,
           state: formData.state || null,
+          logo_url: formData.logo_url,
         })
         .select('*')
         .single();
@@ -137,7 +141,7 @@ export default function EstrategosClients() {
       toast.success(`Cliente "${ws.name}" criado com sucesso!`);
       setWizardOpen(false);
       setStep(0);
-      setFormData({ name: '', segment: '', city: '', state: '' });
+      setFormData({ name: '', segment: '', city: '', state: '', logo_url: null });
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : 'Erro ao criar cliente');
@@ -146,9 +150,10 @@ export default function EstrategosClients() {
     }
   };
 
-  const handleEdit = (ws: { id: string; name: string; segment: string | null; city: string | null; state: string | null }) => {
+  const handleEdit = (ws: { id: string; name: string; segment: string | null; city: string | null; state: string | null; logo_url?: string | null }) => {
     setEditingWs({ id: ws.id, name: ws.name, segment: ws.segment || '', city: ws.city || '', state: ws.state || '' });
     setEditForm({ name: ws.name, segment: ws.segment || '', city: ws.city || '', state: ws.state || '' });
+    setEditLogoUrl(ws.logo_url ?? null);
     setEditOpen(true);
   };
 
@@ -163,6 +168,7 @@ export default function EstrategosClients() {
           segment: editForm.segment || null,
           city: editForm.city || null,
           state: editForm.state || null,
+          logo_url: editLogoUrl,
         })
         .eq('id', editingWs.id);
 
@@ -232,7 +238,7 @@ export default function EstrategosClients() {
             return (
               <Card key={ws.id} className="relative group">
                 <div className="flex items-start gap-3">
-                  <Avatar name={ws.name} size="lg" />
+                  <WorkspaceLogo name={ws.name} logoUrl={ws.logo_url} size="lg" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-gray-900 truncate">{ws.name}</h3>
@@ -308,20 +314,26 @@ export default function EstrategosClients() {
         <p className="text-sm font-medium text-gray-900 mb-4">{wizardSteps[step]}</p>
 
         {step === 0 && (
-          <div className="space-y-4">
-            <Input
-              label="Nome da empresa"
-              value={formData.name}
-              onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
-              placeholder="Ex: Demo Estrategos"
-            />
-            <Select
-              label="Segmento"
-              value={formData.segment}
-              onChange={(e) => setFormData(p => ({ ...p, segment: e.target.value }))}
-              placeholder="Selecione"
-              options={SEGMENTS.map(s => ({ value: s, label: s }))}
-            />
+          <div className="flex flex-col sm:flex-row sm:items-start gap-6">
+            <div className="flex-1 space-y-4">
+              <Input
+                label="Nome da empresa"
+                value={formData.name}
+                onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
+                placeholder="Ex: Demo Estrategos"
+              />
+              <Select
+                label="Segmento"
+                value={formData.segment}
+                onChange={(e) => setFormData(p => ({ ...p, segment: e.target.value }))}
+                placeholder="Selecione"
+                options={SEGMENTS.map(s => ({ value: s, label: s }))}
+              />
+            </div>
+            <div className="sm:w-56 shrink-0">
+              <p className="text-sm font-medium text-gray-700 mb-1.5">Logomarca</p>
+              <LogoUploader name={formData.name || 'Cliente'} logoUrl={formData.logo_url} onChange={(url) => setFormData(p => ({ ...p, logo_url: url }))} />
+            </div>
           </div>
         )}
 
@@ -378,6 +390,12 @@ export default function EstrategosClients() {
       {/* Edit Client Modal */}
       <Modal isOpen={editOpen} onClose={() => setEditOpen(false)} title="Editar Cliente" size="md">
         <div className="space-y-4">
+          <p className="text-sm font-medium text-gray-700">Logomarca</p>
+          <LogoUploader
+            name={editForm.name || 'Cliente'}
+            logoUrl={editLogoUrl}
+            onChange={setEditLogoUrl}
+          />
           <Input
             label="Nome da empresa"
             value={editForm.name}

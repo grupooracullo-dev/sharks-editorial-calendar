@@ -5,6 +5,7 @@ import { useNotifications } from '@/contexts/NotificationContext';
 import { ChevronDown, Bell, Search, Check, X, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Avatar from '@/components/ui/Avatar';
+import WorkspaceLogo from '@/components/ui/WorkspaceLogo';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { EnvironmentType } from '@/types';
 
@@ -68,6 +69,12 @@ export default function TopHeader({ onOpenMobileNav }: { onOpenMobileNav?: () =>
               onClick={() => setWsDropdownOpen(!wsDropdownOpen)}
               className="flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-sm font-medium text-gray-700"
             >
+              <WorkspaceLogo
+                name={currentWorkspace?.name ?? 'Todos os clientes'}
+                logoUrl={currentWorkspace?.logo_url}
+                size="sm"
+                className="w-7 h-7"
+              />
               <span className="max-w-[200px] truncate">
                 {currentWorkspace ? currentWorkspace.name : 'Todos os clientes'}
               </span>
@@ -86,9 +93,7 @@ export default function TopHeader({ onOpenMobileNav }: { onOpenMobileNav?: () =>
                     !currentWorkspace && 'bg-primary-50 text-primary-700'
                   )}
                 >
-                  <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
-                    <span className="text-xs font-bold text-primary-600">T</span>
-                  </div>
+                  <WorkspaceLogo name="Todos os clientes" size="sm" />
                   <span className="font-medium">Todos os clientes</span>
                   {!currentWorkspace && <Check className="w-4 h-4 ml-auto text-primary-600" />}
                 </button>
@@ -104,14 +109,14 @@ export default function TopHeader({ onOpenMobileNav }: { onOpenMobileNav?: () =>
                       currentWorkspace?.id === ws.id && 'bg-primary-50 text-primary-700'
                     )}
                   >
-                    <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <span className="text-xs font-bold text-gray-600">{ws.name.charAt(0)}</span>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <WorkspaceLogo name={ws.name} logoUrl={ws.logo_url} size="sm" />
+                      <div className="text-left min-w-0">
+                        <p className="font-medium truncate">{ws.name}</p>
+                        <p className="text-xs text-gray-400 truncate">{ws.segment}</p>
+                      </div>
                     </div>
-                    <div className="text-left">
-                      <p className="font-medium">{ws.name}</p>
-                      <p className="text-xs text-gray-400">{ws.segment}</p>
-                    </div>
-                    {currentWorkspace?.id === ws.id && <Check className="w-4 h-4 ml-auto text-primary-600" />}
+                    {currentWorkspace?.id === ws.id && <Check className="w-4 h-4 ml-auto flex-shrink-0 text-primary-600" />}
                   </button>
                 ))}
               </div>

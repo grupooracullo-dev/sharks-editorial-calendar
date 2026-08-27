@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Avatar from '@/components/ui/Avatar';
+import StatsCard from '@/components/dashboard/StatsCard';
 import MiniCalendar from '@/components/dashboard/MiniCalendar';
 import MonthSummaryCard from '@/components/dashboard/MonthSummaryCard';
 import StatusBadge from '@/components/actions/StatusBadge';
@@ -11,7 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { type User, type EnvironmentType, type Action, type Campaign, type StrategicDate } from '@/types';
 import { formatCalendarDate, parseISO, format, ptBR } from '@/lib/dateUtils';
 import { formatDate, cn } from '@/lib/utils';
-import { Users, Building2, Briefcase, Link2, CalendarDays, ArrowRight } from 'lucide-react';
+import { Users, Building2, Briefcase, Link2, CalendarDays, ArrowRight, Boxes } from 'lucide-react';
 
 export default function OraculloDashboard() {
   const navigate = useNavigate();
@@ -81,49 +82,33 @@ export default function OraculloDashboard() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <Users className="w-4 h-4 text-gray-400" />
-            <p className="text-xs text-gray-400 font-medium">Usuários</p>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{users.length}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <Building2 className="w-4 h-4 text-gray-400" />
-            <p className="text-xs text-gray-400 font-medium">Workspaces</p>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{wsCount.sharks + wsCount.estrategos}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <CalendarDays className="w-4 h-4 text-gray-400" />
-            <p className="text-xs text-gray-400 font-medium">Ações total</p>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{actions.length}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <Briefcase className="w-4 h-4 text-gray-400" />
-            <p className="text-xs text-gray-400 font-medium">Projetos Estrategos</p>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{actions.filter(a => a.environment === 'estrategos').length}</p>
-        </div>
+        <StatsCard icon={Users} label="Usuários" value={users.length} />
+        <StatsCard icon={Building2} label="Workspaces" value={wsCount.sharks + wsCount.estrategos} />
+        <StatsCard icon={CalendarDays} label="Ações total" value={actions.length} />
+        <StatsCard icon={Briefcase} label="Projetos Estrategos" value={actions.filter(a => a.environment === 'estrategos').length} />
       </div>
 
       {/* ESTE MÊS — acima do calendário */}
       <MonthSummaryCard actions={actions} />
 
       {/* CALENDARIO - largura total da secao */}
-      <Card>
+      <Card className="border-t-4 border-t-primary-500">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CalendarDays className="w-4 h-4 text-primary-500" />
-            Calendário
+            <span className="w-8 h-8 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center">
+              <CalendarDays className="w-4 h-4" />
+            </span>
+            CALENDÁRIO
           </CardTitle>
-          <span className="text-xs text-gray-400 flex items-center gap-1">
-            todos os ambientes <ArrowRight className="w-3 h-3" />
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-50 text-primary-700 text-xs font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse" />
+              {actions.filter(a => a.action_date === todayStr && a.status !== 'cancelled').length} ação{actions.filter(a => a.action_date === todayStr && a.status !== 'cancelled').length !== 1 ? 'ões' : ''} hoje
+            </span>
+            <span className="text-xs text-gray-400 flex items-center gap-1">
+              todos os ambientes <ArrowRight className="w-3 h-3" />
+            </span>
+          </div>
         </CardHeader>
         <MiniCalendar
           actions={actions}
@@ -185,7 +170,9 @@ export default function OraculloDashboard() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <span className="text-xl leading-none">🌐</span>
+            <span className="w-8 h-8 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center">
+              <Boxes className="w-4 h-4" />
+            </span>
             Ambientes
           </CardTitle>
           <span className="text-xs text-gray-400">visao consolidada</span>

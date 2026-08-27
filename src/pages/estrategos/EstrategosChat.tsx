@@ -5,6 +5,7 @@ import { useChat } from '@/hooks/useChat';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import ChatPanel from '@/components/chat/ChatPanel';
 import Avatar from '@/components/ui/Avatar';
+import WorkspaceLogo from '@/components/ui/WorkspaceLogo';
 import Card from '@/components/ui/Card';
 import { MessageType } from '@/types';
 import { ChevronDown } from 'lucide-react';
@@ -44,7 +45,7 @@ export default function EstrategosChat() {
             <div className="flex items-center gap-2 min-w-0">
               {selectedWs ? (
                 <>
-                  <Avatar name={selectedWs.name} size="sm" />
+                  <WorkspaceLogo name={selectedWs.name} logoUrl={selectedWs.logo_url} size="sm" />
                   <span className="text-sm font-medium text-gray-900 truncate">{selectedWs.name}</span>
                 </>
               ) : (
@@ -61,7 +62,7 @@ export default function EstrategosChat() {
                   onClick={() => { setSelectedWsId(ws.id); setShowWsList(false); }}
                   className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left"
                 >
-                  <Avatar name={ws.name} size="sm" />
+                  <WorkspaceLogo name={ws.name} logoUrl={ws.logo_url} size="sm" />
                   <span className="truncate">{ws.name}</span>
                 </button>
               ))}
@@ -85,7 +86,7 @@ export default function EstrategosChat() {
                     ws.id === activeWsId ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  <Avatar name={ws.name} size="sm" />
+                  <WorkspaceLogo name={ws.name} logoUrl={ws.logo_url} size="sm" />
                   <span className="truncate">{ws.name}</span>
                 </button>
               ))}
