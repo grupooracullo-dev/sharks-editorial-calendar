@@ -21,7 +21,9 @@ DECLARE
 BEGIN
   IF TG_OP = 'DELETE' THEN
     INSERT INTO calendar_sync_queue (workspace_id, source, source_id, operation)
-    VALUES (OLD.workspace_id, 'campaign', OLD.id, 'delete');
+    VALUES (OLD.workspace_id, 'campaign', OLD.id, 'delete')
+    ON CONFLICT (source, source_id) WHERE status = 'pending' AND source_id IS NOT NULL
+    DO UPDATE SET operation = EXCLUDED.operation, created_at = now();
     RETURN OLD;
   END IF;
 
@@ -41,12 +43,18 @@ BEGIN
 
   visible := NEW.status IN ('active', 'draft') AND NEW.start_date IS NOT NULL;
 
+  -- Toggle rapido pause<->ativa: o item pending anterior e flipado no
+  -- lugar de colidir com uq_csq_source_pending (23505).
   IF visible THEN
     INSERT INTO calendar_sync_queue (workspace_id, source, source_id, operation)
-    VALUES (NEW.workspace_id, 'campaign', NEW.id, 'create');
+    VALUES (NEW.workspace_id, 'campaign', NEW.id, 'create')
+    ON CONFLICT (source, source_id) WHERE status = 'pending' AND source_id IS NOT NULL
+    DO UPDATE SET operation = EXCLUDED.operation, created_at = now();
   ELSE
     INSERT INTO calendar_sync_queue (workspace_id, source, source_id, operation)
-    VALUES (NEW.workspace_id, 'campaign', NEW.id, 'delete');
+    VALUES (NEW.workspace_id, 'campaign', NEW.id, 'delete')
+    ON CONFLICT (source, source_id) WHERE status = 'pending' AND source_id IS NOT NULL
+    DO UPDATE SET operation = EXCLUDED.operation, created_at = now();
   END IF;
   RETURN NEW;
 END;

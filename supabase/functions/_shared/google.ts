@@ -408,6 +408,50 @@ async function gFetch(url: string, init: RequestInit, token: string): Promise<Re
   return fetch(url, { ...init, headers });
 }
 
+// ---------- Idempotencia de criacao ----------
+// Se um evento foi criado mas o link nao persistiu (falha transitória),
+// o retry antigo fazia POST de novo -> duplicata. Agora todo POST carrega
+// extendedProperties.private.srcKey e, antes de criar, buscamos por essa
+// chave na agenda destino: achou, reusa; nao achou, cria.
+
+async function findEventBySrcKey(
+  token: string,
+  calId: string,
+  srcKey: string,
+): Promise<{ id: string } | null> {
+  const url =
+    `${CAL_API}/calendars/${encodeURIComponent(calId)}/events` +
+    `?privateExtendedProperty=${encodeURIComponent(`srcKey=${srcKey}`)}&maxResults=1`;
+  const res = await gFetch(url, { method: 'GET' }, token);
+  if (!res.ok) return null;
+  const json = await res.json().catch(() => null);
+  const items = (json?.items ?? []) as Array<{ id: string }>;
+  return items.length > 0 ? items[0] : null;
+}
+
+async function createIdempotentEvent(
+  token: string,
+  calId: string,
+  srcKey: string,
+  src: QueueSource,
+  row: Record<string, any>,
+  integ: IntegrationRow,
+): Promise<{ id: string; reused: boolean }> {
+  const existing = await findEventBySrcKey(token, calId, srcKey);
+  if (existing) return { id: existing.id, reused: true };
+
+  const body = buildEventBody(src, row, integ);
+  body.extendedProperties = { private: { srcKey } };
+  const res = await gFetch(
+    `${CAL_API}/calendars/${encodeURIComponent(calId)}/events`,
+    { method: 'POST', body: JSON.stringify(body) },
+    token,
+  );
+  if (!res.ok) throw new Error(`Google ${res.status}: ${(await res.text()).slice(0, 150)}`);
+  const ev = await res.json();
+  return { id: ev.id as string, reused: false };
+}
+
 export async function processWorkspace(
   admin: ReturnType<typeof serviceClient>,
   workspaceId: string,
@@ -694,37 +738,61 @@ export async function processWorkspace(
               }
 
               const token = await tokenFor(integ);
-              const bodyJson = JSON.stringify(buildEventBody(src, row, integ));
+              const srcKey = `${src}:${sid}`;
               const eventId = linkMap.get(`${src}:${sid}:${integ.id}`) ?? calEventIds.get(calKey) ?? undefined;
-              let res: Response;
+              let evId: string;
+              let createdNow = false;
+
               if (eventId) {
-                res = await gFetch(
+                const bodyJson = JSON.stringify(buildEventBody(src, row, integ));
+                const res = await gFetch(
                   `${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`,
                   { method: 'PATCH', body: bodyJson },
                   token,
                 );
                 if (res.status === 404 || res.status === 410) {
-                  res = await gFetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events`, { method: 'POST', body: bodyJson }, token);
+                  const created = await createIdempotentEvent(token, calId, srcKey, src, row, integ);
+                  evId = created.id;
+                  createdNow = !created.reused;
+                } else if (!res.ok) {
+                  throw new Error(`Google ${res.status}: ${(await res.text()).slice(0, 150)}`);
+                } else {
+                  evId = eventId;
                 }
               } else {
-                res = await gFetch(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events`, { method: 'POST', body: bodyJson }, token);
+                const created = await createIdempotentEvent(token, calId, srcKey, src, row, integ);
+                evId = created.id;
+                createdNow = !created.reused;
               }
-              if (!res.ok) throw new Error(`Google ${res.status}: ${(await res.text()).slice(0, 150)}`);
-              const ev = await res.json();
 
-              calEventIds.set(calKey, ev.id);
+              calEventIds.set(calKey, evId);
               writtenCals.add(calKey);
 
-              await admin.from('calendar_event_links').upsert({
-                action_id: src === 'sharks_action' ? sid : null,
-                source: src,
-                source_id: sid,
-                workspace_id: workspaceId,
-                integration_id: integ.id,
-                google_event_id: ev.id,
-                last_synced_at: now(),
-                sync_status: 'synced',
-              }, { onConflict: 'source,source_id,integration_id' });
+              try {
+                await admin.from('calendar_event_links').upsert({
+                  action_id: src === 'sharks_action' ? sid : null,
+                  source: src,
+                  source_id: sid,
+                  workspace_id: workspaceId,
+                  integration_id: integ.id,
+                  google_event_id: evId,
+                  last_synced_at: now(),
+                  sync_status: 'synced',
+                }, { onConflict: 'source,source_id,integration_id' });
+              } catch (linkErr) {
+                // Compensacao: evento recem-criado sem link persistido seria
+                // re-POSTado no retry -> duplicata. Remove e falha o item.
+                if (createdNow) {
+                  await gFetch(
+                    `${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(evId)}`,
+                    { method: 'DELETE' },
+                    token,
+                  ).catch(() => {});
+                  calEventIds.delete(calKey);
+                  writtenCals.delete(calKey);
+                }
+                throw linkErr;
+              }
               anyOk = true;
             } catch (e) {
               errs.push(`${integ.google_account_email ?? integ.id}: ${String((e as Error).message).slice(0, 120)}`);
