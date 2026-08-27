@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useActions, useOverdueActions } from '@/hooks/useActions';
 import StatsCard from '@/components/dashboard/StatsCard';
-import AlertCard from '@/components/dashboard/AlertCard';
 import MiniCalendar from '@/components/dashboard/MiniCalendar';
 import MonthSummaryCard from '@/components/dashboard/MonthSummaryCard';
 import StatusBadge from '@/components/actions/StatusBadge';
@@ -98,44 +97,6 @@ export default function SharksDashboard() {
         <StatsCard icon={Clock} label="Pendências" value={stats.pending} />
         <StatsCard icon={AlertTriangle} label="Atrasadas" value={stats.overdue} iconBg="bg-red-50 text-red-600" />
       </div>
-
-      {/* ALERTAS — quick insight acima do calendário */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
-            ALERTAS
-          </CardTitle>
-          <button
-            onClick={() => navigate('/sharks/calendar')}
-            className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
-          >
-            Resolver <ArrowRight className="w-3 h-3" />
-          </button>
-        </CardHeader>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
-          {overdue.slice(0, 2).map(action => (
-            <AlertCard
-              key={action.id}
-              type="danger"
-              title="Ação atrasada"
-              message={action.title}
-              onClick={() => navigate('/sharks/calendar')}
-            />
-          ))}
-          {stats.pending > 0 && (
-            <AlertCard
-              type="warning"
-              title={`${stats.pending} pendências`}
-              message="Ações aguardando produção"
-              onClick={() => navigate('/sharks/calendar')}
-            />
-          )}
-          {overdue.length === 0 && stats.pending === 0 && (
-            <AlertCard type="success" title="Tudo em ordem!" message="Nenhum alerta ativo no momento." />
-          )}
-        </div>
-      </Card>
 
       {/* ESTE MÊS — acima do calendário */}
       <MonthSummaryCard actions={allActions.actions} />

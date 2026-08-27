@@ -24,8 +24,9 @@ Deno.serve(async req => {
   const { data: userData } = await admin.auth.getUser(token);
   if (!userData?.user) return json(401, { error: 'Token invalido' });
 
-  const { data: caller } = await admin.from('users').select('role').eq('id', userData.user.id).maybeSingle();
-  if (!caller || caller.role !== 'admin_sharks') {
+  const { data: caller } = await admin.from('users').select('role, is_guardian').eq('id', userData.user.id).maybeSingle();
+  const isStaff = !!caller?.is_guardian || caller?.role === 'oracullo_admin' || caller?.role === 'admin_sharks';
+  if (!isStaff) {
     return json(403, { error: 'Apenas administradores podem alterar permissoes' });
   }
 

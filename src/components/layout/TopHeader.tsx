@@ -3,6 +3,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { ChevronDown, Bell, Search, Check, X, Menu } from 'lucide-react';
+import sharksLogo from '/logo-sharks.png?url';
+import estrategosLogo from '/logo-estrategos.png?url';
 import { cn } from '@/lib/utils';
 import Avatar from '@/components/ui/Avatar';
 import WorkspaceLogo from '@/components/ui/WorkspaceLogo';
@@ -26,6 +28,12 @@ export default function TopHeader({ onOpenMobileNav }: { onOpenMobileNav?: () =>
     ? 'estrategos'
     : 'sharks_company';
   const workspaces = workspacesByEnv(routeEnv);
+
+  // Logomarca de marca nas rotas staff (Sharks/Estrategos)
+  const staffEnv: 'estrategos' | 'sharks_company' | null =
+    location.pathname.startsWith('/estrategos') ? 'estrategos'
+    : location.pathname.startsWith('/sharks') ? 'sharks_company'
+    : null;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -60,6 +68,15 @@ export default function TopHeader({ onOpenMobileNav }: { onOpenMobileNav?: () =>
             >
               <Menu className="w-5 h-5" />
             </button>
+          )}
+
+          {/* Logomarca de marca (rotas staff) */}
+          {staffEnv && (
+            <img
+              src={staffEnv === 'estrategos' ? estrategosLogo : sharksLogo}
+              alt=""
+              className="hidden sm:block h-7 w-7 object-contain shrink-0"
+            />
           )}
 
           {/* Workspace Selector (Sharks only) */}

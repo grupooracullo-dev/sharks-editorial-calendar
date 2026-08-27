@@ -140,6 +140,19 @@ export default function SharksTeam() {
 
   /* ─── Helpers ─── */
 
+  // Extrai a mensagem real devolvida pela edge function (FunctionsHttpError.context)
+  async function functionErrorMessage(error: unknown): Promise<string> {
+    if (error && typeof error === 'object' && 'context' in error) {
+      try {
+        const body = await (error as { context: Response }).context.clone().json();
+        if (body && typeof body.error === 'string') return body.error;
+      } catch {
+        // resposta não-JSON — usa a mensagem padrão abaixo
+      }
+    }
+    return error instanceof Error ? error.message : 'Erro inesperado';
+  }
+
   /* ─── Handlers ─── */
   const handleInvite = async () => {
     if (!inviteForm.full_name.trim() || !inviteForm.email.trim() || !inviteForm.password.trim() || submitting) return;
@@ -156,7 +169,7 @@ export default function SharksTeam() {
         },
       });
 
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(await functionErrorMessage(error));
       if (data?.error) throw new Error(data.error);
 
       toast.success(`"${inviteForm.full_name}" foi adicionado ao time!`);
@@ -208,7 +221,7 @@ export default function SharksTeam() {
         },
       });
 
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(await functionErrorMessage(error));
       if (data?.error) throw new Error(data.error);
 
       toast.success('Membro atualizado!');
@@ -229,7 +242,7 @@ export default function SharksTeam() {
       const { error } = await supabase.functions.invoke('admin-delete-user', {
         body: { user_id: userId },
       });
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(await functionErrorMessage(error));
       toast.success(`"${name}" removido do time.`);
       setDeleteConfirm(null);
       await loadData();
