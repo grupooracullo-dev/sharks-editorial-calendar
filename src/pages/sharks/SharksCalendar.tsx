@@ -19,6 +19,7 @@ import { useEditorial } from '@/hooks/useEditorial';
 import { useStrategicDates } from '@/hooks/useStrategicDates';
 import { useChannels } from '@/hooks/useChannels';
 import { useActiveCampaigns } from '@/hooks/useCampaigns';
+import { ACTION_STATUSES } from '@/lib/constants';
 import { ChevronLeft, ChevronRight, Calendar, Plus, Wand2, RefreshCw } from 'lucide-react';
 import { DndContext, DragOverlay, closestCenter, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { toast } from 'sonner';
@@ -86,6 +87,20 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
   const handleCreate = () => {
     setEditingAction(null);
     setFormOpen(true);
+  };
+
+  const handleCreateAtDate = (dateStr: string) => {
+    setEditingAction({ action_date: dateStr } as Action);
+    setFormOpen(true);
+  };
+
+  const handleQuickStatus = async (action: Action, newStatus: Action['status']) => {
+    const result = await update(action.id, { status: newStatus });
+    if (result.ok) {
+      toast.success(`Status alterado para "${ACTION_STATUSES[newStatus]?.label || newStatus}"`);
+    } else {
+      toast.error(result.error || 'Erro ao alterar status');
+    }
   };
 
   const handleSync = async () => {
@@ -252,14 +267,19 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                   return dateStr >= start && dateStr <= end;
                 });
 
+                // Datas estratégicas deste dia
+                const dayStrategic = strategicDates.filter(s => s.date === dateStr);
+
                 return (
                   <div
                     key={i}
                     id={dateStr}
+                    onClick={() => { if (dayActions.length === 0) handleCreateAtDate(dateStr); }}
                     className={cn(
                       'min-h-[70px] sm:min-h-[100px] md:min-h-[120px] border-r border-b last:border-r-0 p-1 sm:p-1.5 transition-colors',
                       !isCurrentMonth && 'bg-gray-50/50',
                       isToday && 'bg-primary-50/30',
+                      dayActions.length === 0 && 'cursor-pointer',
                       'calendar-cell hover:bg-gray-50/80'
                     )}
                   >
@@ -273,6 +293,20 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                         {day.getDate()}
                       </span>
                     </div>
+                    {/* Datas estratégicas */}
+                    {dayStrategic.length > 0 && (
+                      <div className="flex flex-col gap-0.5 mb-1">
+                        {dayStrategic.map(s => (
+                          <div
+                            key={s.id}
+                            className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-50 border border-amber-200"
+                            title={s.description || s.title}
+                          >
+                            <span className="text-[8px] text-amber-600 font-medium truncate">{s.title}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {/* Indicadores de campanha */}
                     {dayCampaigns.length > 0 && (
                       <div className="flex flex-col gap-0.5 mb-1">
@@ -292,6 +326,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                           key={action.id}
                           action={action}
                           onClick={() => handleActionClick(action)}
+                          onQuickStatus={handleQuickStatus}
                           compact
                           showClient={isAdmin}
                         />
@@ -305,8 +340,8 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
               })}
             </div>
 
-            {/* Legenda de campanhas */}
-            {activeCampaigns.filter(c => c.start_date).length > 0 && (
+            {/* Legenda */}
+            {(activeCampaigns.filter(c => c.start_date).length > 0 || strategicDates.length > 0) && (
               <div className="flex flex-wrap items-center gap-3 px-3 py-2 border-t border-gray-100 bg-gray-50/50">
                 {activeCampaigns.filter(c => c.start_date).map(c => (
                   <span key={c.id} className="flex items-center gap-1.5 text-[11px] text-gray-600">
@@ -314,6 +349,12 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                     {c.name}
                   </span>
                 ))}
+                {strategicDates.length > 0 && (
+                  <span className="flex items-center gap-1.5 text-[11px] text-amber-600">
+                    <span className="w-3 h-1.5 rounded-full bg-amber-400" />
+                    Data estratégica
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -351,9 +392,27 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                   const end = c.end_date || c.start_date;
                   return dateStr >= start && dateStr <= end;
                 });
+                const dayStrategic = strategicDates.filter(s => s.date === dateStr);
 
                 return (
-                  <div key={i} id={dateStr} className="border-r last:border-r-0 p-1.5 sm:p-2 space-y-1 sm:space-y-2">
+                  <div
+                    key={i}
+                    id={dateStr}
+                    onClick={() => { if (dayActions.length === 0) handleCreateAtDate(dateStr); }}
+                    className={cn(
+                      'border-r last:border-r-0 p-1.5 sm:p-2 space-y-1 sm:space-y-2',
+                      dayActions.length === 0 && 'cursor-pointer'
+                    )}
+                  >
+                    {dayStrategic.length > 0 && (
+                      <div className="flex flex-col gap-0.5">
+                        {dayStrategic.map(s => (
+                          <div key={s.id} className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-50 border border-amber-200" title={s.description || s.title}>
+                            <span className="text-[8px] text-amber-600 font-medium truncate">{s.title}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {dayCampaigns.length > 0 && (
                       <div className="flex flex-col gap-0.5">
                         {dayCampaigns.map(c => (
@@ -371,6 +430,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                         key={action.id}
                         action={action}
                         onClick={() => handleActionClick(action)}
+                        onQuickStatus={handleQuickStatus}
                         compact={isMobile}
                         showClient={isAdmin}
                       />
@@ -399,10 +459,10 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                 const dayActions = actions.filter(a => a.action_date === dateStr);
                 if (dayActions.length === 0) {
                   return (
-                    <div className="p-8 text-center">
+                    <div className="p-8 text-center cursor-pointer hover:bg-gray-50/80 transition-colors" onClick={() => handleCreateAtDate(dateStr)}>
                       <Calendar className="w-10 h-10 text-gray-300 mx-auto mb-2" />
                       <p className="text-sm font-medium text-gray-900">Nenhuma ação</p>
-                      <p className="text-xs text-gray-500 mt-1">Toque em "+" para criar uma ação.</p>
+                      <p className="text-xs text-gray-500 mt-1">Clique aqui para criar uma ação.</p>
                     </div>
                   );
                 }
@@ -411,6 +471,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                     <CalendarEvent
                       action={action}
                       onClick={() => handleActionClick(action)}
+                      onQuickStatus={handleQuickStatus}
                       showClient={isAdmin}
                     />
                   </div>
@@ -446,6 +507,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                           key={action.id}
                           action={action}
                           onClick={() => handleActionClick(action)}
+                          onQuickStatus={handleQuickStatus}
                           showClient={isAdmin}
                         />
                       ))}

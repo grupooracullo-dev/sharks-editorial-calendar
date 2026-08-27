@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useActions, useOverdueActions } from '@/hooks/useActions';
@@ -10,6 +10,8 @@ import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
 import Avatar from '@/components/ui/Avatar';
 import { formatDate, formatTime, cn } from '@/lib/utils';
 import { formatCalendarDate, startOfWeek, endOfWeek, parseISO, format, ptBR } from '@/lib/dateUtils';
+import { supabase } from '@/lib/supabase';
+import { type Campaign, type StrategicDate } from '@/types';
 import {
   Users,
   CalendarDays,
@@ -27,6 +29,18 @@ export default function SharksDashboard() {
 
   const allActions = useActions({});
   const overdue = useOverdueActions();
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [strategicDates, setStrategicDates] = useState<StrategicDate[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('campaigns').select('*'),
+      supabase.from('strategic_dates').select('*'),
+    ]).then(([cp, sd]) => {
+      setCampaigns((cp.data as unknown as Campaign[]) ?? []);
+      setStrategicDates((sd.data as unknown as StrategicDate[]) ?? []);
+    });
+  }, []);
 
   const today = new Date();
   const todayStr = formatCalendarDate(today);
@@ -95,6 +109,8 @@ export default function SharksDashboard() {
             actions={allActions.actions}
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
+            campaigns={campaigns}
+            strategicDates={strategicDates}
           />
         </Card>
 

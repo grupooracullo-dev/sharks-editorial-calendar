@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Action } from '@/types';
+import { Action, Campaign, StrategicDate } from '@/types';
 import { cn } from '@/lib/utils';
 import { getCalendarDays, isSameMonth, isSameDay, isToday, format, formatCalendarDate, ptBR } from '@/lib/dateUtils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -8,14 +8,15 @@ interface MiniCalendarProps {
   actions: Action[];
   selectedDate: string;
   onSelectDate: (date: string) => void;
+  campaigns?: Campaign[];
+  strategicDates?: StrategicDate[];
 }
 
-export default function MiniCalendar({ actions, selectedDate, onSelectDate }: MiniCalendarProps) {
+export default function MiniCalendar({ actions, selectedDate, onSelectDate, campaigns = [], strategicDates = [] }: MiniCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(() => new Date(selectedDate + 'T00:00:00'));
 
   const days = useMemo(() => getCalendarDays(currentMonth), [currentMonth]);
 
-  // Mapa de acoes por dia (fora do mes atual: ignora)
   const actionsByDay = useMemo(() => {
     const map = new Map<string, Action[]>();
     for (const a of actions) {
@@ -33,11 +34,7 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate }: Mi
   }, [currentMonth]);
 
   const selected = useMemo(() => {
-    try {
-      return new Date(selectedDate + 'T00:00:00');
-    } catch {
-      return new Date();
-    }
+    try { return new Date(selectedDate + 'T00:00:00'); } catch { return new Date(); }
   }, [selectedDate]);
 
   const goMonth = (dir: 1 | -1) =>
@@ -51,43 +48,27 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate }: Mi
 
   return (
     <div className="select-none">
-      {/* Cabecalho do mes */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => goMonth(-1)}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
-            aria-label="Mes anterior"
-          >
+          <button onClick={() => goMonth(-1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors" aria-label="Mes anterior">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => goMonth(1)}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
-            aria-label="Proximo mes"
-          >
+          <button onClick={() => goMonth(1)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors" aria-label="Proximo mes">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
         <span className="text-sm font-semibold text-gray-900">{monthLabel}</span>
-        <button
-          onClick={goToday}
-          className="text-[11px] font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 px-2 py-1 rounded-md transition-colors"
-        >
+        <button onClick={goToday} className="text-[11px] font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 px-2 py-1 rounded-md transition-colors">
           Hoje
         </button>
       </div>
 
-      {/* Dias da semana */}
       <div className="grid grid-cols-7 mb-1">
         {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((d, i) => (
-          <div key={i} className="text-center text-[10px] font-semibold text-gray-400 uppercase py-1">
-            {d}
-          </div>
+          <div key={i} className="text-center text-[10px] font-semibold text-gray-400 uppercase py-1">{d}</div>
         ))}
       </div>
 
-      {/* Grade do mes */}
       <div className="grid grid-cols-7 gap-y-0.5">
         {days.map(day => {
           const dateStr = formatCalendarDate(day);
@@ -95,6 +76,15 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate }: Mi
           const inMonth = isSameMonth(day, currentMonth);
           const isTodayFlag = isToday(day);
           const isSelected = isSameDay(day, selected);
+
+          // Campanhas ativas neste dia
+          const dayCampaigns = campaigns.filter(c => {
+            if (!c.start_date) return false;
+            return dateStr >= c.start_date && dateStr <= (c.end_date || c.start_date);
+          });
+
+          // Datas estratégicas neste dia
+          const dayStrategic = strategicDates.filter(s => s.date === dateStr);
 
           return (
             <button
@@ -108,29 +98,24 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate }: Mi
                 isSelected && 'bg-primary-500 text-white shadow-sm hover:bg-primary-600'
               )}
             >
-              <span
-                className={cn(
-                  'text-xs leading-none font-medium',
-                  isSelected && 'text-white',
-                  isTodayFlag && !isSelected && 'text-primary-600 font-bold'
-                )}
-              >
+              <span className={cn('text-xs leading-none font-medium', isSelected && 'text-white', isTodayFlag && !isSelected && 'text-primary-600 font-bold')}>
                 {day.getDate()}
               </span>
 
-              {/* Contagem visivel de acoes no dia */}
-              {dayActions.length > 0 && (
-                <span
-                  className={cn(
-                    'mt-1 rounded-full text-[9px] font-bold leading-none px-1.5 py-[3px] min-w-[16px] text-center',
-                    isSelected
-                      ? 'bg-white/90 text-primary-700'
-                      : inMonth
-                      ? 'bg-primary-100 text-primary-700'
-                      : 'bg-gray-100 text-gray-300'
+              {/* Indicadores: pontos de campanha + strategic */}
+              {(dayCampaigns.length > 0 || dayStrategic.length > 0 || dayActions.length > 0) && (
+                <span className="flex items-center gap-0.5 mt-1">
+                  {dayCampaigns.slice(0, 2).map(c => (
+                    <span key={c.id} className="w-1 h-1 rounded-full" style={{ backgroundColor: c.color || '#3B82F6' }} />
+                  ))}
+                  {dayStrategic.length > 0 && (
+                    <span className="w-1 h-1 rounded-full bg-amber-400" />
                   )}
-                >
-                  {dayActions.length}
+                  {dayActions.length > 0 && (
+                    <span className={cn('rounded-full text-[8px] font-bold leading-none px-1 min-w-[12px] text-center', isSelected ? 'bg-white/90 text-primary-700' : 'bg-primary-100 text-primary-700')}>
+                      {dayActions.length}
+                    </span>
+                  )}
                 </span>
               )}
             </button>
@@ -138,12 +123,20 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate }: Mi
         })}
       </div>
 
-      {/* Legenda */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 pt-3 border-t border-gray-100">
-        <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
-          <span className="rounded-full bg-primary-100 text-primary-700 text-[9px] font-bold px-1.5 py-[3px]">3</span>
-          ações no dia — clique para ver a lista
+        <span className="flex items-center gap-1 text-[10px] text-gray-500">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary-500" /> Ação
         </span>
+        {campaigns.length > 0 && (
+          <span className="flex items-center gap-1 text-[10px] text-gray-500">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: campaigns[0]?.color || '#3B82F6' }} /> Campanha
+          </span>
+        )}
+        {strategicDates.length > 0 && (
+          <span className="flex items-center gap-1 text-[10px] text-amber-500">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Estratégica
+          </span>
+        )}
       </div>
     </div>
   );

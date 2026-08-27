@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useActions, useOverdueActions } from '@/hooks/useActions';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -9,6 +9,8 @@ import StatusBadge from '@/components/actions/StatusBadge';
 import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
 import { formatDate, cn } from '@/lib/utils';
 import { formatCalendarDate, startOfWeek, endOfWeek, parseISO, format, ptBR } from '@/lib/dateUtils';
+import { supabase } from '@/lib/supabase';
+import { type Campaign, type StrategicDate } from '@/types';
 import {
   Briefcase,
   CalendarDays,
@@ -24,6 +26,18 @@ export default function EstrategosDashboard() {
 
   const allActions = useActions({});
   const overdue = useOverdueActions();
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [strategicDates, setStrategicDates] = useState<StrategicDate[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('campaigns').select('*'),
+      supabase.from('strategic_dates').select('*'),
+    ]).then(([cp, sd]) => {
+      setCampaigns((cp.data as unknown as Campaign[]) ?? []);
+      setStrategicDates((sd.data as unknown as StrategicDate[]) ?? []);
+    });
+  }, []);
 
   const today = new Date();
   const todayStr = formatCalendarDate(today);
@@ -88,6 +102,8 @@ export default function EstrategosDashboard() {
             actions={allActions.actions}
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
+            campaigns={campaigns}
+            strategicDates={strategicDates}
           />
         </Card>
 

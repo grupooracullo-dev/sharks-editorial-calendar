@@ -7,7 +7,7 @@ import MiniCalendar from '@/components/dashboard/MiniCalendar';
 import StatusBadge from '@/components/actions/StatusBadge';
 import ActionDrawer from '@/components/actions/ActionDrawer';
 import { supabase } from '@/lib/supabase';
-import { type User, type EnvironmentType, type Action } from '@/types';
+import { type User, type EnvironmentType, type Action, type Campaign, type StrategicDate } from '@/types';
 import { formatCalendarDate, parseISO, format, ptBR } from '@/lib/dateUtils';
 import { formatDate, cn } from '@/lib/utils';
 import { Users, Building2, Briefcase, Link2, CalendarDays } from 'lucide-react';
@@ -17,6 +17,8 @@ export default function OraculloDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [wsCount, setWsCount] = useState<{ sharks: number; estrategos: number }>({ sharks: 0, estrategos: 0 });
   const [actions, setActions] = useState<Action[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [strategicDates, setStrategicDates] = useState<StrategicDate[]>([]);
   const [detailAction, setDetailAction] = useState<Action | null>(null);
   const today = new Date();
   const todayStr = formatCalendarDate(today);
@@ -24,10 +26,12 @@ export default function OraculloDashboard() {
 
   useEffect(() => {
     const load = async () => {
-      const [u, w, ac] = await Promise.all([
+      const [u, w, ac, cp, sd] = await Promise.all([
         supabase.from('users').select('id, email, full_name, role'),
         supabase.from('workspaces').select('id, organizations(environment)').eq('is_active', true),
         supabase.from('actions').select('*, workspace:workspaces(name)').order('action_date'),
+        supabase.from('campaigns').select('*'),
+        supabase.from('strategic_dates').select('*'),
       ]);
       setUsers((u.data as unknown as User[]) ?? []);
       const wsRows = (w.data ?? []) as unknown as Array<{ organizations: { environment: EnvironmentType } | null }>;
@@ -36,6 +40,8 @@ export default function OraculloDashboard() {
         estrategos: wsRows.filter(r => r.organizations?.environment === 'estrategos').length,
       });
       setActions((ac.data as unknown as Action[]) ?? []);
+      setCampaigns((cp.data as unknown as Campaign[]) ?? []);
+      setStrategicDates((sd.data as unknown as StrategicDate[]) ?? []);
     };
     load();
 
@@ -114,6 +120,8 @@ export default function OraculloDashboard() {
             actions={actions}
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
+            campaigns={campaigns}
+            strategicDates={strategicDates}
           />
         </Card>
 
