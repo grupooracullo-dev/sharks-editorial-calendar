@@ -24,7 +24,7 @@ export default function OraculloDashboard() {
     const load = async () => {
       const [u, w, ac] = await Promise.all([
         supabase.from('users').select('id, email, full_name, role'),
-        supabase.from('workspaces').select('id, organizations(environment)'),
+        supabase.from('workspaces').select('id, organizations(environment)').eq('is_active', true),
         supabase.from('actions').select('*, workspace:workspaces(name)').order('action_date'),
       ]);
       setUsers((u.data as unknown as User[]) ?? []);
