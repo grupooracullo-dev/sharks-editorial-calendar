@@ -275,6 +275,9 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                     key={i}
                     id={dateStr}
                     onClick={() => { if (dayActions.length === 0) handleCreateAtDate(dateStr); }}
+                    style={dayCampaigns.length > 0 ? {
+                      backgroundImage: `linear-gradient(${dayCampaigns[0].color || '#3B82F6'}0F, ${dayCampaigns[0].color || '#3B82F6'}0F)`,
+                    } : undefined}
                     className={cn(
                       'min-h-[70px] sm:min-h-[100px] md:min-h-[120px] border-r border-b last:border-r-0 p-1 sm:p-1.5 transition-colors',
                       !isCurrentMonth && 'bg-gray-50/50',
@@ -307,17 +310,38 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                         ))}
                       </div>
                     )}
-                    {/* Indicadores de campanha */}
+                    {/* Faixa de campanha: continua entre dias, com label no inicio */}
                     {dayCampaigns.length > 0 && (
                       <div className="flex flex-col gap-0.5 mb-1">
-                        {dayCampaigns.map(c => (
-                          <div
-                            key={c.id}
-                            className="h-1.5 rounded-full opacity-80"
-                            style={{ backgroundColor: c.color || '#3B82F6' }}
-                            title={c.name}
-                          />
-                        ))}
+                        {dayCampaigns.slice(0, 2).map(c => {
+                          const rangeEnd = c.end_date || c.start_date!;
+                          const col = i % 7;
+                          const isStart = dateStr === c.start_date || col === 0;
+                          const isEnd = dateStr === rangeEnd || col === 6;
+                          const showLabel = dateStr === c.start_date || (col === 0 && c.start_date! < dateStr);
+                          const color = c.color || '#3B82F6';
+                          return (
+                            <div
+                              key={c.id}
+                              title={`${c.name}${c.start_date ? ` · ${c.start_date.split('-').reverse().join('/')} → ${rangeEnd.split('-').reverse().join('/')}` : ''}`}
+                              className={cn(
+                                'flex items-center overflow-hidden',
+                                showLabel ? 'h-[14px] px-1' : 'h-1.5',
+                                isStart && isEnd && 'rounded-full',
+                                isStart && !isEnd && 'rounded-l-full',
+                                !isStart && isEnd && 'rounded-r-full'
+                              )}
+                              style={{ backgroundColor: color }}
+                            >
+                              {showLabel && (
+                                <span className="text-[8px] font-semibold text-white truncate">🏁 {c.name}</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {dayCampaigns.length > 2 && (
+                          <p className="text-[8px] text-gray-400 leading-none">+{dayCampaigns.length - 2} campanhas</p>
+                        )}
                       </div>
                     )}
                     <div className="space-y-0.5 sm:space-y-1">
@@ -418,10 +442,15 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                         {dayCampaigns.map(c => (
                           <div
                             key={c.id}
-                            className="h-1 rounded-full opacity-80"
-                            style={{ backgroundColor: c.color || '#3B82F6' }}
-                            title={c.name}
-                          />
+                            className="flex items-center gap-1 px-1.5 py-0.5 rounded-md"
+                            style={{ backgroundColor: `${c.color || '#3B82F6'}1F` }}
+                            title={`${c.name}${c.start_date ? ` · ${c.start_date.split('-').reverse().join('/')} → ${(c.end_date || c.start_date).split('-').reverse().join('/')}` : ''}`}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.color || '#3B82F6' }} />
+                            <span className="text-[9px] font-semibold truncate" style={{ color: c.color || '#3B82F6' }}>
+                              🏁 {c.name}
+                            </span>
+                          </div>
                         ))}
                       </div>
                     )}

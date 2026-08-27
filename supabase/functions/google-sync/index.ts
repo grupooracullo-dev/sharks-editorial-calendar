@@ -10,7 +10,7 @@
 //     ops: list_calendars | set_target | disconnect.
 // ==========================================
 
-import { CAL_API, corsHeaders, getValidToken, processWorkspace, serviceClient, verifyWorkspaceAccess } from '../_shared/google.ts';
+import { CAL_API, corsHeaders, getValidToken, processWorkspace, resyncWorkspace, serviceClient, verifyWorkspaceAccess } from '../_shared/google.ts';
 
 // Per-request CORS (updated at handler start)
 let CORS: Record<string, string> = {};
@@ -26,8 +26,9 @@ const NULL_UUID = '00000000-0000-0000-0000-000000000000';
 
 // ==========================================
 // Migracao de agenda destino: remove eventos
-// da agenda antiga, reseta vinculos e
-// re-enfileira tudo para a nova agenda.
+// da agenda antiga (best-effort), limpa vinculos
+// e re-enfileira tudo — agora via resyncWorkspace
+// compartilhado (inclui campanhas).
 // ==========================================
 async function migrateTarget(
   admin: ReturnType<typeof serviceClient>,
@@ -36,48 +37,7 @@ async function migrateTarget(
   oldCalId: string,
   integId: string,
 ): Promise<void> {
-  // 1. remover eventos da agenda antiga (apenas os links DESSA integracao)
-  const { data: links } = await admin
-    .from('calendar_event_links')
-    .select('google_event_id')
-    .eq('workspace_id', wsId)
-    .or(`integration_id.eq.${integId},integration_id.is.null`);
-  for (const l of links ?? []) {
-    if (!l.google_event_id) continue;
-    await fetch(
-      `${CAL_API}/calendars/${encodeURIComponent(oldCalId)}/events/${encodeURIComponent(l.google_event_id)}`,
-      { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
-    ).catch(() => {});
-  }
-
-  // 2. resetar vinculos (só dessa integracao) e status
-  await admin.from('calendar_event_links').delete().eq('workspace_id', wsId).or(`integration_id.eq.${integId},integration_id.is.null`);
-  await admin.from('actions').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).neq('status', 'cancelled');
-  await admin.from('estrategos_meetings').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).neq('status', 'cancelled');
-  await admin.from('estrategos_implementations').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).not('status', 'in', '(cancelled)');
-
-  // 3. re-enfileirar todos os itens ativos para re-sync na nova
-  //    agenda (fan-out recria para TODAS as integracoes ativas).
-  //    Migration 025: actions + meetings/impl estrategos.
-  await admin.from('calendar_sync_queue').delete().eq('workspace_id', wsId).in('status', ['pending', 'error']);
-  const { data: acts } = await admin.from('actions').select('id').eq('workspace_id', wsId).neq('status', 'cancelled');
-  if (acts?.length) {
-    await admin
-      .from('calendar_sync_queue')
-      .insert(acts.map(a => ({ workspace_id: wsId, action_id: a.id, source: 'sharks_action' as const, source_id: a.id, operation: 'create' as const })));
-  }
-  const { data: meets } = await admin.from('estrategos_meetings').select('id').eq('workspace_id', wsId).neq('status', 'cancelled');
-  if (meets?.length) {
-    await admin
-      .from('calendar_sync_queue')
-      .insert(meets.map(m => ({ workspace_id: wsId, source: 'estrategos_meeting' as const, source_id: m.id, operation: 'create' as const })));
-  }
-  const { data: impls } = await admin.from('estrategos_implementations').select('id').eq('workspace_id', wsId).not('status', 'in', '(cancelled,completed)');
-  if (impls?.length) {
-    await admin
-      .from('calendar_sync_queue')
-      .insert(impls.map(i => ({ workspace_id: wsId, source: 'estrategos_implementation' as const, source_id: i.id, operation: 'create' as const })));
-  }
+  await resyncWorkspace(admin, wsId, [{ integId, calIds: [oldCalId] }]);
 }
 Deno.serve(async req => {
   CORS = corsHeaders(req);
@@ -266,9 +226,17 @@ Deno.serve(async req => {
       case 'change_sync_mode': {
         // Migration 025: alterna unified <-> split.
         // Para split cria as agendas por ambiente se faltarem.
+        // Depois re-sincroniza TUDO: eventos antigos sao removidos
+        // dos destinos anteriores e recriados nos novos (fix: antes
+        // a troca deixava links apontando para agendas abandonadas).
         if (!integ?.is_connected) return json(400, { error: 'Integracao nao conectada' });
         const mode = body.mode === 'split' ? 'split' : 'unified';
         const patch: Record<string, unknown> = { sync_mode: mode };
+
+        // destinos ANTIGOS desta integracao (antes da troca)
+        const oldTargets = new Set<string>();
+        if (integ.google_calendar_id) oldTargets.add(integ.google_calendar_id);
+        for (const v of Object.values(integ.env_calendar_ids ?? {})) if (v) oldTargets.add(v);
 
         if (mode === 'split') {
           const t = await getValidToken(admin, integ);
@@ -290,7 +258,37 @@ Deno.serve(async req => {
         }
 
         await admin.from('calendar_integrations').update(patch).eq('id', integ.id);
+
+        // re-sync do workspace coberto (linhas de agencia)
+        if (!isGlobal && wsId) {
+          const result = await resyncWorkspace(admin, wsId, [{ integId: integ.id, calIds: [...oldTargets] }]);
+          return json(200, { ok: true, sync_mode: mode, resync: result, ...(patch.env_calendar_ids ? { env_calendar_ids: patch.env_calendar_ids } : {}) });
+        }
         return json(200, { ok: true, sync_mode: mode, ...(patch.env_calendar_ids ? { env_calendar_ids: patch.env_calendar_ids } : {}) });
+      }
+
+      case 'resync': {
+        // Reparo manual: limpa links orfaos e recria tudo nos
+        // destinos atuais. Best-effort delete nas agendas antigas
+        // conhecidas desta integracao (atuais + env).
+        if (!isGlobal && !wsId) return json(400, { error: 'workspace_id obrigatorio' });
+        const oldCals = new Set<string>();
+        if (integ) {
+          if (integ.google_calendar_id) oldCals.add(integ.google_calendar_id);
+          for (const v of Object.values(integ.env_calendar_ids ?? {})) if (v) oldCals.add(v);
+        }
+        const plan = integ ? [{ integId: integ.id, calIds: [...oldCals] }] : [];
+        if (isGlobal) {
+          // modo global: re-sync de todos os workspaces ativos
+          const { data: allWs } = await admin.from('workspaces').select('id').eq('is_active', true);
+          const results = [];
+          for (const ws of (allWs ?? [])) {
+            results.push({ ws: ws.id, ...(await resyncWorkspace(admin, ws.id, plan)) });
+          }
+          return json(200, { ok: true, mode: 'global', results });
+        }
+        const result = await resyncWorkspace(admin, wsId!, plan);
+        return json(200, { ok: true, ...result });
       }
 
       case 'disconnect': {
@@ -336,6 +334,7 @@ Deno.serve(async req => {
           const keepAct = [...new Set((remainingWs ?? []).filter(r => r.action_id).map(r => r.action_id))];
           const keepMeet = [...new Set((remainingWs ?? []).filter(r => r.source === 'estrategos_meeting' && r.source_id).map(r => r.source_id))];
           const keepImpl = [...new Set((remainingWs ?? []).filter(r => r.source === 'estrategos_implementation' && r.source_id).map(r => r.source_id))];
+          const keepCamp = [...new Set((remainingWs ?? []).filter(r => r.source === 'campaign' && r.source_id).map(r => r.source_id))];
 
           const resetActions = admin.from('actions').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).neq('sync_status', 'not_synced');
           if (keepAct.length) await resetActions.not('id', 'in', `(${keepAct.join(',')})`);
@@ -348,6 +347,10 @@ Deno.serve(async req => {
           const resetImpls = admin.from('estrategos_implementations').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).neq('sync_status', 'not_synced');
           if (keepImpl.length) await resetImpls.not('id', 'in', `(${keepImpl.join(',')})`);
           else await resetImpls;
+
+          const resetCamps = admin.from('campaigns').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).neq('sync_status', 'not_synced');
+          if (keepCamp.length) await resetCamps.not('id', 'in', `(${keepCamp.join(',')})`);
+          else await resetCamps;
           // Fila permanece: outras integracoes (pessoais/agencia) ainda cobrem o workspace
         }
         return json(200, { ok: true });
