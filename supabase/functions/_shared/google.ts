@@ -156,8 +156,27 @@ export async function verifyWorkspaceAccess(
   userId: string,
   workspaceId: string,
 ): Promise<boolean> {
-  const { data: u } = await admin.from('users').select('role').eq('id', userId).maybeSingle();
-  if (u && (u.role === 'oracullo_admin' || u.role === 'admin_sharks' || u.role === 'sharks_team')) return true;
+  const { data: u } = await admin.from('users').select('role, is_guardian').eq('id', userId).maybeSingle();
+  if (u && (u.is_guardian || u.role === 'oracullo_admin' || u.role === 'admin_sharks' || u.role === 'sharks_team')) return true;
+
+  // Staff por ambiente (user_environments): o ambiente do workspace
+  // precisa bater com um cargo admin/team do usuario — sem depender
+  // de membership (RLS ws_visible usa o mesmo criterio).
+  const [wsOrgRes, envsRes] = await Promise.all([
+    admin.from('workspaces').select('organization_id').eq('id', workspaceId).maybeSingle(),
+    admin.from('user_environments').select('environment, role').eq('user_id', userId),
+  ]);
+  if (wsOrgRes.data?.organization_id) {
+    const { data: org } = await admin
+      .from('organizations')
+      .select('environment')
+      .eq('id', wsOrgRes.data.organization_id)
+      .maybeSingle();
+    if (org && (envsRes.data ?? []).some(e => e.environment === org.environment && (e.role === 'admin' || e.role === 'team'))) {
+      return true;
+    }
+  }
+
   const { data: m } = await admin
     .from('memberships')
     .select('id')

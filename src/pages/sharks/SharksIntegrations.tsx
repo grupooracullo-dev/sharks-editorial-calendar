@@ -42,6 +42,10 @@ export default function SharksIntegrations() {
   const workspaces = workspacesByEnv('sharks_company');
   const { user, isSharks, isAdmin } = useAuth();
 
+  // Guarda de ambiente: currentWorkspace persiste entre trocas de ambiente
+  // (guardiao/admin dual) — so e valido aqui se for do ambiente Sharks.
+  const sharksWs = currentWorkspace?.environment === 'sharks_company' ? currentWorkspace : null;
+
   const [syncing, setSyncing] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [showCalendars, setShowCalendars] = useState(false);
@@ -54,12 +58,12 @@ export default function SharksIntegrations() {
   // Global integration (admin)
   const [globalInteg, setGlobalInteg] = useState<GoogleIntegration | null>(null);
 
-  const { integration: wsIntegration, loading } = useIntegration(currentWorkspace?.id);
+  const { integration: wsIntegration, loading } = useIntegration(sharksWs?.id);
   // Use global integration when no workspace selected
-  const integration = currentWorkspace ? wsIntegration : globalInteg;
+  const integration = sharksWs ? wsIntegration : globalInteg;
 
   useEffect(() => {
-    if (currentWorkspace) return;
+    if (sharksWs) return;
     let active = true;
     const refresh = () => {
       loadAllIntegrations()
@@ -77,7 +81,7 @@ export default function SharksIntegrations() {
       active = false;
       unsubscribe();
     };
-  }, [currentWorkspace?.id]);
+  }, [sharksWs?.id]);
 
   // Resultado do redirect do OAuth
   useEffect(() => {
@@ -111,11 +115,11 @@ export default function SharksIntegrations() {
   const handleConnect = () => {
     if (!user) return;
     // Global mode when no workspace selected
-    startGoogleConnect(currentWorkspace?.id ?? null, user.id);
+    startGoogleConnect(sharksWs?.id ?? null, user.id);
   };
 
   const handleSyncNow = async () => {
-    const wsParam = currentWorkspace?.id ?? null;
+    const wsParam = sharksWs?.id ?? null;
     if (syncing) return;
     setSyncing(true);
     try {
@@ -137,7 +141,7 @@ export default function SharksIntegrations() {
   const handleToggleAuto = async () => {
     if (!integration) return;
     try {
-      await setAutoSync(currentWorkspace?.id ?? null, !integration.auto_sync);
+      await setAutoSync(sharksWs?.id ?? null, !integration.auto_sync);
       toast.success(integration.auto_sync ? 'Sincronização automática pausada.' : 'Sincronização automática ativada.');
     } catch (e) {
       toast.error(`Erro: ${(e as Error).message}`);
@@ -147,7 +151,7 @@ export default function SharksIntegrations() {
   const handleDisconnect = async () => {
     setConfirmDisconnect(false);
     try {
-      await disconnectCalendar(currentWorkspace?.id ?? null);
+      await disconnectCalendar(sharksWs?.id ?? null);
       toast.success('Google Calendar desconectado.');
     } catch (e) {
       toast.error(`Erro: ${(e as Error).message}`);
@@ -157,7 +161,7 @@ export default function SharksIntegrations() {
   const handleLoadCalendars = async () => {
     setLoadingCalendars(true);
     try {
-      const res = await listCalendars(currentWorkspace?.id ?? null);
+      const res = await listCalendars(sharksWs?.id ?? null);
       setCalendars(res.calendars);
     } catch (e) {
       toast.error(`Erro ao listar agendas: ${(e as Error).message}`);
@@ -168,7 +172,7 @@ export default function SharksIntegrations() {
 
   const handlePickCalendar = async (cal: GoogleCalendarOption) => {
     try {
-      await setTargetCalendar(currentWorkspace?.id ?? null, cal.id, cal.name);
+      await setTargetCalendar(sharksWs?.id ?? null, cal.id, cal.name);
       toast.success(`Agenda destino: ${cal.name}`);
     } catch (e) {
       toast.error(`Erro: ${(e as Error).message}`);
@@ -179,9 +183,9 @@ export default function SharksIntegrations() {
     if (creatingCalendar) return;
     setCreatingCalendar(true);
     try {
-      const res = await createClientCalendar(currentWorkspace?.id ?? null);
+      const res = await createClientCalendar(sharksWs?.id ?? null);
       toast.success(`Agenda "${res.calendar_name}" criada! Re-sincronizando...`);
-      processQueue(currentWorkspace?.id ?? null).catch(() => {});
+      processQueue(sharksWs?.id ?? null).catch(() => {});
     } catch (e) {
       toast.error(`Erro ao criar agenda: ${(e as Error).message}`);
     } finally {
@@ -241,7 +245,7 @@ export default function SharksIntegrations() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-3 pt-3 border-t border-green-100 text-sm">
             <p className="text-green-800 truncate">
               <span className="text-green-600 text-xs uppercase tracking-wide font-medium block">Cliente</span>
-              {currentWorkspace?.name ?? '—'}
+              {sharksWs?.name ?? '—'}
             </p>
             <p className="text-green-800 truncate">
               <span className="text-green-600 text-xs uppercase tracking-wide font-medium block">Conta Google</span>
@@ -272,8 +276,8 @@ export default function SharksIntegrations() {
           <CardTitle className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-primary-500" />
             Google Calendar
-            {currentWorkspace && (
-              <span className="text-xs font-normal text-gray-400">— {currentWorkspace.name}</span>
+            {sharksWs && (
+              <span className="text-xs font-normal text-gray-400">— {sharksWs.name}</span>
             )}
           </CardTitle>
           {loading ? (
@@ -299,7 +303,7 @@ export default function SharksIntegrations() {
           )}
         </CardHeader>
 
-        {!currentWorkspace ? (
+        {!sharksWs ? (
           <>
             {/* Card pessoal — cada usuario conecta a PROPRIA conta Google */}
             {isSharks && (
@@ -396,7 +400,7 @@ export default function SharksIntegrations() {
                 reprocessamento e mapeamento por ID de evento.
               </p>
             </div>
-            <Button onClick={handleConnect} disabled={!currentWorkspace}>
+            <Button onClick={handleConnect} disabled={!sharksWs}>
               <LinkIcon className="w-4 h-4" />
               Conectar Google Calendar
             </Button>
@@ -506,7 +510,7 @@ export default function SharksIntegrations() {
                 size="sm"
                 onClick={handleCreateClientCalendar}
                 disabled={creatingCalendar}
-                title={`Cria a agenda "Sharks | ${currentWorkspace.name}" na conta Google conectada e move os eventos para lá`}
+                title={`Cria a agenda "Sharks | ${sharksWs.name}" na conta Google conectada e move os eventos para lá`}
               >
                 {creatingCalendar ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarPlus className="w-4 h-4" />}
                 Criar agenda dedicada do cliente

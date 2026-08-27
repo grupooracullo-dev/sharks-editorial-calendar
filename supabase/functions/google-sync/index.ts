@@ -242,6 +242,16 @@ Deno.serve(async req => {
         return json(200, { ok: true, calendar_id: cal.id, calendar_name: summary });
       }
 
+      case 'set_auto_sync': {
+        // Pausa/ativa o sync automatico da linha resolvida acima
+        // (global = pessoal / staff = agencia / cliente = pessoal).
+        // Via edge function porque a RLS de escrita exige env admin —
+        // team precisa conseguir pausar/ativar tambem.
+        if (!integ) return json(400, { error: 'Integracao nao encontrada' });
+        await admin.from('calendar_integrations').update({ auto_sync: !!body.value }).eq('id', integ.id);
+        return json(200, { ok: true });
+      }
+
       case 'set_env_sync': {
         // Migration 025: liga/desliga o sync de UM ambiente
         // nesta integracao (apenas a linha do caller).

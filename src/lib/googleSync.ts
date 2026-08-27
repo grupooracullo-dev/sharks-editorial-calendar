@@ -155,14 +155,9 @@ export function disconnectCalendar(workspaceId: string | null): Promise<{ ok: bo
 }
 
 export async function setAutoSync(workspaceId: string | null, value: boolean): Promise<void> {
-  // Migration 021: modo global = linha PESSOAL do usuario logado
-  const { data: { session } } = await supabase.auth.getSession();
-  const uid = session?.user?.id;
-  let q = supabase.from('calendar_integrations').update({ auto_sync: value });
-  const { error } = workspaceId === null
-    ? await (uid ? q.is('workspace_id', null).eq('user_id', uid) : q.is('workspace_id', null))
-    : await q.eq('workspace_id', workspaceId);
-  if (error) throw error;
+  // Via edge function: a RLS de escrita em calendar_integrations exige
+  // env admin para linhas da agencia — team tambem precisa alternar.
+  await callFn({ ...(workspaceId ? { workspace_id: workspaceId } : {}), op: 'set_auto_sync', value });
 }
 
 // ---------- Multi-ambiente (migration 025) ----------
