@@ -1,4 +1,5 @@
 import { serviceClient, corsHeaders } from '../_shared/google.ts';
+import { sendEmail, welcomeEmail } from '../_shared/email.ts';
 
 // Per-request CORS (updated at handler start)
 let CORS: Record<string, string> = {};
@@ -118,5 +119,19 @@ Deno.serve(async req => {
     if (memError) membershipsWarning = `Clientes: ${memError.message}`;
   }
 
-  return json(200, { ok: true, user_id: authUser.user.id, warning: membershipsWarning });
+  // 5. E-mail de boas-vindas (best-effort — nunca bloqueia a criacao)
+  let emailSent = false;
+  try {
+    const mail = welcomeEmail({
+      name: full_name,
+      roleLabel: role === 'admin_sharks' ? 'Administrador' : 'Time Sharks',
+      password: String(password),
+    });
+    const mailResult = await sendEmail({ to: String(email).trim().toLowerCase(), subject: mail.subject, html: mail.html });
+    emailSent = mailResult.ok;
+  } catch (e) {
+    console.warn('[create-user] e-mail falhou:', (e as Error).message);
+  }
+
+  return json(200, { ok: true, user_id: authUser.user.id, email_sent: emailSent, warning: membershipsWarning });
 });

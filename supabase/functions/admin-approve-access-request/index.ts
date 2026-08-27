@@ -1,4 +1,5 @@
 import { serviceClient, corsHeaders } from '../_shared/google.ts';
+import { sendEmail, approvedAccessEmail } from '../_shared/email.ts';
 
 const CORS: Record<string, string> = {};
 function json(status: number, body: unknown) {
@@ -369,6 +370,22 @@ Deno.serve(async req => {
 
   if (updErr) console.warn('[approve] update warning:', updErr.message);
 
+  // 11. E-mail transacional (best-effort — nunca bloqueia a aprovacao)
+  let emailSent = false;
+  try {
+    const mail = approvedAccessEmail({
+      name: fullName || reqRow.full_name || reqRow.email,
+      roleLabel: role === 'sharks_team' ? 'Time Sharks' : 'Cliente',
+      envLabels: environments.map(e => e === 'estrategos' ? 'Estrategos' : 'Sharks').join(', '),
+      authProvider,
+      tempPassword,
+    });
+    const mailResult = await sendEmail({ to: reqRow.email, subject: mail.subject, html: mail.html });
+    emailSent = mailResult.ok;
+  } catch (e) {
+    console.warn('[approve] e-mail falhou:', (e as Error).message);
+  }
+
   return json(200, {
     ok: true,
     user_id: userId,
@@ -377,6 +394,7 @@ Deno.serve(async req => {
     auth_provider: authProvider,
     temp_password: tempPassword,
     email: reqRow.email,
+    email_sent: emailSent,
     warning: membershipsWarning,
   });
 });
