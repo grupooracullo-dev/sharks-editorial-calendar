@@ -42,6 +42,8 @@ import OraculloDashboard from '@/pages/oracullo/OraculloDashboard';
 import OraculloAccess from '@/pages/oracullo/OraculloAccess';
 import OraculloAccessRequests from '@/pages/oracullo/OraculloAccessRequests';
 import OraculloUsers from '@/pages/oracullo/OraculloUsers';
+import PrivacyPolicy from '@/pages/legal/PrivacyPolicy';
+import TermsOfService from '@/pages/legal/TermsOfService';
 
 function DataSync() {
   const { user } = useAuth();
@@ -91,6 +93,8 @@ function AppRoutes() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/request-access" element={<RequestAccess />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
@@ -105,6 +109,8 @@ function AppRoutes() {
         {/* Allow direct access to the request page if a specific
             workspace was requested by the admin before approval */}
         <Route path="/request-access" element={<RequestAccess authUser={authUser} onSubmitted={() => {}} />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
         <Route path="*" element={<AuthGate />} />
       </Routes>
     );
@@ -150,6 +156,10 @@ function AppRoutes() {
       <Route path="/estrategos/clients" element={<EstrategosLayout><EstrategosClients /></EstrategosLayout>} />
       <Route path="/estrategos/integrations" element={<EstrategosLayout><EstrategosIntegrations /></EstrategosLayout>} />
       <Route path="/estrategos/access-requests" element={<EstrategosLayout><EstrategosAccessRequests /></EstrategosLayout>} />
+
+      {/* Legal (público, exigência OAuth Google) */}
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsOfService />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to={homePath} replace />} />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
@@ -138,6 +138,12 @@ export default function LoginPage() {
             </div>
           </form>
         </div>
+
+        <p className="text-center text-xs text-gray-500 mt-6">
+          <RouterLink to="/privacy" className="hover:text-gray-300 transition-colors">Política de Privacidade</RouterLink>
+          <span className="mx-2 opacity-40">·</span>
+          <RouterLink to="/terms" className="hover:text-gray-300 transition-colors">Termos de Serviço</RouterLink>
+        </p>
       </div>
     </div>
   );
