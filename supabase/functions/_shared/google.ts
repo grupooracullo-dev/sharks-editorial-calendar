@@ -265,10 +265,13 @@ function pretty(v: unknown): string {
   return v ? String(v).replace(/_/g, ' ') : '';
 }
 
-function envPrefix(source: QueueSource, unified: boolean): string {
+// O prefixo vem do AMBIENTE do workspace — nao do label do source.
+// Acoes de ambos os ambientes sao enfileiradas como 'sharks_action'
+// (nome historico da tabela actions), entao decidir pelo source
+// rotularia acoes Estrategos como [Sharks].
+function envPrefix(env: EnvType, unified: boolean): string {
   if (!unified) return '';
-  if (source === 'sharks_action' || source === 'campaign') return '[Sharks] ';
-  return '[Estrategos] ';
+  return env === 'estrategos' ? '[Estrategos] ' : '[Sharks] ';
 }
 
 // ---------- Campaign color -> Google palette ----------
@@ -296,9 +299,10 @@ export function buildEventBody(
   source: QueueSource,
   row: Record<string, any>,
   integ: IntegrationRow,
+  env: EnvType = 'sharks_company',
 ): Record<string, unknown> {
   const unified = integ.sync_mode !== 'split';
-  const prefix = envPrefix(source, unified);
+  const prefix = envPrefix(env, unified);
 
   if (source === 'campaign') {
     const lines: string[] = [];
@@ -436,11 +440,12 @@ async function createIdempotentEvent(
   src: QueueSource,
   row: Record<string, any>,
   integ: IntegrationRow,
+  env: EnvType,
 ): Promise<{ id: string; reused: boolean }> {
   const existing = await findEventBySrcKey(token, calId, srcKey);
   if (existing) return { id: existing.id, reused: true };
 
-  const body = buildEventBody(src, row, integ);
+  const body = buildEventBody(src, row, integ, env);
   body.extendedProperties = { private: { srcKey } };
   const res = await gFetch(
     `${CAL_API}/calendars/${encodeURIComponent(calId)}/events`,
@@ -744,14 +749,14 @@ export async function processWorkspace(
               let createdNow = false;
 
               if (eventId) {
-                const bodyJson = JSON.stringify(buildEventBody(src, row, integ));
+                const bodyJson = JSON.stringify(buildEventBody(src, row, integ, env));
                 const res = await gFetch(
                   `${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`,
                   { method: 'PATCH', body: bodyJson },
                   token,
                 );
                 if (res.status === 404 || res.status === 410) {
-                  const created = await createIdempotentEvent(token, calId, srcKey, src, row, integ);
+                  const created = await createIdempotentEvent(token, calId, srcKey, src, row, integ, env);
                   evId = created.id;
                   createdNow = !created.reused;
                 } else if (!res.ok) {
@@ -760,7 +765,7 @@ export async function processWorkspace(
                   evId = eventId;
                 }
               } else {
-                const created = await createIdempotentEvent(token, calId, srcKey, src, row, integ);
+                const created = await createIdempotentEvent(token, calId, srcKey, src, row, integ, env);
                 evId = created.id;
                 createdNow = !created.reused;
               }
