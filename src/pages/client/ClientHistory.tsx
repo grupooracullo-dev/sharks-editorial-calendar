@@ -52,12 +52,12 @@ export default function ClientHistory() {
       </div>
 
       {/* Month navigation */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Button variant="outline" size="sm" onClick={() => setMonthOffset(o => o - 1)}>
           <ChevronLeft className="w-4 h-4" />
           Mês anterior
         </Button>
-        <h2 className="text-lg font-semibold text-gray-900 capitalize">{monthName}</h2>
+        <h2 className="flex-1 min-w-[6rem] text-center text-lg font-semibold text-gray-900 capitalize">{monthName}</h2>
         <Button
           variant="outline"
           size="sm"

@@ -14,11 +14,13 @@ import { CONTENT_FORMATS, OBJECTIVES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { formatCalendarDate, getCalendarDays, isSameMonth, isSameDay, format, ptBR, addMonths, subMonths } from '@/lib/dateUtils';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 
 export default function ClientCalendar() {
   const { currentWorkspace } = useWorkspace();
+  const { isMobile } = useBreakpoint();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<CalendarViewType>('month');
+  const [view, setView] = useState<CalendarViewType>(isMobile ? 'agenda' : 'month');
   const [selectedAction, setSelectedAction] = useState<Action | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -28,6 +30,15 @@ export default function ClientCalendar() {
   const calendarDays = getCalendarDays(currentDate);
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   const monthLabel = format(currentDate, 'MMMM yyyy', { locale: ptBR });
+
+  const goPrev = () => {
+    if (view === 'week') setCurrentDate(d => new Date(d.getFullYear(), d.getMonth(), d.getDate() - (isMobile ? 3 : 7)));
+    else setCurrentDate(d => subMonths(d, 1));
+  };
+  const goNext = () => {
+    if (view === 'week') setCurrentDate(d => new Date(d.getFullYear(), d.getMonth(), d.getDate() + (isMobile ? 3 : 7)));
+    else setCurrentDate(d => addMonths(d, 1));
+  };
 
   const handleActionClick = (action: Action) => {
     setSelectedAction(action);
@@ -41,7 +52,7 @@ export default function ClientCalendar() {
         <h1 className="text-xl font-bold text-gray-900 capitalize">Meu Calendário — {monthLabel}</h1>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
-            {(['month', 'week', 'agenda'] as CalendarViewType[]).map(v => (
+            {(isMobile ? (['week', 'agenda'] as CalendarViewType[]) : (['month', 'week', 'agenda'] as CalendarViewType[])).map(v => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -55,11 +66,11 @@ export default function ClientCalendar() {
             ))}
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" onClick={() => setCurrentDate(d => subMonths(d, 1))}>
+            <Button variant="outline" size="icon" onClick={goPrev}>
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>Hoje</Button>
-            <Button variant="outline" size="icon" onClick={() => setCurrentDate(d => addMonths(d, 1))}>
+            <Button variant="outline" size="icon" onClick={goNext}>
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
@@ -171,8 +182,8 @@ export default function ClientCalendar() {
       {/* Week view (read-only) */}
       {view === 'week' && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="grid grid-cols-7 min-h-[500px] sm:min-h-[600px]">
-            {calendarDays.slice(0, 7).map((day, i) => {
+          <div className={cn('grid min-h-[420px] sm:min-h-[600px]', isMobile ? 'grid-cols-3' : 'grid-cols-7')}>
+            {(isMobile ? calendarDays.slice(0, 3) : calendarDays.slice(0, 7)).map((day, i) => {
               const dateStr = formatCalendarDate(day);
               const dayActions = actions.filter(a => a.action_date === dateStr);
               const dayCampaigns = activeCampaigns.filter(c => {
@@ -183,7 +194,7 @@ export default function ClientCalendar() {
               return (
                 <div key={i} className="border-r last:border-r-0 p-2">
                   <div className="text-center py-2 border-b border-gray-100 mb-2">
-                    <p className="text-xs text-gray-500">{weekDays[i]}</p>
+                    <p className="text-xs text-gray-500">{isMobile ? format(day, 'EEE', { locale: ptBR }) : weekDays[i]}</p>
                     <p className={cn('font-semibold', isSameDay(day, new Date()) ? 'text-primary-600' : 'text-gray-900')}>
                       {day.getDate()}
                     </p>

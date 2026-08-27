@@ -30,11 +30,12 @@ export default function ClientDashboard() {
     const upcoming = actions.filter(a => a.action_date >= todayStr && a.status !== 'cancelled').slice(0, 5);
     const nextAction = upcoming[0];
     const activeCampaign = campaigns.find(c => c.status === 'active');
+    const todayActions = actions.filter(a => a.action_date === todayStr && a.status !== 'cancelled');
     const selectedDayActions = actions
       .filter(a => a.action_date === selectedDate && a.status !== 'cancelled')
       .sort((a, b) => (a.action_time || '').localeCompare(b.action_time || ''));
 
-    return { weekActions, upcoming, nextAction, activeCampaign, selectedDayActions };
+    return { weekActions, upcoming, nextAction, activeCampaign, todayActions, selectedDayActions };
   }, [actions, campaigns, todayStr, selectedDate, weekStart, weekEnd]);
 
   const selectedDayLabel = useMemo(() => {
@@ -54,19 +55,27 @@ export default function ClientDashboard() {
         <p className="text-sm text-gray-500 mt-0.5">Aqui está o resumo do seu planejamento</p>
       </div>
 
-      {/* CALENDARIO - largura total da secao */}
-      <Card>
+      {/* CALENDARIO - principal, largura total da secao */}
+      <Card className="border-t-4 border-t-primary-500">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CalendarDays className="w-4 h-4 text-primary-500" />
+            <span className="w-8 h-8 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center">
+              <CalendarDays className="w-4 h-4" />
+            </span>
             CALENDÁRIO
           </CardTitle>
-          <button
-            onClick={() => navigate('/client/calendar')}
-            className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
-          >
-            Ver agenda completa <ArrowRight className="w-3 h-3" />
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-50 text-primary-700 text-xs font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse" />
+              {data.todayActions.length} ação{data.todayActions.length !== 1 ? 'ões' : ''} hoje
+            </span>
+            <button
+              onClick={() => navigate('/client/calendar')}
+              className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
+            >
+              Ver agenda completa <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
         </CardHeader>
         <MiniCalendar actions={actions} selectedDate={selectedDate} onSelectDate={setSelectedDate} campaigns={campaigns} />
       </Card>

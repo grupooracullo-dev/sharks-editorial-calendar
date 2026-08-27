@@ -60,6 +60,22 @@
   transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+/* Calendar month slide change */
+.cal-slide-left {
+  animation: cal-slide-left 0.22s ease-out;
+}
+.cal-slide-right {
+  animation: cal-slide-right 0.22s ease-out;
+}
+@keyframes cal-slide-left {
+  from { opacity: 0.4; transform: translateX(28px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes cal-slide-right {
+  from { opacity: 0.4; transform: translateX(-28px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 /* Card hover effects */
 .card-hover {
   transition: transform 0.2s ease, box-shadow 0.2s ease;

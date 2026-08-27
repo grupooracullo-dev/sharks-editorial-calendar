@@ -159,7 +159,7 @@ export default function StrategicDatesSection({ workspaceId }: { workspaceId: st
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 shrink-0">
                         {CATEGORY_LABELS[d.category ?? 'custom'] ?? d.category}
                       </span>
-                      <button onClick={() => handleDelete(d.id)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-500 transition-all">
+                      <button onClick={() => handleDelete(d.id)} className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 text-gray-300 hover:text-red-500 transition-all">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -181,7 +181,7 @@ export default function StrategicDatesSection({ workspaceId }: { workspaceId: st
                       <span className={`text-xs font-mono px-2 py-0.5 rounded-full shrink-0 ${c.color}`}>{c.text}</span>
                       <span className="flex-1 min-w-0 text-sm text-gray-600 truncate">{d.title}</span>
                       <span className="text-xs text-gray-400 shrink-0">{d.date}</span>
-                      <button onClick={() => handleDelete(d.id)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-500 transition-all">
+                      <button onClick={() => handleDelete(d.id)} className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 text-gray-300 hover:text-red-500 transition-all">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>

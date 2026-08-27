@@ -259,7 +259,7 @@ export default function WeekGeneratorModal({
         )}
 
         {/* Actions */}
-        <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
+        <div className="flex flex-wrap justify-end gap-2 pt-4 border-t border-gray-100">
           {!result ? (
             <>
               <Button variant="ghost" onClick={onClose}>

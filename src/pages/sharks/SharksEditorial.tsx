@@ -149,7 +149,7 @@ export default function SharksEditorial() {
               <Badge variant="primary">{p.percentage}%</Badge>
               <button
                 onClick={() => deletePillar(p.id)}
-                className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-300 hover:text-red-500 transition-all"
+                className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 text-gray-300 hover:text-red-500 transition-all"
               >
                 <Trash2 className="w-4 h-4" />
               </button>

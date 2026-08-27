@@ -59,17 +59,18 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
   const { dates: strategicDates } = useStrategicDates(currentWorkspace?.id);
   const channels = useChannels(currentWorkspace?.id);
 
+  const weekStep = isMobile ? 3 : 7;
   const goToToday = () => setCurrentDate(new Date());
   const goPrev = () => {
     if (view === 'month') setCurrentDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
-    else if (view === 'week') setCurrentDate(d => new Date(d.getTime() - 7 * 86400000));
-    else if (view === 'day') setCurrentDate(d => new Date(d.getTime() - 86400000));
+    else if (view === 'week') setCurrentDate(d => new Date(d.getFullYear(), d.getMonth(), d.getDate() - weekStep));
+    else if (view === 'day') setCurrentDate(d => new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1));
     else setCurrentDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
   };
   const goNext = () => {
     if (view === 'month') setCurrentDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
-    else if (view === 'week') setCurrentDate(d => new Date(d.getTime() + 7 * 86400000));
-    else if (view === 'day') setCurrentDate(d => new Date(d.getTime() + 86400000));
+    else if (view === 'week') setCurrentDate(d => new Date(d.getFullYear(), d.getMonth(), d.getDate() + weekStep));
+    else if (view === 'day') setCurrentDate(d => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
     else setCurrentDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
   };
 
