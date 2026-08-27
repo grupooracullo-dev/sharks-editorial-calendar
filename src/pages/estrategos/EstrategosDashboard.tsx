@@ -112,6 +112,7 @@ export default function EstrategosDashboard() {
           onSelectDate={setSelectedDate}
           campaigns={campaigns}
           strategicDates={strategicDates}
+          onOpenCalendar={() => navigate('/estrategos/calendar')}
         />
       </Card>
 

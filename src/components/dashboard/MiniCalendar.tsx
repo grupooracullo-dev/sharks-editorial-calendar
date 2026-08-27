@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Action, Campaign, StrategicDate } from '@/types';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { getCalendarDays, isSameMonth, isSameDay, isToday, format, formatCalendarDate, ptBR } from '@/lib/dateUtils';
-import { ChevronLeft, ChevronRight, Megaphone } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Megaphone, Clock, User, StickyNote } from 'lucide-react';
+import Modal from '@/components/ui/Modal';
+import StatusBadge from '@/components/actions/StatusBadge';
+import Avatar from '@/components/ui/Avatar';
+import { CONTENT_FORMATS } from '@/lib/constants';
 
 interface MiniCalendarProps {
   actions: Action[];
@@ -10,6 +14,7 @@ interface MiniCalendarProps {
   onSelectDate: (date: string) => void;
   campaigns?: Campaign[];
   strategicDates?: StrategicDate[];
+  onOpenCalendar?: (date: string) => void;
 }
 
 interface DragState {
@@ -36,10 +41,16 @@ const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 const SWIPE_THRESHOLD = 60;
 
-export default function MiniCalendar({ actions, selectedDate, onSelectDate, campaigns = [], strategicDates = [] }: MiniCalendarProps) {
+const ENV_LABEL: Record<string, string> = {
+  sharks_company: 'Sharks',
+  estrategos: 'Estrategos',
+};
+
+export default function MiniCalendar({ actions, selectedDate, onSelectDate, campaigns = [], strategicDates = [], onOpenCalendar }: MiniCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(() => new Date(selectedDate + 'T00:00:00'));
   const [slide, setSlide] = useState<1 | -1 | 0>(0);
   const [drag, setDrag] = useState<DragState | null>(null);
+  const [modalDate, setModalDate] = useState<string | null>(null);
   const mounted = useRef(false);
 
   useEffect(() => {
@@ -84,6 +95,12 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate, camp
     onSelectDate(formatCalendarDate(now));
   };
 
+  const handleDayTap = (dateStr: string) => {
+    onSelectDate(dateStr);
+    const list = actionsByDay.get(dateStr);
+    if (list && list.length > 0) setModalDate(dateStr);
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -109,7 +126,7 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate, camp
     if (drag.hMode === null) {
       const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-date]') as HTMLElement | null;
       const date = el?.dataset?.date;
-      if (date) onSelectDate(date);
+      if (date) handleDayTap(date);
       setDrag(null);
     } else if (drag.hMode === true) {
       if (Math.abs(drag.delta) > SWIPE_THRESHOLD) {
@@ -163,14 +180,14 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate, camp
 
       <div className="touch-pan-y cursor-grab active:cursor-grabbing" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => setDrag(null)}>
         <div key={monthKey} className={cn('will-change-transform', slideClass)} style={gridStyle}>
-          {/* Dia da semana */}
+          {/* Dia da semana — fim de semana em laranja suave */}
           <div className="grid grid-cols-7 gap-px bg-transparent mb-px">
             {WEEKDAYS.map((d, i) => (
               <div
                 key={d}
                 className={cn(
                   'text-center text-[11px] sm:text-xs font-semibold uppercase py-1.5 border-b border-gray-200',
-                  i === 0 || i === 6 ? 'text-rose-400' : 'text-gray-400'
+                  i === 0 || i === 6 ? 'text-orange-500' : 'text-gray-400'
                 )}
               >
                 {d}
@@ -198,11 +215,13 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate, camp
                 <button
                   key={dateStr}
                   data-date={dateStr}
-                  onClick={() => onSelectDate(dateStr)}
+                  onClick={() => handleDayTap(dateStr)}
                   title={dayActions.length > 0 ? dayActions.map(a => a.title).join('\n') : undefined}
                   className={cn(
                     'calendar-cell relative flex flex-col items-stretch text-left p-1 sm:p-1.5 min-h-[72px] sm:min-h-[96px] md:min-h-[110px] group',
-                    inMonth ? 'bg-white hover:bg-primary-50/60' : 'bg-gray-100/60 text-gray-300 hover:bg-gray-100',
+                    inMonth && !isWeekend && 'bg-white hover:bg-primary-50/60',
+                    inMonth && isWeekend && 'bg-orange-50 hover:bg-orange-100/70',
+                    !inMonth && 'bg-gray-100/60 text-gray-300 hover:bg-gray-100',
                     isSelected && 'ring-2 ring-primary-400 ring-inset bg-primary-50/30 z-10'
                   )}
                 >
@@ -213,7 +232,7 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate, camp
                         'w-6 h-6 flex items-center justify-center rounded-full text-xs font-medium leading-none',
                         isTodayFlag && 'bg-gradient-to-br from-primary-400 to-primary-600 text-white font-bold shadow-sm shadow-primary-200',
                         !isTodayFlag && isSelected && 'ring-2 ring-primary-500 text-primary-700 font-semibold bg-primary-50',
-                        !isTodayFlag && !isSelected && inMonth && isWeekend && 'text-rose-500',
+                        !isTodayFlag && !isSelected && inMonth && isWeekend && 'text-orange-500',
                         !isTodayFlag && !isSelected && inMonth && !isWeekend && 'text-gray-700',
                         !isTodayFlag && !isSelected && !inMonth && 'text-gray-300'
                       )}
@@ -302,11 +321,130 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate, camp
             <span className="w-2 h-2 rounded-full bg-amber-400" /> Data estratégica
           </span>
         )}
-        <span className="flex items-center gap-1.5 text-[11px] text-rose-500">
-          <ChevronLeft className="w-3 h-3" /> Deslize para navegar
+        <span className="flex items-center gap-1.5 text-[11px] text-orange-600">
+          <span className="w-2 h-2 rounded-sm bg-orange-100 ring-1 ring-orange-200" /> Fim de semana
         </span>
         <span className="ml-auto text-[11px] text-gray-400">{actions.filter(a => a.status !== 'cancelled').length} ações no mês</span>
       </div>
+
+      {/* Modal de detalhes do dia */}
+      <DayActionsModal
+        date={modalDate}
+        actions={modalDate ? actionsByDay.get(modalDate) ?? [] : []}
+        onClose={() => setModalDate(null)}
+        onOpenCalendar={onOpenCalendar}
+      />
     </div>
+  );
+}
+
+function DayActionsModal({
+  date,
+  actions,
+  onClose,
+  onOpenCalendar,
+}: {
+  date: string | null;
+  actions: Action[];
+  onClose: () => void;
+  onOpenCalendar?: (date: string) => void;
+}) {
+  const d = date ? new Date(date + 'T00:00:00') : null;
+  const label = d
+    ? format(d, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })
+    : '';
+  const capitalized = label ? label.charAt(0).toUpperCase() + label.slice(1) : '';
+
+  return (
+    <Modal isOpen={!!date} onClose={onClose} title={capitalized} size="md">
+      {actions.length === 0 ? (
+        <div className="py-8 text-center">
+          <Clock className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+          <p className="text-sm text-gray-500">Nenhuma ação neste dia</p>
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {actions.map(action => {
+            const color = STATUS_COLORS[action.status] || '#9ca3af';
+            return (
+              <div
+                key={action.id}
+                className="flex items-start gap-3 p-3 rounded-xl bg-gray-50/80 ring-1 ring-black/[0.03]"
+                style={{ borderLeft: `3px solid ${color}` }}
+              >
+                <div className="flex flex-col items-center gap-1 w-14 shrink-0">
+                  <span className="text-xs font-bold text-gray-900">
+                    {action.action_time ? action.action_time.slice(0, 5) : '—'}
+                  </span>
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold text-gray-900 leading-snug">{action.title}</p>
+                    <StatusBadge status={action.status} size="sm" className="shrink-0" />
+                  </div>
+
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {action.format && (
+                      <span className="px-2 py-0.5 rounded-full bg-white border border-gray-200 text-[10px] font-medium text-gray-600">
+                        {CONTENT_FORMATS[action.format] || action.format}
+                      </span>
+                    )}
+                    {action.campaign?.name && (
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
+                        style={{ backgroundColor: action.campaign.color || '#3B82F6' }}
+                      >
+                        {action.campaign.name}
+                      </span>
+                    )}
+                    {action.workspace?.name && (
+                      <span className="px-2 py-0.5 rounded-full bg-white border border-gray-200 text-[10px] font-medium text-gray-600">
+                        {action.workspace.name}
+                      </span>
+                    )}
+                    {action.environment && (
+                      <span className="px-2 py-0.5 rounded-full bg-gray-100 text-[10px] font-medium text-gray-500">
+                        {ENV_LABEL[action.environment] || action.environment}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                    {action.responsible && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Avatar name={action.responsible.full_name} size="sm" />
+                        <span className="text-gray-600">{action.responsible.full_name}</span>
+                      </span>
+                    )}
+                    {action.observations && (
+                      <span className="inline-flex items-center gap-1 max-w-full">
+                        <StickyNote className="w-3 h-3 text-gray-400 shrink-0" />
+                        <span className="truncate">{action.observations}</span>
+                      </span>
+                    )}
+                    {!action.responsible && !action.observations && (
+                      <span className="inline-flex items-center gap-1"><User className="w-3 h-3 text-gray-400" /> Sem responsável definido</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {onOpenCalendar && date && (
+            <div className="pt-2 text-center">
+              <button
+                onClick={() => onOpenCalendar(date)}
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
+              >
+                Ver no calendário completo →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      <div className="mt-4 text-center text-[10px] text-gray-300">{date ? formatDate(date) : ''}</div>
+    </Modal>
   );
 }

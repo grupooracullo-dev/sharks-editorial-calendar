@@ -77,7 +77,13 @@ export default function ClientDashboard() {
             </button>
           </div>
         </CardHeader>
-        <MiniCalendar actions={actions} selectedDate={selectedDate} onSelectDate={setSelectedDate} campaigns={campaigns} />
+        <MiniCalendar
+          actions={actions}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          campaigns={campaigns}
+          onOpenCalendar={() => navigate('/client/calendar')}
+        />
       </Card>
 
       {/* CARDS ABAIXO DO CALENDARIO */}

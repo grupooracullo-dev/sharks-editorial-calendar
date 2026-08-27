@@ -118,6 +118,7 @@ export default function SharksDashboard() {
           onSelectDate={setSelectedDate}
           campaigns={campaigns}
           strategicDates={strategicDates}
+          onOpenCalendar={() => navigate('/sharks/calendar')}
         />
       </Card>
 
