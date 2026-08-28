@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Calendar, Users, MessageSquare, History, Link2, Briefcase, Rocket, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, MessageSquare, History, Link2, Briefcase, Rocket, ShieldCheck, CalendarDays } from 'lucide-react';
 
 const sharksNavItems = [
   { path: '/sharks', icon: LayoutDashboard, label: 'Home' },
@@ -21,6 +21,8 @@ const clientNavItems = [
 const estrategosNavItems = [
   { path: '/estrategos', icon: LayoutDashboard, label: 'Home' },
   { path: '/estrategos/calendar', icon: Calendar, label: 'Calendário' },
+  { path: '/estrategos/meetings', icon: CalendarDays, label: 'Reuniões' },
+  { path: '/estrategos/implementations', icon: Rocket, label: 'Impl.' },
   { path: '/estrategos/projects', icon: Briefcase, label: 'Projetos' },
   { path: '/estrategos/chat', icon: MessageSquare, label: 'Chat' },
 ];
@@ -28,6 +30,7 @@ const estrategosNavItems = [
 const oraculloNavItems = [
   { path: '/oracullo', icon: LayoutDashboard, label: 'Home' },
   { path: '/oracullo/access', icon: ShieldCheck, label: 'Acessos' },
+  { path: '/oracullo/clients', icon: Users, label: 'Clientes' },
   { path: '/oracullo/users', icon: Users, label: 'Usuários' },
 ];
 

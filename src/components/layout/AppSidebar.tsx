@@ -27,6 +27,8 @@ import {
   Briefcase,
   Rocket,
   ShieldCheck,
+  CalendarDays,
+  Building2,
 } from 'lucide-react';
 import logoUrl from '/logo.png?url';
 import logoSharksUrl from '/logo-sharks.png?url';
@@ -59,6 +61,8 @@ const estrategosNavItems = [
   { icon: LayoutDashboard, label: 'Visão Geral', path: '/estrategos' },
   { icon: Calendar, label: 'Calendário', path: '/estrategos/calendar' },
   { icon: Briefcase, label: 'Projetos', path: '/estrategos/projects' },
+  { icon: CalendarDays, label: 'Reuniões', path: '/estrategos/meetings' },
+  { icon: Rocket, label: 'Implementações', path: '/estrategos/implementations' },
   { icon: MessageSquare, label: 'Chat', path: '/estrategos/chat' },
   { icon: Users, label: 'Clientes', path: '/estrategos/clients', adminOnly: true },
   { icon: UserPlus, label: 'Acessos', path: '/estrategos/access-requests', adminOnly: true },
@@ -70,6 +74,7 @@ const oraculloNavItems = [
   { icon: ShieldCheck, label: 'Acessos', path: '/oracullo/access' },
   { icon: UserPlus, label: 'Solicitações', path: '/oracullo/access-requests' },
   { icon: Users, label: 'Usuários', path: '/oracullo/users' },
+  { icon: Building2, label: 'Clientes', path: '/oracullo/clients' },
 ];
 
 type SidebarEnv = 'sharks' | 'client' | 'estrategos' | 'oracullo';

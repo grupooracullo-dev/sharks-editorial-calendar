@@ -38,7 +38,10 @@ import EstrategosChat from '@/pages/estrategos/EstrategosChat';
 import EstrategosClients from '@/pages/estrategos/EstrategosClients';
 import EstrategosAccessRequests from '@/pages/estrategos/EstrategosAccessRequests';
 import EstrategosIntegrations from '@/pages/estrategos/EstrategosIntegrations';
+import EstrategosMeetings from '@/pages/estrategos/EstrategosMeetings';
+import EstrategosImplementations from '@/pages/estrategos/EstrategosImplementations';
 import OraculloDashboard from '@/pages/oracullo/OraculloDashboard';
+import OraculloClients from '@/pages/oracullo/OraculloClients';
 import OraculloAccess from '@/pages/oracullo/OraculloAccess';
 import OraculloAccessRequests from '@/pages/oracullo/OraculloAccessRequests';
 import OraculloUsers from '@/pages/oracullo/OraculloUsers';
@@ -126,6 +129,7 @@ function AppRoutes() {
       <Route path="/oracullo/access" element={<OraculloLayout><OraculloAccess /></OraculloLayout>} />
       <Route path="/oracullo/access-requests" element={<OraculloLayout><OraculloAccessRequests /></OraculloLayout>} />
       <Route path="/oracullo/users" element={<OraculloLayout><OraculloUsers /></OraculloLayout>} />
+      <Route path="/oracullo/clients" element={<OraculloLayout><OraculloClients /></OraculloLayout>} />
 
       {/* Sharks routes */}
       <Route path="/sharks" element={<SharksLayout><SharksDashboard /></SharksLayout>} />
@@ -155,6 +159,8 @@ function AppRoutes() {
       <Route path="/estrategos/chat" element={<EstrategosLayout><EstrategosChat /></EstrategosLayout>} />
       <Route path="/estrategos/clients" element={<EstrategosLayout><EstrategosClients /></EstrategosLayout>} />
       <Route path="/estrategos/integrations" element={<EstrategosLayout><EstrategosIntegrations /></EstrategosLayout>} />
+      <Route path="/estrategos/meetings" element={<EstrategosLayout><EstrategosMeetings /></EstrategosLayout>} />
+      <Route path="/estrategos/implementations" element={<EstrategosLayout><EstrategosImplementations /></EstrategosLayout>} />
       <Route path="/estrategos/access-requests" element={<EstrategosLayout><EstrategosAccessRequests /></EstrategosLayout>} />
 
       {/* Legal (público, exigência OAuth Google) */}
