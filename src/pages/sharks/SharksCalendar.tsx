@@ -4,7 +4,6 @@ import { cn, formatWeekdayShort } from '@/lib/utils';
 import { getCalendarDays, isSameMonth, isSameDay, formatCalendarDate, format, ptBR, addDays, startOfWeek } from '@/lib/dateUtils';
 import { isOverdue } from '@/lib/dateUtils';
 import { useActions } from '@/hooks/useActions';
-import { subscribeToActions } from '@/lib/actionService';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
@@ -46,12 +45,6 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
   const { integration } = useIntegration(currentWorkspace?.id);
   const [syncing, setSyncing] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
-  const [actionsHydrated, setActionsHydrated] = useState(false);
-
-  useEffect(() => {
-    const unsubscribe = subscribeToActions(() => setActionsHydrated(true));
-    return unsubscribe;
-  }, []);
 
   const filterObj = useMemo(() => ({
     workspaceId: currentWorkspace?.id,
@@ -61,7 +54,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
     environment,
   }), [currentWorkspace?.id, filters.format, filters.status, filters.objective, environment]);
 
-  const { actions, update, remove, create } = useActions(filterObj);
+  const { actions, update, remove, create, loadStatus } = useActions(filterObj);
   const { pillars, profile } = useEditorial(currentWorkspace?.id);
   const activeCampaigns = useActiveCampaigns(currentWorkspace?.id);
   const { dates: strategicDates } = useStrategicDates(currentWorkspace?.id);
@@ -517,7 +510,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                           showClient={isAdmin}
                         />
                       ))}
-                      {dayActions.length === 0 && (actionsHydrated || actions.length > 0) && (
+                      {dayActions.length === 0 && loadStatus === 'success' && (
                         <Button
                           variant="ghost"
                           size="sm"

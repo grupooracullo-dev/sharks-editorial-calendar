@@ -10,6 +10,7 @@ import { notifyActionChanged } from '@/lib/googleSync';
 
 let actionsStore: Action[] = [];
 let currentScope: string | null | undefined = undefined; // undefined = not loaded yet
+let loadStatus: 'idle' | 'loading' | 'success' | 'error' = 'idle';
 let listeners: (() => void)[] = [];
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 
@@ -75,6 +76,8 @@ const SELECT_WITH_JOINS = '*, campaign:campaigns(*), editorial_pillar:editorial_
 
 export async function loadActions(workspaceId?: string | null, environment?: string | null): Promise<void> {
   currentScope = workspaceId ?? null;
+  loadStatus = 'loading';
+  notifyListeners();
   let query = supabase.from('actions').select(SELECT_WITH_JOINS);
   if (workspaceId) {
     query = query.eq('workspace_id', workspaceId);
@@ -86,10 +89,13 @@ export async function loadActions(workspaceId?: string | null, environment?: str
 
   if (error) {
     console.error('[actions] load error:', error.message);
+    loadStatus = 'error';
+    notifyListeners();
     return;
   }
 
   actionsStore = (data as unknown as Action[]) || [];
+  loadStatus = 'success';
   notifyListeners();
 
   // Realtime: single global channel, reload scope on any change
@@ -117,6 +123,10 @@ export async function reloadActions(): Promise<void> {
 
 export function getCurrentScope(): string | null | undefined {
   return currentScope;
+}
+
+export function getActionsLoadStatus(): 'idle' | 'loading' | 'success' | 'error' {
+  return loadStatus;
 }
 
 export function getActions(filters?: ActionFilters): Action[] {
