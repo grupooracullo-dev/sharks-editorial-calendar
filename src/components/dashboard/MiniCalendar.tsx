@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Megaphone, Clock, User, StickyNote } from 'l
 import Modal from '@/components/ui/Modal';
 import StatusBadge from '@/components/actions/StatusBadge';
 import Avatar from '@/components/ui/Avatar';
-import { CONTENT_FORMATS } from '@/lib/constants';
+import { CONTENT_FORMATS, ACTION_STATUS_DOT_HEX } from '@/lib/constants';
 
 interface MiniCalendarProps {
   actions: Action[];
@@ -24,18 +24,6 @@ interface DragState {
   hMode: boolean | null;
   snapping: boolean;
 }
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: '#9ca3af',
-  briefing: '#3b82f6',
-  in_production: '#eab308',
-  sharks_review: '#a855f7',
-  scheduled: '#6366f1',
-  published: '#22c55e',
-  completed: '#10b981',
-  cancelled: '#f87171',
-  overdue: '#f97316',
-};
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -259,7 +247,7 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate, camp
                   {/* Chips de acao (estilo Google) */}
                   <div className="flex flex-col gap-0.5 mt-0.5 min-w-0 flex-1">
                     {dayActions.slice(0, 3).map((action, i) => {
-                      const color = STATUS_COLORS[action.status] || '#9ca3af';
+                      const color = ACTION_STATUS_DOT_HEX[action.status] || '#9ca3af';
                       return (
                         <span
                           key={action.id}
@@ -369,7 +357,7 @@ function DayActionsModal({
       ) : (
         <div className="space-y-2.5">
           {actions.map(action => {
-            const color = STATUS_COLORS[action.status] || '#9ca3af';
+            const color = ACTION_STATUS_DOT_HEX[action.status] || '#9ca3af';
             return (
               <div
                 key={action.id}

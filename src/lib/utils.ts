@@ -67,11 +67,3 @@ export function getMonthName(monthIndex: number): string {
   ];
   return months[monthIndex];
 }
-
-export function isOverdue(dateStr: string, status: string): boolean {
-  if (['published', 'completed', 'cancelled'].includes(status)) return false;
-  const date = new Date(dateStr + 'T00:00:00');
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return date < today;
-}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Action } from '@/types';
 import { cn } from '@/lib/utils';
-import { FORMAT_COLORS, ACTION_STATUSES } from '@/lib/constants';
+import { FORMAT_COLORS, ACTION_STATUSES, ACTION_STATUS_DOT_CLASSES } from '@/lib/constants';
 import { isOverdue } from '@/lib/dateUtils';
 import { GripVertical, Megaphone, Clock, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 
@@ -13,18 +13,6 @@ interface CalendarEventProps {
   showClient?: boolean;
   isDragging?: boolean;
 }
-
-const STATUS_DOT_COLORS: Record<string, string> = {
-  draft: 'bg-gray-400',
-  briefing: 'bg-blue-500',
-  in_production: 'bg-yellow-500',
-  sharks_review: 'bg-purple-500',
-  scheduled: 'bg-indigo-500',
-  published: 'bg-green-500',
-  completed: 'bg-emerald-500',
-  cancelled: 'bg-red-400',
-  overdue: 'bg-orange-500',
-};
 
 const NEXT_STATUS: Record<string, { status: Action['status']; label: string; icon: typeof CheckCircle2 }> = {
   draft: { status: 'briefing', label: 'Briefing', icon: Clock },
@@ -73,7 +61,7 @@ export default function CalendarEvent({ action, onClick, onQuickStatus, compact,
             )}
             <div className="flex items-center gap-1">
               {/* Status dot */}
-              <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', STATUS_DOT_COLORS[action.status] || 'bg-gray-400')} />
+              <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', ACTION_STATUS_DOT_CLASSES[action.status] || 'bg-gray-400')} />
               <p className={cn(
                 'font-medium leading-tight truncate',
                 compact ? 'text-[10px]' : 'text-xs',
@@ -132,7 +120,7 @@ export default function CalendarEvent({ action, onClick, onQuickStatus, compact,
       {hovered && !isDragging && !compact && (
         <div className="absolute z-50 bottom-full left-0 mb-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-3 pointer-events-none">
           <div className="flex items-center gap-2 mb-1.5">
-            <span className={cn('w-2 h-2 rounded-full', STATUS_DOT_COLORS[action.status])} />
+            <span className={cn('w-2 h-2 rounded-full', ACTION_STATUS_DOT_CLASSES[action.status])} />
             <span className="text-xs font-semibold text-gray-900 truncate">{action.title}</span>
           </div>
           <div className="space-y-1 text-[11px] text-gray-500">
@@ -141,7 +129,7 @@ export default function CalendarEvent({ action, onClick, onQuickStatus, compact,
               <span>{action.action_date}{action.action_time ? ` às ${action.action_time.slice(0, 5)}` : ''}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className={cn('w-1.5 h-1.5 rounded-full', STATUS_DOT_COLORS[action.status])} />
+              <span className={cn('w-1.5 h-1.5 rounded-full', ACTION_STATUS_DOT_CLASSES[action.status])} />
               <span>{statusConf.label}</span>
               <span className="text-gray-300">·</span>
               <span className="capitalize">{formatLabel}</span>

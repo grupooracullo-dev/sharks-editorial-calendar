@@ -30,7 +30,8 @@ interface GeneratorInput {
   recentPillars: string[];
   recentObjectives: Objective[];
   channels: string[];
-  weeksAhead?: number;
+  weeksAhead?: number;      // default 1 (ignorado se weekStart informada)
+  weekStart?: Date;         // data de referência da semana a gerar
 }
 
 // ---------- helpers ----------
@@ -351,9 +352,12 @@ export function generateWeek(input: GeneratorInput): WeekGeneratorResult {
     recentObjectives,
     channels,
     weeksAhead = 1,
+    weekStart,
   } = input;
 
-  const nextWeekStart = addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 7 * weeksAhead);
+  const nextWeekStart = weekStart
+    ? startOfWeek(weekStart, { weekStartsOn: 1 })
+    : addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 7 * weeksAhead);
   const weekDates = getWeekDates(nextWeekStart);
 
   const totalFrequency = Math.min(profile.frequency_per_week, profile.max_weekly || profile.frequency_per_week + 2);

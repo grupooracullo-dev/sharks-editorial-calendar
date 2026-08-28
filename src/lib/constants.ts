@@ -28,6 +28,32 @@ export const ACTION_STATUSES: Record<ActionStatus, { label: string; color: strin
   overdue: { label: 'Atrasado', color: 'text-orange-600', bgColor: 'bg-orange-50' },
 };
 
+// Cores de "dot" de status no calendário (classes Tailwind — fonte única)
+export const ACTION_STATUS_DOT_CLASSES: Record<ActionStatus, string> = {
+  draft: 'bg-gray-400',
+  briefing: 'bg-blue-500',
+  in_production: 'bg-yellow-500',
+  sharks_review: 'bg-purple-500',
+  scheduled: 'bg-indigo-500',
+  published: 'bg-green-500',
+  completed: 'bg-emerald-500',
+  cancelled: 'bg-red-400',
+  overdue: 'bg-orange-500',
+};
+
+// Cores de "dot" de status no calendário (hex — para estilos inline)
+export const ACTION_STATUS_DOT_HEX: Record<ActionStatus, string> = {
+  draft: '#9ca3af',
+  briefing: '#3b82f6',
+  in_production: '#eab308',
+  sharks_review: '#a855f7',
+  scheduled: '#6366f1',
+  published: '#22c55e',
+  completed: '#10b981',
+  cancelled: '#f87171',
+  overdue: '#f97316',
+};
+
 // Action Types
 export const ACTION_TYPES: Record<ActionType, string> = {
   content: 'Conteúdo',

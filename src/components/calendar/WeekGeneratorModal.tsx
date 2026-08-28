@@ -6,7 +6,7 @@ import Badge from '@/components/ui/Badge';
 import { CONTENT_FORMATS, OBJECTIVES } from '@/lib/constants';
 import { generateWeek } from '@/lib/weekGenerator';
 import { useActions } from '@/hooks/useActions';
-import { formatCalendarDate, addDays, startOfWeek } from '@/lib/dateUtils';
+import { formatCalendarDate, addDays, startOfWeek, parseISO, format } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { Sparkles, Check, X, RefreshCw, Lock, Unlock, ChevronLeft, ChevronRight, AlertTriangle, BarChart3, Layers } from 'lucide-react';
 
@@ -36,19 +36,37 @@ export default function WeekGeneratorModal({
   channels = [],
 }: WeekGeneratorModalProps) {
   const [result, setResult] = useState<WeekGeneratorResult | null>(null);
-  const [weeksAhead, setWeeksAhead] = useState(1);
+  const [weekStart, setWeekStart] = useState<string>('');
   const [locked, setLocked] = useState<Set<number>>(new Set());
   const { create } = useActions({});
   const [saving, setSaving] = useState(false);
   const [selectedPillars, setSelectedPillars] = useState<Set<string>>(new Set());
 
-  // Inicializa com todos os pilares ativos selecionados ao abrir
+  // Próxima segunda-feira (limite mínimo do período)
+  const minWeekStart = formatCalendarDate(addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 7));
+  const isCurrentWeek = weekStart === minWeekStart;
+
+  // Inicializa com os pilares ativos + semana padrão ao abrir
   useEffect(() => {
     if (isOpen) {
       const activeIds = pillars.filter(p => p.is_active).map(p => p.id);
       setSelectedPillars(new Set(activeIds));
+      setWeekStart(minWeekStart);
     }
-  }, [isOpen, pillars]);
+  }, [isOpen, pillars, minWeekStart]);
+
+  const weekStartDate = parseISO(weekStart + 'T00:00:00');
+  const weekEndDate = addDays(weekStartDate, 6);
+
+  const shiftWeek = (days: number) => {
+    setWeekStart(s => formatCalendarDate(addDays(parseISO(s + 'T00:00:00'), days)));
+  };
+
+  const handlePickWeek = (value: string) => {
+    if (!value) return;
+    // Ajusta qualquer dia da semana para a segunda-feira correspondente
+    setWeekStart(formatCalendarDate(startOfWeek(parseISO(value + 'T00:00:00'), { weekStartsOn: 1 })));
+  };
 
   const handleGenerate = () => {
     if (!profile) {
@@ -76,7 +94,7 @@ export default function WeekGeneratorModal({
       recentPillars,
       recentObjectives,
       channels,
-      weeksAhead,
+      weekStart: weekStartDate,
     });
 
     setResult(generated);
@@ -102,7 +120,7 @@ export default function WeekGeneratorModal({
       recentPillars: keptPillars,
       recentObjectives: keptObjectives,
       channels,
-      weeksAhead,
+      weekStart: weekStartDate,
     });
 
     // Merge: locked actions stay, unlocked replaced
@@ -143,32 +161,41 @@ export default function WeekGeneratorModal({
     }
   };
 
-  const weekStart = addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 7 * weeksAhead);
-  const weekEnd = addDays(weekStart, 6);
-
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Gerar Semana Editorial" size="xl">
       <div className="space-y-4">
         {/* Week selector */}
-        <div className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2">
+        <div className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg px-4 py-2">
           <button
-            className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-30"
-            disabled={weeksAhead <= 1}
-            onClick={() => setWeeksAhead(w => w - 1)}
+            className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+            disabled={isCurrentWeek}
+            onClick={() => shiftWeek(-7)}
+            title="Semana anterior"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <div className="text-center">
-            <p className="text-sm font-medium text-gray-900">
-              Semana de {formatCalendarDate(weekStart)} a {formatCalendarDate(weekEnd)}
-            </p>
-            <p className="text-[11px] text-gray-400">
-              {weeksAhead === 1 ? 'Próxima semana' : `${weeksAhead} semanas à frente`}
-            </p>
+          <div className="flex-1 flex items-center justify-center gap-3 min-w-0">
+            <div className="text-left min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">
+                Semana de {format(weekStartDate, 'dd/MM')} a {format(weekEndDate, 'dd/MM')}
+              </p>
+              <p className="text-[11px] text-gray-400">
+                {isCurrentWeek ? 'Próxima semana' : 'Escolha o período no calendário'}
+              </p>
+            </div>
+            <input
+              type="date"
+              value={weekStart}
+              min={minWeekStart}
+              onChange={e => handlePickWeek(e.target.value)}
+              className="text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary-400"
+              title="Início do período das publicações"
+            />
           </div>
           <button
             className="p-1 text-gray-500 hover:text-gray-700"
-            onClick={() => setWeeksAhead(w => w + 1)}
+            onClick={() => shiftWeek(7)}
+            title="Próxima semana"
           >
             <ChevronRight className="w-4 h-4" />
           </button>

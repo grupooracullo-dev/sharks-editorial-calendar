@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Action, CalendarViewType, EnvironmentType } from '@/types';
 import { cn } from '@/lib/utils';
 import { getCalendarDays, isSameMonth, isSameDay, formatCalendarDate, format, ptBR } from '@/lib/dateUtils';
-import { isOverdue } from '@/lib/utils';
+import { isOverdue } from '@/lib/dateUtils';
 import { useActions } from '@/hooks/useActions';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,7 +19,7 @@ import { useEditorial } from '@/hooks/useEditorial';
 import { useStrategicDates } from '@/hooks/useStrategicDates';
 import { useChannels } from '@/hooks/useChannels';
 import { useActiveCampaigns } from '@/hooks/useCampaigns';
-import { ACTION_STATUSES } from '@/lib/constants';
+import { ACTION_STATUSES, ACTION_STATUS_DOT_CLASSES } from '@/lib/constants';
 import { ChevronLeft, ChevronRight, Calendar, Plus, Wand2, RefreshCw } from 'lucide-react';
 import { DndContext, DragOverlay, closestCenter, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { toast } from 'sonner';
@@ -59,18 +59,6 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
   const activeCampaigns = useActiveCampaigns(currentWorkspace?.id);
   const { dates: strategicDates } = useStrategicDates(currentWorkspace?.id);
   const channels = useChannels(currentWorkspace?.id);
-
-  const STATUS_DOT_COLORS: Record<string, string> = {
-    draft: 'bg-gray-400',
-    briefing: 'bg-blue-500',
-    in_production: 'bg-yellow-500',
-    sharks_review: 'bg-purple-500',
-    scheduled: 'bg-indigo-500',
-    published: 'bg-green-500',
-    completed: 'bg-emerald-500',
-    cancelled: 'bg-red-400',
-    overdue: 'bg-orange-500',
-  };
 
   const weekStep = isMobile ? 3 : 7;
   const goToToday = () => setCurrentDate(new Date());
@@ -376,7 +364,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                                 onClick={(e) => { e.stopPropagation(); handleActionClick(action); }}
                                 className="flex items-center gap-1 px-1 py-0.5 rounded cursor-pointer hover:bg-gray-100 transition-colors"
                               >
-                                <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', STATUS_DOT_COLORS[action.status] || 'bg-gray-400')} />
+                                <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', ACTION_STATUS_DOT_CLASSES[action.status] || 'bg-gray-400')} />
                                 <span className="text-[10px] font-medium truncate">{action.title}</span>
                               </div>
                             ))}
@@ -398,7 +386,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                                     onClick={(e) => { e.stopPropagation(); handleActionClick(action); }}
                                     className="flex items-center gap-1 px-1 py-0.5 rounded cursor-pointer hover:bg-gray-100 transition-colors"
                                   >
-                                    <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', STATUS_DOT_COLORS[action.status] || 'bg-gray-400')} />
+                                    <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', ACTION_STATUS_DOT_CLASSES[action.status] || 'bg-gray-400')} />
                                     <span className="text-[10px] font-medium truncate">{action.title}</span>
                                   </div>
                                 ))}
