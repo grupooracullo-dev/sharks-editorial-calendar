@@ -220,7 +220,7 @@ export default function TopHeader({ onOpenMobileNav }: { onOpenMobileNav?: () =>
 
           {/* User avatar */}
           <div className="flex items-center gap-2">
-            <Avatar name={user?.full_name || 'U'} size="sm" />
+            <Avatar name={user?.full_name || 'U'} src={user?.avatar_url} size="sm" />
             <span className="hidden md:block text-sm font-medium text-gray-700">
               {user?.full_name}
             </span>

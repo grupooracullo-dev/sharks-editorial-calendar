@@ -29,7 +29,7 @@ export default function OraculloDashboard() {
   useEffect(() => {
     const load = async () => {
       const [u, w, ac, cp, sd] = await Promise.all([
-        supabase.from('users').select('id, email, full_name, role'),
+        supabase.from('users').select('id, email, full_name, role, avatar_url'),
         supabase.from('workspaces').select('id, organizations(environment)').eq('is_active', true),
         supabase.from('actions').select('*, workspace:workspaces(name)').order('action_date'),
         supabase.from('campaigns').select('*'),
@@ -191,7 +191,7 @@ export default function OraculloDashboard() {
           <div className="space-y-2 lg:col-span-2">
             {users.slice(0, 5).map(u => (
               <div key={u.id} className="flex items-center gap-2.5">
-                <Avatar name={u.full_name} size="sm" />
+                <Avatar name={u.full_name} src={u.avatar_url} size="sm" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-gray-900 truncate">{u.full_name}</p>
                 </div>

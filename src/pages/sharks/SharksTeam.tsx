@@ -298,7 +298,7 @@ export default function SharksTeam() {
                   className="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50/50 transition-colors"
                   onClick={() => setExpandedCard(isExpanded ? null : member.id)}
                 >
-                  <Avatar name={member.full_name} size="lg" />
+                  <Avatar name={member.full_name} src={member.avatar_url} size="lg" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-gray-900">{member.full_name}</h3>

@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
-import Avatar from '@/components/ui/Avatar';
+import AvatarUploader from '@/components/ui/AvatarUploader';
 import Badge from '@/components/ui/Badge';
 import { USER_ROLES } from '@/lib/constants';
 import { toast } from 'sonner';
@@ -62,7 +62,7 @@ export default function SharksSettings() {
 
   // perfil
   const [name, setName] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
 
   // senha
@@ -75,7 +75,7 @@ export default function SharksSettings() {
 
   useEffect(() => {
     setName(user?.full_name ?? '');
-    setAvatarUrl(user?.avatar_url ?? '');
+    setAvatarUrl(user?.avatar_url || null);
     setPrefs(loadPrefs());
   }, [user?.id, user?.full_name, user?.avatar_url]);
 
@@ -92,7 +92,7 @@ export default function SharksSettings() {
     setSavingProfile(true);
     const { error } = await supabase
       .from('users')
-      .update({ full_name: name.trim(), avatar_url: avatarUrl.trim() || null })
+      .update({ full_name: name.trim(), avatar_url: avatarUrl })
       .eq('id', user!.id);
     setSavingProfile(false);
     if (error) {
@@ -148,21 +148,15 @@ export default function SharksSettings() {
           </Badge>
         </CardHeader>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
-          <Avatar name={name || 'U'} src={avatarUrl || undefined} size="lg" />
+          <AvatarUploader name={name || 'U'} avatarUrl={avatarUrl} userId={user?.id || ''} onChange={setAvatarUrl} size="lg" />
           <div className="flex-1 w-full space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Nome completo</label>
-                <Input value={name} onChange={e => setName(e.target.value)} placeholder="Seu nome" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">URL do avatar (opcional)</label>
-                <Input value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} placeholder="https://..." />
-              </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Nome completo</label>
+              <Input value={name} onChange={e => setName(e.target.value)} placeholder="Seu nome" />
             </div>
             <div className="flex items-center justify-between">
               <p className="text-xs text-gray-400">{user?.email}</p>
-              <Button size="sm" onClick={handleSaveProfile} disabled={savingProfile || name === (user?.full_name ?? '') && avatarUrl === (user?.avatar_url ?? '')}>
+              <Button size="sm" onClick={handleSaveProfile} disabled={savingProfile || (name === (user?.full_name ?? '') && (avatarUrl ?? '') === (user?.avatar_url ?? ''))}>
                 {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Salvar
               </Button>

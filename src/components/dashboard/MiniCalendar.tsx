@@ -417,7 +417,7 @@ function DayActionsModal({
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                     {action.responsible && (
                       <span className="inline-flex items-center gap-1.5">
-                        <Avatar name={action.responsible.full_name} size="sm" />
+                        <Avatar name={action.responsible.full_name} src={action.responsible.avatar_url} size="sm" />
                         <span className="text-gray-600">{action.responsible.full_name}</span>
                       </span>
                     )}

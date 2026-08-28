@@ -318,7 +318,7 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
         {/* Footer */}
         <div className={cn('border-t border-gray-100 p-3', collapsed && 'p-2')}>
           <div className={cn('flex items-center gap-3', collapsed && 'flex-col gap-2')}>
-            <Avatar name={user?.full_name || 'U'} size="sm" />
+            <Avatar name={user?.full_name || 'U'} src={user?.avatar_url} size="sm" />
             {!collapsed && (
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{user?.full_name}</p>

@@ -24,7 +24,7 @@ export default function ChatMessage({ content, sender, message_type, created_at,
 
   return (
     <div className={cn('flex gap-2.5 mb-4', isOwn && 'flex-row-reverse')}>
-      <Avatar name={sender.full_name} size="sm" />
+      <Avatar name={sender.full_name} src={sender.avatar_url} size="sm" />
       <div className={cn('max-w-[75%]', isOwn && 'items-end flex flex-col')}>
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xs font-medium text-gray-700">{isOwn ? 'Você' : sender.full_name}</span>

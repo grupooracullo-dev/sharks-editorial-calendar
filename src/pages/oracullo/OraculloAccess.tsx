@@ -195,7 +195,7 @@ export default function OraculloAccess() {
               return (
                 <div key={user.id} className="flex items-center justify-between gap-4 py-3.5">
                   <div className="flex items-center gap-3 min-w-0">
-                    <Avatar name={user.full_name} size="md" />
+                    <Avatar name={user.full_name} src={user.avatar_url} size="md" />
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{user.full_name}</p>
                       <p className="text-xs text-gray-500 truncate">{user.email}</p>
