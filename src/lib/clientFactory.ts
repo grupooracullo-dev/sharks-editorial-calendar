@@ -58,6 +58,8 @@ export async function createFullClient(input: CreateFullClientInput): Promise<Wo
   if (!org) throw new Error(`Organização ${input.environment} não encontrada`);
 
   const slugBase = slugify(name) || `cliente-${Date.now()}`;
+  // Cliente nasce INATIVO: só vira visível (fetchAllClients/workspacesByEnv)
+  // depois que todos os dados dependentes forem gravados com sucesso.
   const { data: ws, error: wsError } = await supabase
     .from('workspaces')
     .insert({
@@ -69,35 +71,37 @@ export async function createFullClient(input: CreateFullClientInput): Promise<Wo
       state: input.state || null,
       country: input.country,
       logo_url: input.logo_url,
+      is_active: false,
     })
     .select('id, organization_id, name, slug, logo_url, segment, city, state, country, is_active, created_at, updated_at')
     .single();
   if (wsError || !ws) throw new Error(wsError?.message || 'Erro ao criar workspace');
 
-  try {
-    // 2. Pilares padrão da linha editorial
-    const pillarRows = MARKETING_PLAN_PILLARS.map((p, i) => ({
-      workspace_id: ws.id,
-      name: p.name,
-      description: p.description,
-      color: p.color,
-      percentage: p.percentage,
-      sort_order: i + 1,
-    }));
-    const { data: pillarsInserted, error: pillarsError } = await supabase
-      .from('editorial_pillars')
-      .insert(pillarRows)
-      .select('id, percentage');
-    if (pillarsError) throw new Error(pillarsError.message);
+  // 2. Pilares padrão da linha editorial
+  const pillarRows = MARKETING_PLAN_PILLARS.map((p, i) => ({
+    workspace_id: ws.id,
+    name: p.name,
+    description: p.description,
+    color: p.color,
+    percentage: p.percentage,
+    sort_order: i + 1,
+  }));
+  const { data: pillarsInserted, error: pillarsError } = await supabase
+    .from('editorial_pillars')
+    .insert(pillarRows)
+    .select('id, percentage');
+  if (pillarsError) throw new Error(pillarsError.message);
 
-    // 3. Perfil editorial (frequência + distribuição por pilar)
-    const ff = normalizeFormatFrequency(input.format_frequency);
-    const frequency = formatFrequencyTotal(ff);
-    const distribution: Record<string, number> = {};
-    pillarsInserted?.forEach(p => {
-      distribution[p.id] = p.percentage;
-    });
-    const { error: profileError } = await supabase.from('editorial_profiles').insert({
+  // 3. Perfil editorial (frequência + distribuição por pilar)
+  const ff = normalizeFormatFrequency(input.format_frequency);
+  const frequency = formatFrequencyTotal(ff);
+  const distribution: Record<string, number> = {};
+  pillarsInserted?.forEach(p => {
+    distribution[p.id] = p.percentage;
+  });
+  const { error: profileError } = await supabase
+    .from('editorial_profiles')
+    .insert({
       workspace_id: ws.id,
       frequency_per_week: frequency,
       format_frequency: ff,
@@ -110,23 +114,29 @@ export async function createFullClient(input: CreateFullClientInput): Promise<Wo
       priority_objectives: ['educational', 'engagement'],
       priority_products: [],
       max_weekly: frequency + 2,
-    });
-    if (profileError) throw new Error(profileError.message);
+    })
+    .select('id');
+  if (profileError) throw new Error(profileError.message);
 
-    // 4. Google Calendar placeholder (opcional)
-    const gcal = input.google_calendar_id?.trim();
-    if (gcal) {
-      const { error: gcalError } = await supabase.from('calendar_integrations').insert({
+  // 4. Google Calendar placeholder (opcional)
+  const gcal = input.google_calendar_id?.trim();
+  if (gcal) {
+    const { error: gcalError } = await supabase
+      .from('calendar_integrations')
+      .insert({
         workspace_id: ws.id,
         google_calendar_id: gcal,
         is_connected: false,
-      });
-      if (gcalError) throw new Error(gcalError.message);
-    }
+      })
+      .select('id');
+    if (gcalError) throw new Error(gcalError.message);
+  }
 
-    // 5. Datas estratégicas detectadas no wizard
-    if (input.selectedDates && input.selectedDates.length > 0) {
-      const { error: datesError } = await supabase.from('strategic_dates').insert(
+  // 5. Datas estratégicas detectadas no wizard
+  if (input.selectedDates && input.selectedDates.length > 0) {
+    const { error: datesError } = await supabase
+      .from('strategic_dates')
+      .insert(
         input.selectedDates.map(d => ({
           workspace_id: ws.id,
           title: d.title,
@@ -137,27 +147,31 @@ export async function createFullClient(input: CreateFullClientInput): Promise<Wo
           description: d.description,
           is_recurring: d.is_recurring,
         }))
-      );
-      if (datesError) throw new Error(datesError.message);
-    }
-  } catch (err) {
-    // Compensa a criação parcial para não deixar cliente órfão ativo
-    // (sem pilares/perfil) visível em fetchAllClients ou workspacesByEnv.
-    await supabase.from('workspaces').update({ is_active: false }).eq('id', ws.id);
-    throw err;
+      )
+      .select('id');
+    if (datesError) throw new Error(datesError.message);
   }
+
+  // 6. Ativa só depois de tudo gravado; se falhar, permanece inativo.
+  const { error: activateError } = await supabase
+    .from('workspaces')
+    .update({ is_active: true })
+    .eq('id', ws.id)
+    .select('id');
+  if (activateError) throw new Error(activateError.message);
+  ws.is_active = true;
 
   return ws;
 }
 
 export async function updateClient(id: string, patch: ClientUpdatePatch): Promise<void> {
-  const { error } = await supabase.from('workspaces').update(patch).eq('id', id);
+  const { error } = await supabase.from('workspaces').update(patch).eq('id', id).select('id');
   if (error) throw new Error(error.message);
 }
 
 /** Desativa o cliente (soft delete — dados preservados). */
 export async function deactivateClient(id: string): Promise<void> {
-  const { error } = await supabase.from('workspaces').update({ is_active: false }).eq('id', id);
+  const { error } = await supabase.from('workspaces').update({ is_active: false }).eq('id', id).select('id');
   if (error) throw new Error(error.message);
 }
 
