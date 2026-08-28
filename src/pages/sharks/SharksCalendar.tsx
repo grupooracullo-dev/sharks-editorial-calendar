@@ -33,7 +33,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
   const { isMobile } = useBreakpoint();
   const { isAdmin } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<CalendarViewType>(isMobile ? 'day' : initialView);
+  const [view, setView] = useState<CalendarViewType>(isMobile ? 'month' : initialView);
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [selectedAction, setSelectedAction] = useState<Action | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -176,6 +176,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
 
   const views: { id: CalendarViewType; label: string }[] = isMobile
     ? [
+        { id: 'month', label: 'Mês' },
         { id: 'day', label: 'Dia' },
         { id: 'week', label: 'Sem' },
         { id: 'agenda', label: 'Agenda' },
@@ -190,12 +191,17 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
     <div className="flex flex-col gap-4 h-[calc(100dvh-9.5rem)] lg:h-[calc(100dvh-6.5rem)]">
       <DndContext collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shrink-0">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900 capitalize">{monthLabel}</h1>
-            <Button variant="ghost" size="sm" onClick={goToToday}>Hoje</Button>
+        <div className="flex flex-col gap-3 shrink-0">
+          {/* Linha 1: título + Hoje + Filtros */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <h1 className="text-2xl font-bold text-gray-900 capitalize truncate">{monthLabel}</h1>
+              <Button variant="ghost" size="sm" onClick={goToToday}>Hoje</Button>
+            </div>
+            <CalendarFilters activeFilters={filters} onFilterChange={setFilters} environment={environment} />
           </div>
 
+          {/* Linha 2: controles em uma linha (views + navegação + ações) */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
               {views.map(v => (
@@ -249,9 +255,6 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
             </Button>
           </div>
         </div>
-
-        {/* Filters */}
-        <CalendarFilters activeFilters={filters} onFilterChange={setFilters} environment={environment} />
 
         {/* Month View */}
         {view === 'month' && (
