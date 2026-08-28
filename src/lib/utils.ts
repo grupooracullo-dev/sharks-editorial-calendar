@@ -13,7 +13,11 @@ function toValidDate(date: string | Date): Date | null {
   if (typeof date === 'string') {
     if (!date) return null;
     const d = new Date(date + 'T00:00:00');
-    return isNaN(d.getTime()) ? null : d;
+    if (isNaN(d.getTime())) return null;
+    const [y, m, day] = date.split('-').map(Number);
+    if (!y || !m || !day) return null;
+    if (d.getFullYear() !== y || d.getMonth() !== m - 1 || d.getDate() !== day) return null;
+    return d;
   }
   return date instanceof Date && !isNaN(date.getTime()) ? date : null;
 }
