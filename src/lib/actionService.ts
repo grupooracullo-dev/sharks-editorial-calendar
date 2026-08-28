@@ -11,6 +11,7 @@ import { notifyActionChanged } from '@/lib/googleSync';
 let actionsStore: Action[] = [];
 let currentScope: string | null | undefined = undefined; // undefined = not loaded yet
 let loadStatus: 'idle' | 'loading' | 'success' | 'error' = 'idle';
+let loadSeq = 0;
 let listeners: (() => void)[] = [];
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 
@@ -76,6 +77,7 @@ const SELECT_WITH_JOINS = '*, campaign:campaigns(*), editorial_pillar:editorial_
 
 export async function loadActions(workspaceId?: string | null, environment?: string | null): Promise<void> {
   currentScope = workspaceId ?? null;
+  const seq = ++loadSeq;
   loadStatus = 'loading';
   notifyListeners();
   let query = supabase.from('actions').select(SELECT_WITH_JOINS);
@@ -86,6 +88,8 @@ export async function loadActions(workspaceId?: string | null, environment?: str
     query = query.eq('environment', environment);
   }
   const { data, error } = await query.order('action_date');
+
+  if (seq !== loadSeq) return;
 
   if (error) {
     console.error('[actions] load error:', error.message);
