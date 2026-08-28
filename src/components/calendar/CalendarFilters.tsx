@@ -52,7 +52,7 @@ export default function CalendarFilters({ onFilterChange, activeFilters, environ
       ];
 
   return (
-    <div className="space-y-3">
+    <div className="relative inline-flex">
       <div className="flex items-center gap-2 flex-wrap">
         <Button
           variant={isOpen ? 'primary' : 'outline'}
@@ -71,7 +71,7 @@ export default function CalendarFilters({ onFilterChange, activeFilters, environ
         {activeCount > 0 && (
           <Button variant="ghost" size="sm" onClick={clearAll}>
             <X className="w-3 h-3" />
-            Limpar filtros
+            Limpar
           </Button>
         )}
 
@@ -94,7 +94,7 @@ export default function CalendarFilters({ onFilterChange, activeFilters, environ
       </div>
 
       {isOpen && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="absolute top-full right-0 z-30 mt-2 bg-white border border-gray-200 rounded-xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 w-[86vw] sm:w-[560px] shadow-lg">
           {filterGroups.map(group => (
             <div key={group.key}>
               <button

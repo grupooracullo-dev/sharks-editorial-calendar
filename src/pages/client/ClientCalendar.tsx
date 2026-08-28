@@ -19,8 +19,8 @@ import { useBreakpoint } from '@/hooks/useBreakpoint';
 export default function ClientCalendar() {
   const { currentWorkspace } = useWorkspace();
   const { isMobile } = useBreakpoint();
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<CalendarViewType>(isMobile ? 'agenda' : 'month');
+const [currentDate, setCurrentDate] = useState(new Date());
+const [view, setView] = useState<CalendarViewType>('month');
   const [selectedAction, setSelectedAction] = useState<Action | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -54,8 +54,8 @@ const goNext = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shrink-0">
         <h1 className="text-xl font-bold text-gray-900 capitalize">Meu Calendário — {monthLabel}</h1>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
-            {(isMobile ? (['week', 'agenda'] as CalendarViewType[]) : (['month', 'week', 'agenda'] as CalendarViewType[])).map(v => (
+      <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+          {(['month', 'week', 'agenda'] as CalendarViewType[]).map(v => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -84,7 +84,7 @@ const goNext = () => {
       {view === 'month' && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
           <div className="grid grid-cols-7 border-b border-gray-200 shrink-0">
-            {weekDays.map(day => (
+            {(isMobile ? ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'] : weekDays).map(day => (
               <div key={day} className="px-2 py-2 text-xs font-semibold text-gray-500 text-center">{day}</div>
             ))}
           </div>
