@@ -35,7 +35,10 @@ const ENV_LABEL: Record<string, string> = {
 };
 
 export default function MiniCalendar({ actions, selectedDate, onSelectDate, campaigns = [], strategicDates = [], onOpenCalendar }: MiniCalendarProps) {
-  const [currentMonth, setCurrentMonth] = useState(() => new Date(selectedDate + 'T00:00:00'));
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const d = new Date(selectedDate + 'T00:00:00');
+    return isNaN(d.getTime()) ? new Date() : d;
+  });
   const [slide, setSlide] = useState<1 | -1 | 0>(0);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [modalDate, setModalDate] = useState<string | null>(null);

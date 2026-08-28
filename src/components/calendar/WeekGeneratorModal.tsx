@@ -35,15 +35,15 @@ export default function WeekGeneratorModal({
   activeCampaigns,
   channels = [],
 }: WeekGeneratorModalProps) {
+  const minWeekStart = formatCalendarDate(addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 7));
+
   const [result, setResult] = useState<WeekGeneratorResult | null>(null);
-  const [weekStart, setWeekStart] = useState<string>('');
+  const [weekStart, setWeekStart] = useState<string>(minWeekStart);
   const [locked, setLocked] = useState<Set<number>>(new Set());
   const { create } = useActions({});
   const [saving, setSaving] = useState(false);
   const [selectedPillars, setSelectedPillars] = useState<Set<string>>(new Set());
 
-  // Próxima segunda-feira (limite mínimo do período)
-  const minWeekStart = formatCalendarDate(addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 7));
   const isCurrentWeek = weekStart === minWeekStart;
 
   // Inicializa com os pilares ativos + semana padrão ao abrir
