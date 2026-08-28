@@ -3,12 +3,13 @@ import { GeneratedAction, WeekGeneratorResult, EditorialProfile, EditorialPillar
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
+import Input from '@/components/ui/Input';
 import { CONTENT_FORMATS, OBJECTIVES } from '@/lib/constants';
 import { generateWeek } from '@/lib/weekGenerator';
 import { useActions } from '@/hooks/useActions';
 import { formatCalendarDate, addDays, startOfWeek, parseISO, format } from '@/lib/dateUtils';
 import { toast } from 'sonner';
-import { Sparkles, Check, X, RefreshCw, Lock, Unlock, ChevronLeft, ChevronRight, AlertTriangle, BarChart3, Layers } from 'lucide-react';
+import { Sparkles, Check, X, RefreshCw, Lock, Unlock, ChevronLeft, ChevronRight, AlertTriangle, BarChart3, Layers, Clock } from 'lucide-react';
 
 interface WeekGeneratorModalProps {
   isOpen: boolean;
@@ -39,6 +40,8 @@ export default function WeekGeneratorModal({
 
   const [result, setResult] = useState<WeekGeneratorResult | null>(null);
   const [weekStart, setWeekStart] = useState<string>(minWeekStart);
+  const [pubStart, setPubStart] = useState<string>('08:00');
+  const [pubEnd, setPubEnd] = useState<string>('18:00');
   const [locked, setLocked] = useState<Set<number>>(new Set());
   const { create } = useActions({});
   const [saving, setSaving] = useState(false);
@@ -79,6 +82,11 @@ export default function WeekGeneratorModal({
       return;
     }
 
+    if (!pubStart || !pubEnd || pubEnd <= pubStart) {
+      toast.error('Defina a janela de publicações corretamente (início antes do término).');
+      return;
+    }
+
     const filteredPillars = pillars.filter(p => selectedPillars.has(p.id));
     const recentFormats = existingActions.map(a => a.format).filter(Boolean) as ContentFormat[];
     const recentPillars = existingActions.map(a => a.editorial_pillar_id).filter(Boolean) as string[];
@@ -95,6 +103,8 @@ export default function WeekGeneratorModal({
       recentObjectives,
       channels,
       weekStart: weekStartDate,
+      pubStart,
+      pubEnd,
     });
 
     setResult(generated);
@@ -121,6 +131,8 @@ export default function WeekGeneratorModal({
       recentObjectives: keptObjectives,
       channels,
       weekStart: weekStartDate,
+      pubStart,
+      pubEnd,
     });
 
     // Merge: locked actions stay, unlocked replaced
@@ -214,6 +226,36 @@ export default function WeekGeneratorModal({
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
             <p className="text-sm text-amber-900">
               Este cliente ainda não possui perfil editorial. Configure em <strong>Linha Editorial</strong>.
+            </p>
+          </div>
+        )}
+
+        {/* Publication window */}
+        {profile && !result && (
+          <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg p-3 flex-wrap">
+            <div className="flex items-center gap-1.5 text-gray-600">
+              <Clock className="w-4 h-4 text-gray-400" />
+              <span className="text-xs font-medium">Horários das publicações</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="time"
+                value={pubStart}
+                onChange={e => setPubStart(e.target.value)}
+                className="w-auto px-2 py-1.5 text-sm"
+                aria-label="Início das publicações"
+              />
+              <span className="text-xs text-gray-400">até</span>
+              <Input
+                type="time"
+                value={pubEnd}
+                onChange={e => setPubEnd(e.target.value)}
+                className="w-auto px-2 py-1.5 text-sm"
+                aria-label="Término das publicações"
+              />
+            </div>
+            <p className="text-[10px] text-gray-400 w-full sm:w-auto">
+              As ações da semana são distribuídas dentro dessa janela.
             </p>
           </div>
         )}
