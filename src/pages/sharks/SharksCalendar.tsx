@@ -434,7 +434,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
         {view === 'week' && (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
             <div className="flex-1 min-h-0 overflow-auto">
-              <div className={cn('h-full flex flex-col', isMobile && 'min-w-[720px]')}>
+              <div className={cn('min-h-full flex flex-col', isMobile && 'min-w-[720px]')}>
                 <div className="sticky top-0 z-10 bg-white grid grid-cols-7 border-b border-gray-200 shrink-0">
                   {weekDayWindow.map((day, i) => (
                     <div key={i} className="px-2 py-3 text-center border-r last:border-r-0">
