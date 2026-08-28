@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import { Action } from '@/types';
 import { cn } from '@/lib/utils';
 import { FORMAT_COLORS, ACTION_STATUSES, ACTION_STATUS_DOT_CLASSES } from '@/lib/constants';
 import { isOverdue } from '@/lib/dateUtils';
 import { GripVertical, Megaphone, Clock, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 
-interface CalendarEventProps {
+export interface CalendarEventProps {
   action: Action;
   onClick: () => void;
   onQuickStatus?: (action: Action, status: Action['status']) => void;
@@ -23,7 +23,10 @@ const NEXT_STATUS: Record<string, { status: Action['status']; label: string; ico
   scheduled: { status: 'published', label: 'Publicar', icon: CheckCircle2 },
 };
 
-export default function CalendarEvent({ action, onClick, onQuickStatus, compact, showTime, showClient, isDragging }: CalendarEventProps) {
+const CalendarEvent = forwardRef<HTMLButtonElement, CalendarEventProps>(function CalendarEvent(
+  { action, onClick, onQuickStatus, compact, showTime, showClient, isDragging },
+  ref
+) {
   const [hovered, setHovered] = useState(false);
   const formatLabel = action.format || action.action_type;
   const clientName = action.workspace?.name;
@@ -40,6 +43,7 @@ export default function CalendarEvent({ action, onClick, onQuickStatus, compact,
       onMouseLeave={() => setHovered(false)}
     >
       <button
+        ref={ref}
         onClick={onClick}
         draggable
         className={cn(
@@ -169,4 +173,6 @@ export default function CalendarEvent({ action, onClick, onQuickStatus, compact,
       )}
     </div>
   );
-}
+});
+
+export default CalendarEvent;

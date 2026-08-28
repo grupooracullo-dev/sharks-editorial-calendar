@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Action, CalendarViewType, EnvironmentType } from '@/types';
-import { cn } from '@/lib/utils';
+import { cn, formatWeekdayShort } from '@/lib/utils';
 import { getCalendarDays, isSameMonth, isSameDay, formatCalendarDate, format, ptBR, addDays, startOfWeek } from '@/lib/dateUtils';
 import { isOverdue } from '@/lib/dateUtils';
 import { useActions } from '@/hooks/useActions';
@@ -435,23 +435,23 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
         {/* Week View */}
         {view === 'week' && (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
-            <div className={cn(
-              'grid border-b border-gray-200 shrink-0',
-              isMobile ? 'grid-cols-3' : 'grid-cols-7'
-            )}>
-              {weekDayWindow.map((day, i) => (
-                <div key={i} className="px-2 py-3 text-center border-r last:border-r-0">
-                  <p className="text-xs text-gray-500">{isMobile ? format(day, 'EEE', { locale: ptBR }) : weekDays[i]}</p>
-                  <p className={cn(
-                    'text-lg font-semibold',
-                    isSameDay(day, new Date()) ? 'text-primary-500' : 'text-gray-900'
-                  )}>
-                    {day.getDate()}
-                  </p>
-                </div>
-              ))}
-            </div>
             <div className="flex-1 min-h-0 overflow-y-auto">
+              <div className={cn(
+                'sticky top-0 z-10 bg-white grid border-b border-gray-200',
+                isMobile ? 'grid-cols-3' : 'grid-cols-7'
+              )}>
+                {weekDayWindow.map((day, i) => (
+                  <div key={i} className="px-2 py-3 text-center border-r last:border-r-0">
+                    <p className="text-xs text-gray-500">{isMobile ? formatWeekdayShort(day) : weekDays[i]}</p>
+                    <p className={cn(
+                      'text-lg font-semibold',
+                      isSameDay(day, new Date()) ? 'text-primary-500' : 'text-gray-900'
+                    )}>
+                      {day.getDate()}
+                    </p>
+                  </div>
+                ))}
+              </div>
               <div className={cn(
                 'grid',
                 isMobile ? 'grid-cols-3' : 'grid-cols-7'
@@ -471,11 +471,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                     <div
                       key={i}
                       id={dateStr}
-                      onClick={() => { if (dayActions.length === 0) handleCreateAtDate(dateStr); }}
-                      className={cn(
-                        'border-r last:border-r-0 p-1.5 sm:p-2 space-y-1 sm:space-y-2 min-h-0',
-                        dayActions.length === 0 && 'cursor-pointer'
-                      )}
+                      className="border-r last:border-r-0 p-1.5 sm:p-2 space-y-1 sm:space-y-2 min-h-0"
                     >
                       {dayStrategic.length > 0 && (
                         <div className="flex flex-col gap-0.5">
@@ -514,6 +510,14 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                           showClient={isAdmin}
                         />
                       ))}
+                      {dayActions.length === 0 && (
+                        <button
+                          onClick={() => handleCreateAtDate(dateStr)}
+                          className="w-full text-center text-[10px] text-gray-300 hover:text-gray-500 hover:bg-gray-50 rounded-md py-1.5 transition-colors"
+                        >
+                          + Nova ação
+                        </button>
+                      )}
                     </div>
                   );
                 })}

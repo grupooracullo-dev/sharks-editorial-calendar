@@ -11,7 +11,7 @@ import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import Card from '@/components/ui/Card';
 import { CONTENT_FORMATS, OBJECTIVES } from '@/lib/constants';
-import { cn } from '@/lib/utils';
+import { cn, formatWeekdayShort } from '@/lib/utils';
 import { formatCalendarDate, getCalendarDays, isSameMonth, isSameDay, format, ptBR, addMonths, subMonths, addDays, startOfWeek } from '@/lib/dateUtils';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
@@ -188,17 +188,17 @@ export default function ClientCalendar() {
       {/* Week view (read-only) */}
       {view === 'week' && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
-          <div className={cn('grid border-b border-gray-100 shrink-0', isMobile ? 'grid-cols-3' : 'grid-cols-7')}>
-            {weekDayWindow.map((day, i) => (
-              <div key={i} className="py-2 text-center border-r last:border-r-0">
-                <p className="text-xs text-gray-500">{isMobile ? format(day, 'EEE', { locale: ptBR }) : weekDays[i]}</p>
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className={cn('sticky top-0 z-10 bg-white grid border-b border-gray-100', isMobile ? 'grid-cols-3' : 'grid-cols-7')}>
+              {weekDayWindow.map((day, i) => (
+                <div key={i} className="py-2 text-center border-r last:border-r-0">
+                  <p className="text-xs text-gray-500">{isMobile ? formatWeekdayShort(day) : weekDays[i]}</p>
                 <p className={cn('font-semibold', isSameDay(day, new Date()) ? 'text-primary-600' : 'text-gray-900')}>
                   {day.getDate()}
                 </p>
               </div>
             ))}
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto">
             <div className={cn('grid', isMobile ? 'grid-cols-3' : 'grid-cols-7')}>
               {weekDayWindow.map((day, i) => {
                 const dateStr = formatCalendarDate(day);
