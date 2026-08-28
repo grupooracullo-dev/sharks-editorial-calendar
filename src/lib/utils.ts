@@ -1,5 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -82,4 +84,8 @@ export function getMonthName(monthIndex: number): string {
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
   ];
   return months[monthIndex];
+}
+
+export function formatWeekdayShort(date: Date): string {
+  return format(date, 'EEE', { locale: ptBR });
 }

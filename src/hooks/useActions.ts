@@ -4,6 +4,7 @@ import {
   getActions,
   subscribeToActions,
   reloadActions,
+  getActionsLoadStatus,
   createAction,
   updateAction,
   deleteAction,
@@ -13,14 +14,19 @@ import {
   getPendingActions,
 } from '@/lib/actionService';
 
+export type ActionsLoadStatus = 'idle' | 'loading' | 'success' | 'error';
+
 export function useActions(filters?: ActionFilters) {
   const [actions, setActions] = useState<Action[]>(() => getActions(filters));
+  const [loadStatus, setLoadStatus] = useState<ActionsLoadStatus>('idle');
 
   useEffect(() => {
     setActions(getActions(filters));
+    setLoadStatus(getActionsLoadStatus());
 
     const unsubscribe = subscribeToActions(() => {
       setActions(getActions(filters));
+      setLoadStatus(getActionsLoadStatus());
     });
 
     return unsubscribe;
@@ -31,6 +37,7 @@ export function useActions(filters?: ActionFilters) {
 
   return {
     actions,
+    loadStatus,
     create: createAction,
     update: updateAction,
     remove: deleteAction,

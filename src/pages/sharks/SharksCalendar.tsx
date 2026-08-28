@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Action, CalendarViewType, EnvironmentType } from '@/types';
-import { cn } from '@/lib/utils';
-import { getCalendarDays, isSameMonth, isSameDay, formatCalendarDate, format, ptBR } from '@/lib/dateUtils';
+import { cn, formatWeekdayShort } from '@/lib/utils';
+import { getCalendarDays, isSameMonth, isSameDay, formatCalendarDate, format, ptBR, addDays, startOfWeek } from '@/lib/dateUtils';
 import { isOverdue } from '@/lib/dateUtils';
 import { useActions } from '@/hooks/useActions';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -54,7 +54,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
     environment,
   }), [currentWorkspace?.id, filters.format, filters.status, filters.objective, environment]);
 
-  const { actions, update, remove, create } = useActions(filterObj);
+  const { actions, update, remove, create, loadStatus } = useActions(filterObj);
   const { pillars, profile } = useEditorial(currentWorkspace?.id);
   const activeCampaigns = useActiveCampaigns(currentWorkspace?.id);
   const { dates: strategicDates } = useStrategicDates(currentWorkspace?.id);
@@ -169,6 +169,12 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
   const calendarDays = getCalendarDays(currentDate);
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   const monthLabel = format(currentDate, 'MMMM yyyy', { locale: ptBR });
+
+  // Janela exibida na view Semana: 3 dias (mobile) ou a semana inteira (desktop),
+  // sempre ancorada no currentDate — navegação ±weekStep funciona em qualquer ponto do mês.
+  const weekDayWindow = isMobile
+    ? [0, 1, 2].map(i => addDays(currentDate, i))
+    : Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(currentDate, { weekStartsOn: 0 }), i));
 
   const views: { id: CalendarViewType; label: string }[] = isMobile
     ? [
@@ -429,86 +435,95 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
         {/* Week View */}
         {view === 'week' && (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
-            <div className={cn(
-              'grid border-b border-gray-200 shrink-0',
-              isMobile ? 'grid-cols-3' : 'grid-cols-7'
-            )}>
-              {(isMobile ? calendarDays.slice(0, 3) : calendarDays.slice(0, 7)).map((day, i) => (
-                <div key={i} className="px-2 py-3 text-center border-r last:border-r-0">
-                  <p className="text-xs text-gray-500">{isMobile ? format(day, 'EEE', { locale: ptBR }) : weekDays[i]}</p>
-                  <p className={cn(
-                    'text-lg font-semibold',
-                    isSameDay(day, new Date()) ? 'text-primary-500' : 'text-gray-900'
-                  )}>
-                    {day.getDate()}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <div className={cn(
-              'grid flex-1 min-h-0',
-              isMobile ? 'grid-cols-3' : 'grid-cols-7'
-            )}>
-              {(isMobile ? calendarDays.slice(0, 3) : calendarDays.slice(0, 7)).map((day, i) => {
-                const dateStr = formatCalendarDate(day);
-                const dayActions = actions.filter(a => a.action_date === dateStr);
-                const dayCampaigns = activeCampaigns.filter(c => {
-                  if (!c.start_date) return false;
-                  const start = c.start_date;
-                  const end = c.end_date || c.start_date;
-                  return dateStr >= start && dateStr <= end;
-                });
-                const dayStrategic = strategicDates.filter(s => s.date === dateStr);
-
-                return (
-                  <div
-                    key={i}
-                    id={dateStr}
-                    onClick={() => { if (dayActions.length === 0) handleCreateAtDate(dateStr); }}
-                    className={cn(
-                      'border-r last:border-r-0 p-1.5 sm:p-2 space-y-1 sm:space-y-2 min-h-0 overflow-y-auto',
-                      dayActions.length === 0 && 'cursor-pointer'
-                    )}
-                  >
-                    {dayStrategic.length > 0 && (
-                      <div className="flex flex-col gap-0.5">
-                        {dayStrategic.map(s => (
-                          <div key={s.id} className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-50 border border-amber-200" title={s.description || s.title}>
-                            <span className="text-[8px] text-amber-600 font-medium truncate">{s.title}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {dayCampaigns.length > 0 && (
-                      <div className="flex flex-col gap-0.5">
-                        {dayCampaigns.map(c => (
-                          <div
-                            key={c.id}
-                            className="flex items-center gap-1 px-1.5 py-0.5 rounded-md"
-                            style={{ backgroundColor: `${c.color || '#3B82F6'}1F` }}
-                            title={`${c.name}${c.start_date ? ` · ${c.start_date.split('-').reverse().join('/')} → ${(c.end_date || c.start_date).split('-').reverse().join('/')}` : ''}`}
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.color || '#3B82F6' }} />
-                            <span className="text-[9px] font-semibold truncate" style={{ color: c.color || '#3B82F6' }}>
-                              🏁 {c.name}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {dayActions.map(action => (
-                      <CalendarEvent
-                        key={action.id}
-                        action={action}
-                        onClick={() => handleActionClick(action)}
-                        onQuickStatus={handleQuickStatus}
-                        compact={isMobile}
-                        showClient={isAdmin}
-                      />
-                    ))}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <div className={cn(
+                'sticky top-0 z-10 bg-white grid border-b border-gray-200',
+                isMobile ? 'grid-cols-3' : 'grid-cols-7'
+              )}>
+                {weekDayWindow.map((day, i) => (
+                  <div key={i} className="px-2 py-3 text-center border-r last:border-r-0">
+                    <p className="text-xs text-gray-500">{isMobile ? formatWeekdayShort(day) : weekDays[i]}</p>
+                    <p className={cn(
+                      'text-lg font-semibold',
+                      isSameDay(day, new Date()) ? 'text-primary-500' : 'text-gray-900'
+                    )}>
+                      {day.getDate()}
+                    </p>
                   </div>
-                );
-              })}
+                ))}
+              </div>
+              <div className={cn(
+                'grid',
+                isMobile ? 'grid-cols-3' : 'grid-cols-7'
+              )}>
+                {weekDayWindow.map((day, i) => {
+                  const dateStr = formatCalendarDate(day);
+                  const dayActions = actions.filter(a => a.action_date === dateStr);
+                  const dayCampaigns = activeCampaigns.filter(c => {
+                    if (!c.start_date) return false;
+                    const start = c.start_date;
+                    const end = c.end_date || c.start_date;
+                    return dateStr >= start && dateStr <= end;
+                  });
+                  const dayStrategic = strategicDates.filter(s => s.date === dateStr);
+
+                  return (
+                    <div
+                      key={i}
+                      id={dateStr}
+                      className="border-r last:border-r-0 p-1.5 sm:p-2 space-y-1 sm:space-y-2 min-h-0"
+                    >
+                      {dayStrategic.length > 0 && (
+                        <div className="flex flex-col gap-0.5">
+                          {dayStrategic.map(s => (
+                            <div key={s.id} className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-50 border border-amber-200" title={s.description || s.title}>
+                              <span className="text-[8px] text-amber-600 font-medium truncate">{s.title}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {dayCampaigns.length > 0 && (
+                        <div className="flex flex-col gap-0.5">
+                          {dayCampaigns.map(c => (
+                            <div
+                              key={c.id}
+                              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md"
+                              style={{ backgroundColor: `${c.color || '#3B82F6'}1F` }}
+                              title={`${c.name}${c.start_date ? ` · ${c.start_date.split('-').reverse().join('/')} → ${(c.end_date || c.start_date).split('-').reverse().join('/')}` : ''}`}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.color || '#3B82F6' }} />
+                              <span className="text-[9px] font-semibold truncate" style={{ color: c.color || '#3B82F6' }}>
+                                🏁 {c.name}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {dayActions.map(action => (
+                        <CalendarEvent
+                          key={action.id}
+                          action={action}
+                          onClick={() => handleActionClick(action)}
+                          onQuickStatus={handleQuickStatus}
+                          compact={isMobile}
+                          showTime={isMobile}
+                          showClient={isAdmin}
+                        />
+                      ))}
+                      {dayActions.length === 0 && loadStatus === 'success' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCreateAtDate(dateStr)}
+                          className="w-full text-[10px] text-gray-300 hover:text-gray-500 py-1 px-1"
+                        >
+                          + Nova ação
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
