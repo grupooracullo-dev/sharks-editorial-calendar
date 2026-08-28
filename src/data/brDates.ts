@@ -11,6 +11,8 @@ export type DateScope = 'national' | 'state' | 'city' | 'segment';
 export interface StrategicDateDraft {
   title: string;
   date: string; // yyyy-MM-dd
+  start_date?: string; // yyyy-MM-dd (para períodos como "Setembro Amarelo")
+  end_date?: string;   // yyyy-MM-dd
   locality: 'national' | 'state' | 'city';
   category: 'holiday' | 'commercial' | 'segment' | 'custom';
   relevance: 'high' | 'medium' | 'low';
@@ -188,6 +190,32 @@ const SEGMENT_FIXED: FixedDef[] = [
   { title: 'Dia da Moda', month: 10, day: 22, scope: 'segment', category: 'segment', relevance: 'low', segments: ['Varejo', 'Beleza'] },
 ];
 
+// ---------- Meses estratégicos (períodos inteiros) ----------
+
+interface MonthlyPeriod {
+  title: string;
+  month: number; // 1-12
+  category: StrategicDateDraft['category'];
+  relevance: StrategicDateDraft['relevance'];
+  description: string;
+  color?: string; // cor temática para UI
+}
+
+const MONTHLY_PERIODS: MonthlyPeriod[] = [
+  { title: 'Janeiro Branco', month: 1, category: 'segment', relevance: 'medium', description: 'Mês da Saúde Mental — conscientização e combate ao estigma', color: '#FFFFFF' },
+  { title: 'Fevereiro Lilás', month: 2, category: 'segment', relevance: 'medium', description: 'Mês de Combate à Violência contra a Mulher', color: '#C8A2C8' },
+  { title: 'Março Violeta', month: 3, category: 'segment', relevance: 'medium', description: 'Mês da Mulher — conquistas e igualdade', color: '#8B5CF6' },
+  { title: 'Abril Azul', month: 4, category: 'segment', relevance: 'medium', description: 'Mês do Autismo — conscientização e inclusão', color: '#3B82F6' },
+  { title: 'Maio Lilás', month: 5, category: 'segment', relevance: 'medium', description: 'Mês da Consciência sobre o Câncer de Pele', color: '#A855F7' },
+  { title: 'Junho Lilás', month: 6, category: 'segment', relevance: 'high', description: 'Mês de Combate à Violência contra a Mulher', color: '#C084FC' },
+  { title: 'Julho Amarelo', month: 7, category: 'segment', relevance: 'medium', description: 'Mês da Conscientização sobre Deficiência', color: '#EAB308' },
+  { title: 'Agosto Dourado', month: 8, category: 'segment', relevance: 'medium', description: 'Mês do Idoso — valorização e respeito', color: '#F59E0B' },
+  { title: 'Setembro Amarelo', month: 9, category: 'segment', relevance: 'high', description: 'Mês da Prevenção ao Suicídio — acolhimento e conscientização', color: '#FBBF24' },
+  { title: 'Outubro Rosa', month: 10, category: 'segment', relevance: 'high', description: 'Mês da Prevenção ao Câncer de Mama — exames e autoexame', color: '#EC4899' },
+  { title: 'Novembro Azul', month: 11, category: 'segment', relevance: 'high', description: 'Mês da Prevenção ao Câncer de Próstata — check-up masculino', color: '#3B82F6' },
+  { title: 'Dezembro Vermelho', month: 12, category: 'segment', relevance: 'high', description: 'Mês da Prevenção e Combate à AIDS/HIV', color: '#EF4444' },
+];
+
 // ---------- UF + normalização ----------
 
 export const BR_STATES: { value: string; label: string }[] = [
@@ -236,6 +264,24 @@ function defToDraft(d: FixedDef): StrategicDateDraft {
     category: d.scope === 'segment' ? 'segment' : d.category,
     relevance: d.relevance,
     description: d.description ?? null,
+    is_recurring: true,
+  };
+}
+
+function monthPeriodToDraft(p: MonthlyPeriod, year: number): StrategicDateDraft {
+  const startDate = fmt(new Date(Date.UTC(year, p.month - 1, 1)));
+  // Último dia do mês
+  const lastDay = new Date(Date.UTC(year, p.month, 0)).getUTCDate();
+  const endDate = fmt(new Date(Date.UTC(year, p.month - 1, lastDay)));
+  return {
+    title: p.title,
+    date: startDate, // date = start_date para compatibilidade
+    start_date: startDate,
+    end_date: endDate,
+    locality: 'national',
+    category: p.category,
+    relevance: p.relevance,
+    description: p.description,
     is_recurring: true,
   };
 }
@@ -315,6 +361,19 @@ export function detectDatesForClient(opts: DetectOptions): DetectResult {
   if (seg) {
     for (const def of [...SEGMENT_FIXED, ...NATIONAL_FIXED.filter(d => d.scope === 'segment')]) {
       if (def.segments?.includes(seg)) push(defToDraft(def));
+    }
+  }
+
+  // 6) Meses estratégicos (períodos inteiros)
+  const currentYear = new Date().getUTCFullYear();
+  for (const period of MONTHLY_PERIODS) {
+    // Inclui mês atual e próximo ano
+    for (const y of [currentYear, currentYear + 1]) {
+      const draft = monthPeriodToDraft(period, y);
+      // Inclui apenas períodos futuros ou em andamento
+      if (draft.end_date && draft.end_date >= fmt(new Date())) {
+        push(draft);
+      }
     }
   }
 

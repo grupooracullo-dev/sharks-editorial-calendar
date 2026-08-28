@@ -15,9 +15,9 @@ import { addDays, startOfWeek, format } from 'date-fns';
 import { CONTENT_FORMATS, OBJECTIVES, FORMAT_ZONES } from '@/lib/constants';
 
 // ==========================================
-// WEEK GENERATOR v2
-// Cobertura de pilares, justificativas, times distribuídos,
-// canais reais, inteligência de sinais recentes.
+// WEEK GENERATOR v3
+// Multi-slot por dia, títulos contextuais,
+// meses estratégicos, anti-repetição avançada.
 // ==========================================
 
 interface GeneratorInput {
@@ -30,7 +30,7 @@ interface GeneratorInput {
   recentPillars: string[];
   recentObjectives: Objective[];
   channels: string[];
-  weeksAhead?: number;      // default 1
+  weeksAhead?: number;
 }
 
 // ---------- helpers ----------
@@ -71,11 +71,24 @@ function pickWeighted<T extends string>(
 
 // ---------- strategic date matching ----------
 
-function findStrategic(dateStr: string, dates: StrategicDate[]): StrategicDate | undefined {
-  return dates.find(d => d.date === dateStr);
+function findStrategicForDate(dateStr: string, dates: StrategicDate[]): StrategicDate | undefined {
+  // Busca exata (data pontual)
+  const exact = dates.find(d => d.date === dateStr && !d.start_date);
+  if (exact) return exact;
+
+  // Busca por período (start_date <= dateStr <= end_date)
+  const period = dates.find(d => {
+    if (!d.start_date || !d.end_date) return false;
+    return dateStr >= d.start_date && dateStr <= d.end_date;
+  });
+  return period;
 }
 
 function strategicTitlePrefix(sd: StrategicDate): string {
+  // Período mensal: usa o nome do mês
+  if (sd.start_date && sd.end_date) {
+    return `Conteúdo ${sd.title}`;
+  }
   if (sd.relevance === 'high') return `Aproveite a data: ${sd.title}`;
   return `${sd.title}`;
 }
@@ -112,12 +125,99 @@ function getFunnelStage(objective: Objective): FunnelStage {
   return map[objective] || 'discovery';
 }
 
-// ---------- slot allocation (pillar % respect) ----------
+// ---------- contextual title templates ----------
+
+type TimeSlot = 'morning' | 'afternoon' | 'evening';
+
+function getTimeSlot(time: string): TimeSlot {
+  const hour = parseInt(time.split(':')[0], 10);
+  if (hour < 12) return 'morning';
+  if (hour < 18) return 'afternoon';
+  return 'evening';
+}
+
+const GREETING_TEMPLATES: Record<TimeSlot, string[]> = {
+  morning: [
+    'Bom Dia',
+    'Bom Dia Institucional',
+    'Dica do Dia',
+    'Bom Dia com',
+    'Comece o Dia com',
+  ],
+  afternoon: [
+    'Boa Tarde',
+    'Saiba Mais',
+    'Curiosidade do Dia',
+    'Boa Tarde com',
+    'Conteúdo do Dia',
+  ],
+  evening: [
+    'Boa Noite',
+    'Reflexão do Dia',
+    'Resumo do Dia',
+    'Boa Noite com',
+    'Encerramento do Dia',
+  ],
+};
+
+const PILLAR_THEMES: Record<string, string[]> = {
+  'Essência da Marca': ['valores', 'propósito', 'identidade', 'cultura', 'missão'],
+  'Geomarketing': ['região', 'local', 'presença', 'comunidade', 'território'],
+  'Público Alvo e Persona': ['persona', 'público', 'segmento', 'perfil', 'audiência'],
+  'Posicionamento': ['diferencial', 'posição', 'valor', 'percepção', 'mindshare'],
+  'Branding': ['marca', 'reconhecimento', 'imagem', 'consistência', 'visual'],
+  'Objetivo de Marketing': ['meta', 'resultado', 'conversão', 'crescimento', 'performance'],
+};
+
+function generateContextualTitle(
+  format: ContentFormat,
+  pillarName: string,
+  objective: Objective,
+  time: string,
+  sd?: StrategicDate,
+  channel?: string,
+): string {
+  const formatLabel = CONTENT_FORMATS[format] || format;
+  const ch = channel || 'Instagram';
+  const timeSlot = getTimeSlot(time);
+
+  // Data estratégica (pontual ou período)
+  if (sd) {
+    const prefix = strategicTitlePrefix(sd);
+    const templates = [
+      `${prefix} — ${formatLabel}`,
+      `${prefix} para ${ch}`,
+      `${prefix} — ${pillarName}`,
+      `${prefix}: ${formatLabel} ${ch}`,
+    ];
+    return templates[Math.floor(Math.random() * templates.length)];
+  }
+
+  // Título contextual baseado no horário + pilar
+  const greetings = GREETING_TEMPLATES[timeSlot];
+  const themes = PILLAR_THEMES[pillarName] || ['conteúdo'];
+  const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+  const theme = themes[Math.floor(Math.random() * themes.length)];
+
+  const templates = [
+    `${greeting} — ${pillarName}`,
+    `${greeting}: ${formatLabel} sobre ${theme}`,
+    `${greeting} com ${pillarName}`,
+    `${formatLabel} de ${pillarName} para ${ch}`,
+    `${pillarName} — ${formatLabel} ${ch}`,
+    `${theme.charAt(0).toUpperCase() + theme.slice(1)}: ${formatLabel} ${pillarName}`,
+  ];
+
+  return templates[Math.floor(Math.random() * templates.length)];
+}
+
+// ---------- slot allocation (multi-slot per day) ----------
 
 interface SlotAllocation {
   dateStr: string;
   dayLabel: string;
-  pillarId: string | null; // null = livre
+  time: string;
+  pillarId: string | null;
   strategicDate?: StrategicDate;
   campaignId: string | null;
 }
@@ -125,26 +225,61 @@ interface SlotAllocation {
 function allocateSlots(
   weekDates: Date[],
   allowedDays: number[],
-  frequency: number,
+  totalFrequency: number,
   pillars: EditorialPillar[],
   distribution: Record<string, number>,
   strategicDates: StrategicDate[],
   activeCampaigns: Campaign[],
-  existingActions: Action[],
-  recentPillars: string[],
+  preferredTimes: string[],
 ): SlotAllocation[] {
   const activePillars = pillars.filter(p => p.is_active);
   if (activePillars.length === 0) return [];
 
-  // Days available (only allowed + weekend excluded)
-  const availableDays = weekDates
-    .filter(d => allowedDays.includes(d.getDay()))
-    .slice(0, frequency);
-
+  // Dias disponíveis na semana
+  const availableDays = weekDates.filter(d => allowedDays.includes(d.getDay()));
   if (availableDays.length === 0) return [];
 
-  // Compute pillar targets (how many slots per pillar)
-  const totalTarget = availableDays.length;
+  // Slots por dia = total / dias disponíveis (mínimo 1)
+  const slotsPerDay = Math.max(1, Math.ceil(totalFrequency / availableDays.length));
+
+  // Horários: expandir preferred_times para cobrir todos os slots
+  const times = preferredTimes.length > 0
+    ? preferredTimes
+    : ['09:00', '11:00', '14:00', '16:00', '18:00'];
+
+  // Mapa de datas estratégicas
+  const strategicMap = new Map<string, StrategicDate>();
+  strategicDates.forEach(sd => {
+    if (sd.start_date && sd.end_date) {
+      // Período: marca todos os dias do período
+      let current = new Date(sd.start_date + 'T00:00:00Z');
+      const end = new Date(sd.end_date + 'T00:00:00Z');
+      while (current <= end) {
+        const ds = format(current, 'yyyy-MM-dd');
+        strategicMap.set(ds, sd);
+        current = addDays(current, 1);
+      }
+    } else {
+      strategicMap.set(sd.date, sd);
+    }
+  });
+
+  // Mapa de campanhas
+  const campaignMap = new Map<string, string | null>();
+  activeCampaigns.forEach(c => {
+    if (c.start_date && c.end_date) {
+      let current = new Date(c.start_date + 'T00:00:00Z');
+      const end = new Date(c.end_date + 'T00:00:00Z');
+      while (current <= end) {
+        const ds = format(current, 'yyyy-MM-dd');
+        campaignMap.set(ds, c.id);
+        current = addDays(current, 1);
+      }
+    }
+  });
+
+  // Distribuir targets dos pillars
+  const totalTarget = Math.min(totalFrequency, availableDays.length * slotsPerDay);
   const pillarTargets: { id: string; name: string; target: number }[] = [];
   let assigned = 0;
   for (const p of activePillars) {
@@ -154,86 +289,52 @@ function allocateSlots(
     assigned += target;
     pillarTargets.push({ id: p.id, name: p.name, target });
   }
-  // Normalize if sum > totalTarget
+  // Normalizar se somar > total
   while (assigned > totalTarget && pillarTargets.length > 1) {
     const max = pillarTargets.reduce((a, b) => (a.target > b.target ? a : b));
     if (max.target > 1) { max.target--; assigned--; }
     else break;
   }
 
-  // Build slots: one per day, assign pillar
-  const existingByDate = new Map<string, boolean>();
-  existingActions.forEach(a => {
-    if (a.status !== 'cancelled') existingByDate.set(a.action_date, true);
-  });
-
-  // First pass: assign strategic dates and campaigns to their days
-  const strategicMap = new Map<string, StrategicDate>();
-  strategicDates.forEach(sd => strategicMap.set(sd.date, sd));
-  const campaignMap = new Map<string, string | null>();
-  activeCampaigns.forEach(c => {
-    if (c.start_date && c.end_date) {
-      for (const d of weekDates) {
-        const ds = format(d, 'yyyy-MM-dd');
-        if (ds >= c.start_date && ds <= c.end_date) campaignMap.set(ds, c.id);
-      }
-    }
-  });
-
+  // Criar slots
   const slots: SlotAllocation[] = [];
+  const pillarCounts = new Map<string, number>();
+  activePillars.forEach(p => pillarCounts.set(p.id, 0));
+
   for (const d of availableDays) {
     const ds = format(d, 'yyyy-MM-dd');
     const sd = strategicMap.get(ds);
     const cid = campaignMap.get(ds) ?? null;
-    slots.push({ dateStr: ds, dayLabel: dayLabel(d), pillarId: null, strategicDate: sd, campaignId: cid });
-  }
 
-  // Fill pillar slots: first slots get the strategic-date pillar (or most under-represented)
-  const pillarCounts = new Map<string, number>();
-  activePillars.forEach(p => pillarCounts.set(p.id, 0));
+    for (let s = 0; s < slotsPerDay && slots.length < totalTarget; s++) {
+      const time = times[s % times.length];
 
-  for (const slot of slots) {
-    // Pick pillar: if strategic date → strongest available; else weighted random
-    if (activePillars.length > 0) {
-      const scored = activePillars.map(p => {
-        const target = pillarTargets.find(pt => pt.id === p.id)?.target ?? 1;
-        const count = pillarCounts.get(p.id) ?? 0;
-        const deficit = target - count;
-        return { pillar: p, score: deficit * 3 + scoreItem(p.id, recentPillars, 0.2) };
+      // Atribuir pilar: preferir pilar com mais déficit
+      let pillarId: string | null = null;
+      if (activePillars.length > 0) {
+        const scored = activePillars.map(p => {
+          const target = pillarTargets.find(pt => pt.id === p.id)?.target ?? 1;
+          const count = pillarCounts.get(p.id) ?? 0;
+          const deficit = target - count;
+          return { pillar: p, score: deficit * 3 + Math.random() * 0.5 };
+        });
+        scored.sort((a, b) => b.score - a.score);
+        pillarId = scored[0].pillar.id;
+        pillarCounts.set(scored[0].pillar.id, (pillarCounts.get(scored[0].pillar.id) ?? 0) + 1);
+      }
+
+      slots.push({
+        dateStr: ds,
+        dayLabel: dayLabel(d),
+        time,
+        pillarId,
+        strategicDate: sd,
+        campaignId: cid,
       });
-      scored.sort((a, b) => b.score - a.score);
-      slot.pillarId = scored[0].pillar.id;
-      pillarCounts.set(scored[0].pillar.id, (pillarCounts.get(scored[0].pillar.id) ?? 0) + 1);
     }
   }
 
   return slots;
-}
-
-// ---------- title generation ----------
-
-function generateTitle(
-  format: ContentFormat,
-  pillarName: string,
-  objective: Objective,
-  sd?: StrategicDate,
-  channel?: string,
-): string {
-  const formatLabel = CONTENT_FORMATS[format] || format;
-  const objectiveLabel = OBJECTIVES[objective] || objective;
-  const ch = channel || 'Instagram';
-
-  if (sd) {
-    const prefix = strategicTitlePrefix(sd);
-    return `${prefix} — ${formatLabel} ${ch}`;
-  }
-
-  const templates = [
-    `${formatLabel}: ${pillarName} (${objectiveLabel})`,
-    `${formatLabel} de ${pillarName} para ${ch}`,
-    `${pillarName} — ${formatLabel}`,
-  ];
-  return templates[Math.floor(Math.random() * templates.length)];
 }
 
 // ---------- main ----------
@@ -255,7 +356,7 @@ export function generateWeek(input: GeneratorInput): WeekGeneratorResult {
   const nextWeekStart = addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 7 * weeksAhead);
   const weekDates = getWeekDates(nextWeekStart);
 
-  const frequency = Math.min(profile.frequency_per_week, profile.max_weekly);
+  const totalFrequency = Math.min(profile.frequency_per_week, profile.max_weekly || profile.frequency_per_week + 2);
   const allowedDays = profile.allowed_days.length > 0 ? profile.allowed_days : [1, 2, 3, 4, 5];
 
   const trackingFormats = [...recentFormats];
@@ -263,11 +364,11 @@ export function generateWeek(input: GeneratorInput): WeekGeneratorResult {
   const trackingObjectives = [...recentObjectives];
 
   const slots = allocateSlots(
-    weekDates, allowedDays, frequency, pillars, profile.distribution,
-    strategicDates, activeCampaigns, existingActions, trackingPillars,
+    weekDates, allowedDays, totalFrequency, pillars, profile.distribution,
+    strategicDates, activeCampaigns, profile.preferred_times,
   );
 
-  // Monta fila de zonas baseada em format_frequency (quota por zona)
+  // Monta fila de zonas baseada em format_frequency
   const ff = profile.format_frequency;
   const ffActive = ff && Object.keys(ff).length > 0
     ? (Object.entries(ff) as [string, number][]).filter(([, n]) => (n ?? 0) > 0)
@@ -276,7 +377,7 @@ export function generateWeek(input: GeneratorInput): WeekGeneratorResult {
   if (ffActive && ffActive.length > 0 && slots.length > 0) {
     const base: string[] = [];
     ffActive.forEach(([z, n]) => { for (let k = 0; k < n; k++) base.push(z); });
-    // Embaralha para evitar sequências (feed,feed,feed...)
+    // Embaralha para evitar sequências
     for (let i = base.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [base[i], base[j]] = [base[j], base[i]];
@@ -291,40 +392,46 @@ export function generateWeek(input: GeneratorInput): WeekGeneratorResult {
     const pillar = pillars.find(p => p.id === slot.pillarId) || pillars[0];
     if (!pillar) continue;
 
+    // Selecionar formato
     const selectedFormat = (() => {
-      // Se format_frequency está configurado, seleciona pela zona do slot
       if (zoneQueue) {
         const zone = zoneQueue[i] as FormatFrequencyZone;
         const pool = FORMAT_ZONES[zone] ?? [zone] as ContentFormat[];
-        // Anti-repetição: evita repetir o mesmo formato nos últimos 3 slots
+        // Anti-repetição: evitar mesmo formato nos últimos 3
         const recent = trackingFormats.slice(-3);
         const fresh = pool.filter(f => !recent.includes(f));
         const list = fresh.length > 0 ? fresh : pool;
         return list[Math.floor(Math.random() * list.length)];
       }
-      // Fallback: seleção ponderada por priority_formats (comportamento legado)
       return pickWeighted(
         (profile.priority_formats.length > 0 ? profile.priority_formats : ['reels', 'carousel', 'story']) as ContentFormat[],
         trackingFormats, 0.3,
       );
     })();
+
+    // Selecionar objetivo
     const selectedObjective = pickWeighted(
       (profile.priority_objectives.length > 0 ? profile.priority_objectives : ['educational', 'engagement']) as Objective[],
       trackingObjectives, 0.25,
     );
     const funnelStage = getFunnelStage(selectedObjective);
+
+    // Canal
     const channel = channels.length > 0
       ? channels[Math.floor(Math.random() * channels.length)]
       : 'Instagram';
-    const timeIndex = Math.floor(Math.random() * Math.min(3, (profile.preferred_times?.length || 1)));
-    const actionTime = profile.preferred_times?.[timeIndex] || '09:00';
 
+    // Título contextual
+    const title = generateContextualTitle(
+      selectedFormat, pillar.name, selectedObjective, slot.time,
+      slot.strategicDate, channel,
+    );
+
+    // Justificativas
     const reasons: string[] = [];
     if (slot.strategicDate) reasons.push(`Data estratégica: ${slot.strategicDate.title}`);
     if (slot.campaignId) reasons.push('Campanha ativa');
     if (trackingPillars.filter(p => p === pillar.id).length === 0) reasons.push('Pilar não usado recentemente');
-
-    const title = generateTitle(selectedFormat, pillar.name, selectedObjective, slot.strategicDate, channel);
 
     generated.push({
       title,
@@ -332,7 +439,7 @@ export function generateWeek(input: GeneratorInput): WeekGeneratorResult {
         ? `Conteúdo para ${slot.strategicDate.title} (${slot.strategicDate.relevance})`
         : `Conteúdo automático — ${pillar.name}`,
       action_date: slot.dateStr,
-      action_time: actionTime,
+      action_time: slot.time,
       action_type: 'content',
       format: selectedFormat,
       channel,
@@ -364,7 +471,7 @@ export function generateWeek(input: GeneratorInput): WeekGeneratorResult {
   if (channels.length === 0) warnings.push('Nenhum canal configurado — canal padrão Instagram usado');
   if (pillars.filter(p => p.is_active).length === 0) warnings.push('Nenhum pilar ativo — revise os pilares editoriais');
   if (allowedDays.length === 0) warnings.push('Nenhum dia permitido — revise a configuração editorial');
-  if (generated.length < frequency) warnings.push(`Geradas ${generated.length} de ${frequency} solicitadas (dias indisponíveis ou sem pilares)`);
+  if (generated.length < totalFrequency) warnings.push(`Geradas ${generated.length} de ${totalFrequency} solicitadas (dias indisponíveis ou sem pilares)`);
 
   const weekLabel = `${format(weekDates[0], 'dd/MM')} - ${format(weekDates[6], 'dd/MM')}`;
   const summary = `${generated.length} ações geradas para ${weekLabel}`;

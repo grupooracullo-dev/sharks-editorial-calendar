@@ -203,6 +203,8 @@ export interface StrategicDate {
   workspace_id: string;
   title: string;
   date: string;
+  start_date: string | null;
+  end_date: string | null;
   locality: string | null;
   category: string | null;
   relevance: DateRelevance;

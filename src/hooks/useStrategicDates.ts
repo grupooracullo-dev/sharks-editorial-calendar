@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 // Cache + realtime (single shared channel)
 // ==========================================
 
-const COLS = 'id, workspace_id, title, date, locality, category, relevance, description, is_recurring, created_at';
+const COLS = 'id, workspace_id, title, date, start_date, end_date, locality, category, relevance, description, is_recurring, created_at';
 
 let store: StrategicDate[] = [];
 let currentScope: string | null | undefined = undefined;
@@ -78,6 +78,8 @@ function ensureChannel(): void {
 export interface DateInput {
   title: string;
   date: string;
+  start_date?: string | null;
+  end_date?: string | null;
   locality?: string;
   category?: string;
   relevance?: string;
@@ -91,6 +93,8 @@ export async function createStrategicDates(workspaceId: string, rows: DateInput[
     workspace_id: workspaceId,
     title: r.title,
     date: r.date,
+    start_date: r.start_date ?? null,
+    end_date: r.end_date ?? null,
     locality: r.locality ?? 'national',
     category: r.category ?? 'commercial',
     relevance: r.relevance ?? 'medium',

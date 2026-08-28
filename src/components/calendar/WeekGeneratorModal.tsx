@@ -245,9 +245,20 @@ export default function WeekGeneratorModal({
                         {ga.action_time?.slice(0, 5)} · {CONTENT_FORMATS[ga.format] || ga.format} · {ga.channel}
                       </p>
                       {ga.reasons && ga.reasons.length > 0 && (
-                        <p className="text-[10px] text-gray-400 mt-0.5 italic">
-                          {ga.reasons.join(' · ')}
-                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {ga.reasons.map((r, ri) => (
+                            <span
+                              key={ri}
+                              className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                r.includes('Data estratégica')
+                                  ? 'bg-purple-100 text-purple-700'
+                                  : 'bg-gray-100 text-gray-500 italic'
+                              }`}
+                            >
+                              {r}
+                            </span>
+                          ))}
+                        </div>
                       )}
                     </div>
                     <Badge variant="primary" size="sm">{OBJECTIVES[ga.objective]}</Badge>

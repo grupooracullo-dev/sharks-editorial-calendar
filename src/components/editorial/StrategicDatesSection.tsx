@@ -45,6 +45,9 @@ export default function StrategicDatesSection({ workspaceId }: { workspaceId: st
   const [addOpen, setAddOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDate, setNewDate] = useState('');
+  const [isPeriod, setIsPeriod] = useState(false);
+  const [newStartDate, setNewStartDate] = useState('');
+  const [newEndDate, setNewEndDate] = useState('');
   const [newCategory, setNewCategory] = useState('commercial');
   const [newRelevance, setNewRelevance] = useState('medium');
   const [manualInput, setManualInput] = useState('');
@@ -69,11 +72,31 @@ export default function StrategicDatesSection({ workspaceId }: { workspaceId: st
   const urgentAlerts = upcoming.filter(d => daysUntil(d.date) <= 7 && d.relevance === 'high');
 
   const handleAdd = async () => {
-    if (!newTitle.trim() || !newDate.trim()) { toast.error('Preencha título e data'); return; }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) { toast.error('Formato: YYYY-MM-DD'); return; }
-    await create([{ title: newTitle.trim(), date: newDate, category: newCategory, relevance: newRelevance }]);
-    setNewTitle(''); setNewDate(''); setAddOpen(false);
-    toast.success('Data adicionada');
+    if (!newTitle.trim()) { toast.error('Preencha o título'); return; }
+    if (isPeriod) {
+      if (!newStartDate.trim() || !newEndDate.trim()) { toast.error('Preencha início e fim do período'); return; }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(newStartDate) || !/^\d{4}-\d{2}-\d{2}$/.test(newEndDate)) { toast.error('Formato: YYYY-MM-DD'); return; }
+      if (newStartDate > newEndDate) { toast.error('Data início deve ser anterior à data fim'); return; }
+      await create([{
+        title: newTitle.trim(),
+        date: newStartDate,
+        start_date: newStartDate,
+        end_date: newEndDate,
+        category: newCategory,
+        relevance: newRelevance,
+      }]);
+    } else {
+      if (!newDate.trim()) { toast.error('Preencha a data'); return; }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) { toast.error('Formato: YYYY-MM-DD'); return; }
+      await create([{
+        title: newTitle.trim(),
+        date: newDate,
+        category: newCategory,
+        relevance: newRelevance,
+      }]);
+    }
+    setNewTitle(''); setNewDate(''); setNewStartDate(''); setNewEndDate(''); setIsPeriod(false); setAddOpen(false);
+    toast.success(isPeriod ? 'Período adicionado' : 'Data adicionada');
   };
 
   const handleManual = async () => {
@@ -148,11 +171,17 @@ export default function StrategicDatesSection({ workspaceId }: { workspaceId: st
                 {upcoming.map(d => {
                   const days = daysUntil(d.date);
                   const c = countdownLabel(days);
+                  const isPeriod = d.start_date && d.end_date;
                   return (
                     <div key={d.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50 group">
                       <span className={`text-xs font-mono px-2 py-0.5 rounded-full shrink-0 ${c.color}`}>{c.text}</span>
-                      <span className="flex-1 min-w-0 text-sm text-gray-900 truncate">{d.title}</span>
-                      <span className="text-xs text-gray-400 shrink-0">{d.date}</span>
+                      <span className="flex-1 min-w-0 text-sm text-gray-900 truncate">
+                        {d.title}
+                        {isPeriod && <span className="text-xs text-gray-400 ml-1">(período)</span>}
+                      </span>
+                      <span className="text-xs text-gray-400 shrink-0">
+                        {isPeriod ? `${d.start_date} → ${d.end_date}` : d.date}
+                      </span>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${RELEVANCE_COLORS[d.relevance] || RELEVANCE_COLORS.medium}`}>
                         {d.relevance === 'high' ? 'alta' : d.relevance === 'medium' ? 'média' : 'baixa'}
                       </span>
@@ -204,7 +233,38 @@ export default function StrategicDatesSection({ workspaceId }: { workspaceId: st
       <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="Nova Data Estratégica" size="sm">
         <div className="space-y-4">
           <Input label="Título" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Ex: Dia do Cliente" />
-          <Input label="Data" type="date" value={newDate} onChange={e => setNewDate(e.target.value)} />
+
+          {/* Toggle: Data única vs Período */}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsPeriod(false)}
+              className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                !isPeriod ? 'bg-primary-50 border-primary-300 text-primary-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              Data única
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsPeriod(true)}
+              className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                isPeriod ? 'bg-primary-50 border-primary-300 text-primary-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              Período
+            </button>
+          </div>
+
+          {!isPeriod ? (
+            <Input label="Data" type="date" value={newDate} onChange={e => setNewDate(e.target.value)} />
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="Início" type="date" value={newStartDate} onChange={e => setNewStartDate(e.target.value)} />
+              <Input label="Fim" type="date" value={newEndDate} onChange={e => setNewEndDate(e.target.value)} />
+            </div>
+          )}
+
           <Select label="Categoria" value={newCategory} onChange={e => setNewCategory(e.target.value)} options={[
             { value: 'commercial', label: 'Comercial' },
             { value: 'holiday', label: 'Feriado' },
