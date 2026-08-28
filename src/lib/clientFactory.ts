@@ -70,74 +70,81 @@ export async function createFullClient(input: CreateFullClientInput): Promise<Wo
       country: input.country,
       logo_url: input.logo_url,
     })
-    .select('*')
+    .select('id, organization_id, name, slug, logo_url, segment, city, state, country, is_active, created_at, updated_at')
     .single();
   if (wsError || !ws) throw new Error(wsError?.message || 'Erro ao criar workspace');
 
-  // 2. Pilares padrão da linha editorial
-  const pillarRows = MARKETING_PLAN_PILLARS.map((p, i) => ({
-    workspace_id: ws.id,
-    name: p.name,
-    description: p.description,
-    color: p.color,
-    percentage: p.percentage,
-    sort_order: i + 1,
-  }));
-  const { data: pillarsInserted, error: pillarsError } = await supabase
-    .from('editorial_pillars')
-    .insert(pillarRows)
-    .select('*');
-  if (pillarsError) throw new Error(pillarsError.message);
-
-  // 3. Perfil editorial (frequência + distribuição por pilar)
-  const ff = normalizeFormatFrequency(input.format_frequency);
-  const frequency = formatFrequencyTotal(ff);
-  const distribution: Record<string, number> = {};
-  pillarsInserted?.forEach(p => {
-    distribution[p.id] = p.percentage;
-  });
-  const { error: profileError } = await supabase.from('editorial_profiles').insert({
-    workspace_id: ws.id,
-    frequency_per_week: frequency,
-    format_frequency: ff,
-    allowed_days: [1, 2, 3, 4, 5],
-    preferred_times: ['09:00', '14:00', '18:00'],
-    priority_formats: (ff.feed ?? 0) > 0
-      ? ['static_post', 'carousel', 'photo', 'video', 'story', 'reels']
-      : ['story', 'reels'],
-    distribution,
-    priority_objectives: ['educational', 'engagement'],
-    priority_products: [],
-    max_weekly: frequency + 2,
-  });
-  if (profileError) throw new Error(profileError.message);
-
-  // 4. Google Calendar placeholder (opcional)
-  const gcal = input.google_calendar_id?.trim();
-  if (gcal) {
-    const { error: gcalError } = await supabase.from('calendar_integrations').insert({
+  try {
+    // 2. Pilares padrão da linha editorial
+    const pillarRows = MARKETING_PLAN_PILLARS.map((p, i) => ({
       workspace_id: ws.id,
-      google_calendar_id: gcal,
-      is_connected: false,
-    });
-    if (gcalError) throw new Error(gcalError.message);
-  }
+      name: p.name,
+      description: p.description,
+      color: p.color,
+      percentage: p.percentage,
+      sort_order: i + 1,
+    }));
+    const { data: pillarsInserted, error: pillarsError } = await supabase
+      .from('editorial_pillars')
+      .insert(pillarRows)
+      .select('id, percentage');
+    if (pillarsError) throw new Error(pillarsError.message);
 
-  // 5. Datas estratégicas detectadas no wizard
-  if (input.selectedDates && input.selectedDates.length > 0) {
-    const { error: datesError } = await supabase.from('strategic_dates').insert(
-      input.selectedDates.map(d => ({
+    // 3. Perfil editorial (frequência + distribuição por pilar)
+    const ff = normalizeFormatFrequency(input.format_frequency);
+    const frequency = formatFrequencyTotal(ff);
+    const distribution: Record<string, number> = {};
+    pillarsInserted?.forEach(p => {
+      distribution[p.id] = p.percentage;
+    });
+    const { error: profileError } = await supabase.from('editorial_profiles').insert({
+      workspace_id: ws.id,
+      frequency_per_week: frequency,
+      format_frequency: ff,
+      allowed_days: [1, 2, 3, 4, 5],
+      preferred_times: ['09:00', '14:00', '18:00'],
+      priority_formats: (ff.feed ?? 0) > 0
+        ? ['static_post', 'carousel', 'photo', 'video', 'story', 'reels']
+        : ['story', 'reels'],
+      distribution,
+      priority_objectives: ['educational', 'engagement'],
+      priority_products: [],
+      max_weekly: frequency + 2,
+    });
+    if (profileError) throw new Error(profileError.message);
+
+    // 4. Google Calendar placeholder (opcional)
+    const gcal = input.google_calendar_id?.trim();
+    if (gcal) {
+      const { error: gcalError } = await supabase.from('calendar_integrations').insert({
         workspace_id: ws.id,
-        title: d.title,
-        date: d.date,
-        locality: d.locality,
-        category: d.category,
-        relevance: d.relevance,
-        description: d.description,
-        is_recurring: d.is_recurring,
-      }))
-    );
-    if (datesError) throw new Error(datesError.message);
+        google_calendar_id: gcal,
+        is_connected: false,
+      });
+      if (gcalError) throw new Error(gcalError.message);
+    }
+
+    // 5. Datas estratégicas detectadas no wizard
+    if (input.selectedDates && input.selectedDates.length > 0) {
+      const { error: datesError } = await supabase.from('strategic_dates').insert(
+        input.selectedDates.map(d => ({
+          workspace_id: ws.id,
+          title: d.title,
+          date: d.date,
+          locality: d.locality,
+          category: d.category,
+          relevance: d.relevance,
+          description: d.description,
+          is_recurring: d.is_recurring,
+        }))
+      );
+      if (datesError) throw new Error(datesError.message);
+    }
+  } catch (err) {
+    // Compensa a criação parcial para não deixar cliente órfão ativo
+    // (sem pilares/perfil) visível em fetchAllClients ou workspacesByEnv.
+    await supabase.from('workspaces').update({ is_active: false }).eq('id', ws.id);
+    throw err;
   }
 
   return ws;
@@ -158,7 +165,7 @@ export async function deactivateClient(id: string): Promise<void> {
 export async function fetchAllClients(): Promise<ClientWithOrg[]> {
   const { data, error } = await supabase
     .from('workspaces')
-    .select('*, organization:organizations(environment, name)')
+    .select('id, organization_id, name, slug, logo_url, segment, city, state, country, is_active, created_at, updated_at, organization:organizations(environment, name)')
     .eq('is_active', true)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);

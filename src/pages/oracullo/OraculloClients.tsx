@@ -132,7 +132,7 @@ export default function OraculloClients() {
 
                 <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
                   <span className="text-[11px] text-gray-400">Desde {formatDate(c.created_at)}</span>
-                  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
                     <button
                       onClick={() => setEditing({
                         id: c.id,

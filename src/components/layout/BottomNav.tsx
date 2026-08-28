@@ -22,6 +22,7 @@ const estrategosNavItems = [
   { path: '/estrategos', icon: LayoutDashboard, label: 'Home' },
   { path: '/estrategos/calendar', icon: Calendar, label: 'Calendário' },
   { path: '/estrategos/meetings', icon: CalendarDays, label: 'Reuniões' },
+  { path: '/estrategos/implementations', icon: Rocket, label: 'Impl.' },
   { path: '/estrategos/projects', icon: Briefcase, label: 'Projetos' },
   { path: '/estrategos/chat', icon: MessageSquare, label: 'Chat' },
 ];

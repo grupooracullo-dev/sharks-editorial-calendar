@@ -6,38 +6,9 @@ import Button from '@/components/ui/Button';
 import LogoUploader from '@/components/ui/LogoUploader';
 import { SEGMENTS } from '@/lib/constants';
 import { BR_STATES } from '@/data/brDates';
+import { CITIES_BY_STATE } from '@/data/brCities';
 import { updateClient } from '@/lib/clientFactory';
 import { toast } from 'sonner';
-
-const CITIES_BY_STATE: Record<string, string[]> = {
-  AC: ['Rio Branco', 'Cruzeiro do Sul', 'Sena Madureira'],
-  AL: ['Maceió', 'Arapiraca', 'Penedo', 'Palmeira dos Índios'],
-  AP: ['Macapá', 'Santana', 'Laranjal do Jari'],
-  AM: ['Manaus', 'Parintins', 'Itacoatiara', 'Manacapuru'],
-  BA: ['Salvador', 'Feira de Santana', 'Vitória da Conquista', 'Camaçari', 'Ilhéus', 'Itabuna'],
-  CE: ['Fortaleza', 'Caucaia', 'Juazeiro do Norte', 'Maracanaú', 'Sobral'],
-  DF: ['Brasília', 'Taguatinga', 'Ceilândia', 'Samambaia', 'Águas Claras'],
-  ES: ['Vitória', 'Vila Velha', 'Serra', 'Cariacica', 'Linhares'],
-  GO: ['Goiânia', 'Aparecida de Goiânia', 'Anápolis', 'Rio Verde', 'Luziânia'],
-  MA: ['São Luís', 'Imperatriz', 'São José de Ribamar', 'Timon', 'Caxias'],
-  MT: ['Cuiabá', 'Várzea Grande', 'Rondonópolis', 'Sinop', 'Tangará da Serra'],
-  MS: ['Campo Grande', 'Dourados', 'Três Lagoas', 'Corumbá', 'Ponta Porã'],
-  MG: ['Belo Horizonte', 'Uberlândia', 'Contagem', 'Juiz de Fora', 'Betim', 'Montes Claros', 'Uberaba'],
-  PA: ['Belém', 'Ananindeua', 'Santarém', 'Marabá', 'Castanhal'],
-  PB: ['João Pessoa', 'Campina Grande', 'Santa Rita', 'Patos', 'Bayeux'],
-  PR: ['Curitiba', 'Londrina', 'Maringá', 'Ponta Grossa', 'Cascavel', 'São José dos Pinhais'],
-  PE: ['Recife', 'Jaboatão dos Guararapes', 'Olinda', 'Caruaru', 'Petrolina'],
-  PI: ['Teresina', 'Parnaíba', 'Picos', 'Floriano'],
-  RJ: ['Rio de Janeiro', 'São Gonçalo', 'Duque de Caxias', 'Niterói', 'Nova Iguaçu', 'Campos dos Goytacazes'],
-  RN: ['Natal', 'Mossoró', 'Parnamirim', 'São Gonçalo do Amarante'],
-  RS: ['Porto Alegre', 'Caxias do Sul', 'Pelotas', 'Canoas', 'Santa Maria', 'Gravataí'],
-  RO: ['Porto Velho', 'Ji-Paraná', 'Ariquemes', 'Vilhena'],
-  RR: ['Boa Vista', 'Rorainópolis', 'Caracaraí'],
-  SC: ['Florianópolis', 'Joinville', 'Blumenau', 'São José', 'Chapecó', 'Itajaí'],
-  SP: ['São Paulo', 'Guarulhos', 'Campinas', 'São Bernardo do Campo', 'Santo André', 'Sorocaba', 'Ribeirão Preto', 'Santos'],
-  SE: ['Aracaju', 'Nossa Senhora do Socorro', 'Lagarto', 'Itabaiana'],
-  TO: ['Palmas', 'Araguaína', 'Gurupi', 'Porto Nacional'],
-};
 
 export interface ClientEditTarget {
   id: string;
@@ -48,7 +19,7 @@ export interface ClientEditTarget {
   logo_url: string | null;
 }
 
-interface ClientEditModalProps {
+export interface ClientEditModalProps {
   open: boolean;
   onClose: () => void;
   client: ClientEditTarget | null;
@@ -125,8 +96,14 @@ export default function ClientEditModal({ open, onClose, client, onSaved }: Clie
         {form.state && (
           <Select
             label="Cidade"
-            value={form.city}
-            onChange={(e) => setForm(p => ({ ...p, city: e.target.value }))}
+            value={CITIES_BY_STATE[form.state]?.includes(form.city) ? form.city : '__outro__'}
+            onChange={(e) => {
+              if (e.target.value === '__outro__') {
+                setForm(p => ({ ...p, city: '' }));
+              } else {
+                setForm(p => ({ ...p, city: e.target.value }));
+              }
+            }}
             placeholder="Selecione a cidade"
             options={[
               ...(CITIES_BY_STATE[form.state] ?? []).map(c => ({ value: c, label: c })),
@@ -134,7 +111,7 @@ export default function ClientEditModal({ open, onClose, client, onSaved }: Clie
             ]}
           />
         )}
-        {form.state && form.city && CITIES_BY_STATE[form.state]?.includes(form.city) === false && (
+        {form.state && !CITIES_BY_STATE[form.state]?.includes(form.city) && (
           <Input
             label="Cidade"
             value={form.city}

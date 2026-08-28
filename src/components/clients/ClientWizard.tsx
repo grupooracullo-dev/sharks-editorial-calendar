@@ -7,45 +7,16 @@ import LogoUploader from '@/components/ui/LogoUploader';
 import FormatFrequencyStepper, { defaultFormatFrequency } from '@/components/editorial/FormatFrequencyStepper';
 import { SEGMENTS } from '@/lib/constants';
 import { BR_STATES, detectDatesForClient, manualCityBirthday, type StrategicDateDraft } from '@/data/brDates';
+import { CITIES_BY_STATE } from '@/data/brCities';
 import { createFullClient } from '@/lib/clientFactory';
 import { ENVIRONMENT_META, type EnvironmentType, type FormatFrequency, type Workspace } from '@/types';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Info, CheckSquare, Square, Building2 } from 'lucide-react';
 
-// Cidades principais por estado (para o dropdown)
-const CITIES_BY_STATE: Record<string, string[]> = {
-  AC: ['Rio Branco', 'Cruzeiro do Sul', 'Sena Madureira'],
-  AL: ['Maceió', 'Arapiraca', 'Penedo', 'Palmeira dos Índios'],
-  AP: ['Macapá', 'Santana', 'Laranjal do Jari'],
-  AM: ['Manaus', 'Parintins', 'Itacoatiara', 'Manacapuru'],
-  BA: ['Salvador', 'Feira de Santana', 'Vitória da Conquista', 'Camaçari', 'Ilhéus', 'Itabuna'],
-  CE: ['Fortaleza', 'Caucaia', 'Juazeiro do Norte', 'Maracanaú', 'Sobral'],
-  DF: ['Brasília', 'Taguatinga', 'Ceilândia', 'Samambaia', 'Águas Claras'],
-  ES: ['Vitória', 'Vila Velha', 'Serra', 'Cariacica', 'Linhares'],
-  GO: ['Goiânia', 'Aparecida de Goiânia', 'Anápolis', 'Rio Verde', 'Luziânia'],
-  MA: ['São Luís', 'Imperatriz', 'São José de Ribamar', 'Timon', 'Caxias'],
-  MT: ['Cuiabá', 'Várzea Grande', 'Rondonópolis', 'Sinop', 'Tangará da Serra'],
-  MS: ['Campo Grande', 'Dourados', 'Três Lagoas', 'Corumbá', 'Ponta Porã'],
-  MG: ['Belo Horizonte', 'Uberlândia', 'Contagem', 'Juiz de Fora', 'Betim', 'Montes Claros', 'Uberaba'],
-  PA: ['Belém', 'Ananindeua', 'Santarém', 'Marabá', 'Castanhal'],
-  PB: ['João Pessoa', 'Campina Grande', 'Santa Rita', 'Patos', 'Bayeux'],
-  PR: ['Curitiba', 'Londrina', 'Maringá', 'Ponta Grossa', 'Cascavel', 'São José dos Pinhais'],
-  PE: ['Recife', 'Jaboatão dos Guararapes', 'Olinda', 'Caruaru', 'Petrolina'],
-  PI: ['Teresina', 'Parnaíba', 'Picos', 'Floriano'],
-  RJ: ['Rio de Janeiro', 'São Gonçalo', 'Duque de Caxias', 'Niterói', 'Nova Iguaçu', 'Campos dos Goytacazes'],
-  RN: ['Natal', 'Mossoró', 'Parnamirim', 'São Gonçalo do Amarante'],
-  RS: ['Porto Alegre', 'Caxias do Sul', 'Pelotas', 'Canoas', 'Santa Maria', 'Gravataí'],
-  RO: ['Porto Velho', 'Ji-Paraná', 'Ariquemes', 'Vilhena'],
-  RR: ['Boa Vista', 'Rorainópolis', 'Caracaraí'],
-  SC: ['Florianópolis', 'Joinville', 'Blumenau', 'São José', 'Chapecó', 'Itajaí'],
-  SP: ['São Paulo', 'Guarulhos', 'Campinas', 'São Bernardo do Campo', 'Santo André', 'Sorocaba', 'Ribeirão Preto', 'Santos'],
-  SE: ['Aracaju', 'Nossa Senhora do Socorro', 'Lagarto', 'Itabaiana'],
-  TO: ['Palmas', 'Araguaína', 'Gurupi', 'Porto Nacional'],
-};
-
 const baseSteps = ['Empresa', 'Localização', 'Linha Editorial', 'Frequência', 'Datas', 'Google Calendar'];
 
-interface ClientWizardProps {
+export interface ClientWizardProps {
   open: boolean;
   onClose: () => void;
   /** null = seletor de ambiente no primeiro passo (Oracullo). */
@@ -136,8 +107,9 @@ export default function ClientWizard({ open, onClose, environment, onCreated }: 
       toast.error('Formato inválido (use DD/MM)');
       return;
     }
+    const newIndex = detectedDates.length;
     setDetectedDates(prev => [...prev, draft]);
-    setSelectedDates(prev => new Set([...prev, prev.size]));
+    setSelectedDates(prev => new Set([...prev, newIndex]));
     setManualDateInput('');
   };
 
@@ -186,9 +158,10 @@ export default function ClientWizard({ open, onClose, environment, onCreated }: 
       <div className="flex items-center gap-1 mb-6">
         {steps.map((s, i) => (
           <div key={i} className="flex items-center flex-1 last:flex-none">
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${
+            <div className={cn(
+              'w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium',
               i <= step ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-400'
-            }`}>
+            )}>
               {i + 1}
             </div>
             {i < steps.length - 1 && (
@@ -211,12 +184,16 @@ export default function ClientWizard({ open, onClose, environment, onCreated }: 
                 key={e}
                 type="button"
                 onClick={() => setEnv(e)}
-                className={`flex items-center gap-3 p-4 rounded-xl border-2 text-left transition-colors ${
+                className={cn(
+                  'flex items-center gap-3 p-4 rounded-xl border-2 text-left transition-colors',
                   selected ? 'border-primary-500 bg-primary-50' : 'border-gray-200 bg-white hover:border-gray-300'
-                }`}
+                )}
               >
-                <span className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
-                  <Building2 className={`w-5 h-5 ${selected ? 'text-primary-600' : 'text-gray-400'}`} />
+                <span className={cn(
+                  'w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center shrink-0',
+                  selected && 'text-primary-600'
+                )}>
+                  <Building2 className={cn('w-5 h-5', selected ? 'text-primary-600' : 'text-gray-400')} />
                 </span>
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold text-gray-900">{meta.label}</span>
@@ -373,9 +350,10 @@ export default function ClientWizard({ open, onClose, environment, onCreated }: 
               <button
                 key={`${d.title}-${d.date}-${i}`}
                 type="button"
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-sm transition-colors ${
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-sm transition-colors',
                   selectedDates.has(i) ? 'bg-primary-50 hover:bg-primary-100' : 'bg-gray-50 hover:bg-gray-100 opacity-60'
-                }`}
+                )}
                 onClick={() => toggleDate(i)}
               >
                 {selectedDates.has(i)
@@ -383,10 +361,11 @@ export default function ClientWizard({ open, onClose, environment, onCreated }: 
                   : <Square className="w-4 h-4 text-gray-300 shrink-0" />}
                 <span className="flex-1 min-w-0 truncate">{d.title}</span>
                 <span className="text-xs text-gray-500 shrink-0">{d.date.slice(5)}</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${
+                <span className={cn(
+                  'text-[10px] px-1.5 py-0.5 rounded-full shrink-0',
                   d.relevance === 'high' ? 'bg-red-100 text-red-700' :
                   d.relevance === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'
-                }`}>
+                )}>
                   {d.relevance === 'high' ? 'alta' : d.relevance === 'medium' ? 'média' : 'baixa'}
                 </span>
               </button>
