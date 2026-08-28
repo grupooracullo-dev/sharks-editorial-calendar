@@ -32,6 +32,8 @@ interface GeneratorInput {
   channels: string[];
   weeksAhead?: number;      // default 1 (ignorado se weekStart informada)
   weekStart?: Date;         // data de referência da semana a gerar
+  pubStart?: string;        // 'HH:MM' — início da janela diária de publicações
+  pubEnd?: string;          // 'HH:MM' — fim da janela diária de publicações
 }
 
 // ---------- helpers ----------
@@ -44,6 +46,25 @@ function getWeekDates(start: Date): Date[] {
 
 function dayLabel(d: Date): string {
   return ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][d.getDay()];
+}
+
+// Distribui os horários dentro da janela [início, término] definida pelo usuário,
+// espaçados de forma homogênea e arredondados a 5 minutos.
+function buildTimes(start: string, end: string, count: number): string[] {
+  const s = start.split(':').map(Number);
+  const e = end.split(':').map(Number);
+  if (s.length !== 2 || e.length !== 2 || !Number.isFinite(s[0]) || !Number.isFinite(e[0])) return [];
+  const startMin = s[0] * 60 + (s[1] ?? 0);
+  const endMin = e[0] * 60 + (e[1] ?? 0);
+  if (endMin <= startMin) return [];
+  const span = endMin - startMin;
+  const times: string[] = [];
+  for (let k = 0; k < count; k++) {
+    const frac = count === 1 ? 0.5 : k / (count - 1);
+    const m = Math.round((startMin + span * frac) / 5) * 5;
+    times.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
+  }
+  return times;
 }
 
 function scoreItem<T extends string>(
@@ -232,6 +253,8 @@ function allocateSlots(
   strategicDates: StrategicDate[],
   activeCampaigns: Campaign[],
   preferredTimes: string[],
+  pubStart?: string,
+  pubEnd?: string,
 ): SlotAllocation[] {
   const activePillars = pillars.filter(p => p.is_active);
   if (activePillars.length === 0) return [];
@@ -243,10 +266,13 @@ function allocateSlots(
   // Slots por dia = total / dias disponíveis (mínimo 1)
   const slotsPerDay = Math.max(1, Math.ceil(totalFrequency / availableDays.length));
 
-  // Horários: expandir preferred_times para cobrir todos os slots
-  const times = preferredTimes.length > 0
-    ? preferredTimes
-    : ['09:00', '11:00', '14:00', '16:00', '18:00'];
+  // Horários: janela de publicações definida pelo usuário (início/término),
+  // senão fallback para preferred_times do perfil editorial.
+  const times = (pubStart && pubEnd && pubEnd > pubStart)
+    ? buildTimes(pubStart, pubEnd, Math.max(1, slotsPerDay))
+    : preferredTimes.length > 0
+      ? preferredTimes
+      : ['09:00', '11:00', '14:00', '16:00', '18:00'];
 
   // Mapa de datas estratégicas
   const strategicMap = new Map<string, StrategicDate>();
@@ -369,7 +395,7 @@ export function generateWeek(input: GeneratorInput): WeekGeneratorResult {
 
   const slots = allocateSlots(
     weekDates, allowedDays, totalFrequency, pillars, profile.distribution,
-    strategicDates, activeCampaigns, profile.preferred_times,
+    strategicDates, activeCampaigns, profile.preferred_times, input.pubStart, input.pubEnd,
   );
 
   // Monta fila de zonas baseada em format_frequency

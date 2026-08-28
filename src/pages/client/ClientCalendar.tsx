@@ -31,20 +31,17 @@ export default function ClientCalendar() {
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   const monthLabel = format(currentDate, 'MMMM yyyy', { locale: ptBR });
 
-  // Janela exibida na view Semana: 3 dias (mobile) ou a semana inteira (desktop),
-  // ancorada no currentDate — navegação abrangente em qualquer ponto do mês.
-  const weekDayWindow = isMobile
-    ? [0, 1, 2].map(i => addDays(currentDate, i))
-    : Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(currentDate, { weekStartsOn: 0 }), i));
+// View Semana: semana completa (7 dias). No mobile a grade rola lateralmente.
+const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(currentDate, { weekStartsOn: 0 }), i));
 
-  const goPrev = () => {
-    if (view === 'week') setCurrentDate(d => new Date(d.getFullYear(), d.getMonth(), d.getDate() - (isMobile ? 3 : 7)));
-    else setCurrentDate(d => subMonths(d, 1));
-  };
-  const goNext = () => {
-    if (view === 'week') setCurrentDate(d => new Date(d.getFullYear(), d.getMonth(), d.getDate() + (isMobile ? 3 : 7)));
-    else setCurrentDate(d => addMonths(d, 1));
-  };
+const goPrev = () => {
+  if (view === 'week') setCurrentDate(d => new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7));
+  else setCurrentDate(d => subMonths(d, 1));
+};
+const goNext = () => {
+  if (view === 'week') setCurrentDate(d => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7));
+  else setCurrentDate(d => addMonths(d, 1));
+};
 
   const handleActionClick = (action: Action) => {
     setSelectedAction(action);
@@ -188,56 +185,58 @@ export default function ClientCalendar() {
       {/* Week view (read-only) */}
       {view === 'week' && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className={cn('sticky top-0 z-10 bg-white grid border-b border-gray-100', isMobile ? 'grid-cols-3' : 'grid-cols-7')}>
-              {weekDayWindow.map((day, i) => (
-                <div key={i} className="py-2 text-center border-r last:border-r-0">
-                  <p className="text-xs text-gray-500">{isMobile ? formatWeekdayShort(day) : weekDays[i]}</p>
-                <p className={cn('font-semibold', isSameDay(day, new Date()) ? 'text-primary-600' : 'text-gray-900')}>
-                  {day.getDate()}
-                </p>
-              </div>
-            ))}
-          </div>
-            <div className={cn('grid', isMobile ? 'grid-cols-3' : 'grid-cols-7')}>
-              {weekDayWindow.map((day, i) => {
-                const dateStr = formatCalendarDate(day);
-                const dayActions = actions.filter(a => a.action_date === dateStr);
-                const dayCampaigns = activeCampaigns.filter(c => {
-                  if (!c.start_date) return false;
-                  return dateStr >= c.start_date && dateStr <= (c.end_date || c.start_date);
-                });
-
-                return (
-                  <div key={i} className="border-r last:border-r-0 p-2 min-h-0">
-                    <div className="space-y-1">
-                      {dayCampaigns.length > 0 && (
-                        <div className="flex flex-col gap-0.5">
-                          {dayCampaigns.map(c => (
-                            <div
-                              key={c.id}
-                              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md"
-                              style={{ backgroundColor: `${c.color || '#3B82F6'}1F` }}
-                              title={`${c.name}${c.start_date ? ` · ${c.start_date.split('-').reverse().join('/')} → ${(c.end_date || c.start_date).split('-').reverse().join('/')}` : ''}`}
-                            >
-                              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.color || '#3B82F6' }} />
-                              <span className="text-[9px] font-semibold truncate" style={{ color: c.color || '#3B82F6' }}>
-                                🏁 {c.name}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {dayActions.length === 0 && (
-                        <p className="text-[10px] text-gray-300 text-center py-2">Sem ações</p>
-                      )}
-                      {dayActions.map(action => (
-                        <CalendarEvent key={action.id} action={action} onClick={() => handleActionClick(action)} />
-                      ))}
-                    </div>
+          <div className="flex-1 min-h-0 overflow-auto">
+            <div className={cn('h-full flex flex-col', isMobile && 'min-w-[720px]')}>
+              <div className="sticky top-0 z-10 bg-white grid grid-cols-7 border-b border-gray-100 shrink-0">
+                {weekDayWindow.map((day, i) => (
+                  <div key={i} className="py-2 text-center border-r last:border-r-0">
+                    <p className="text-xs text-gray-500">{isMobile ? formatWeekdayShort(day) : weekDays[i]}</p>
+                    <p className={cn('font-semibold', isSameDay(day, new Date()) ? 'text-primary-600' : 'text-gray-900')}>
+                      {day.getDate()}
+                    </p>
                   </div>
-                );
-              })}
+                ))}
+              </div>
+              <div className="grid grid-cols-7 auto-rows-fr flex-1">
+                {weekDayWindow.map((day, i) => {
+                  const dateStr = formatCalendarDate(day);
+                  const dayActions = actions.filter(a => a.action_date === dateStr);
+                  const dayCampaigns = activeCampaigns.filter(c => {
+                    if (!c.start_date) return false;
+                    return dateStr >= c.start_date && dateStr <= (c.end_date || c.start_date);
+                  });
+
+                  return (
+                    <div key={i} className="border-r last:border-r-0 p-2">
+                      <div className="space-y-1">
+                        {dayCampaigns.length > 0 && (
+                          <div className="flex flex-col gap-0.5">
+                            {dayCampaigns.map(c => (
+                              <div
+                                key={c.id}
+                                className="flex items-center gap-1 px-1.5 py-0.5 rounded-md"
+                                style={{ backgroundColor: `${c.color || '#3B82F6'}1F` }}
+                                title={`${c.name}${c.start_date ? ` · ${c.start_date.split('-').reverse().join('/')} → ${(c.end_date || c.start_date).split('-').reverse().join('/')}` : ''}`}
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.color || '#3B82F6' }} />
+                                <span className="text-[9px] font-semibold truncate" style={{ color: c.color || '#3B82F6' }}>
+                                  🏁 {c.name}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {dayActions.length === 0 && (
+                          <p className="text-[10px] text-gray-300 text-center py-2">Sem ações</p>
+                        )}
+                        {dayActions.map(action => (
+                          <CalendarEvent key={action.id} action={action} onClick={() => handleActionClick(action)} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
