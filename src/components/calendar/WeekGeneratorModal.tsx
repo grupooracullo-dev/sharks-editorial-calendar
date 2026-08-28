@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GeneratedAction, WeekGeneratorResult, EditorialProfile, EditorialPillar, Action, StrategicDate, Campaign, ContentFormat, Objective } from '@/types';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
@@ -8,7 +8,7 @@ import { generateWeek } from '@/lib/weekGenerator';
 import { useActions } from '@/hooks/useActions';
 import { formatCalendarDate, addDays, startOfWeek } from '@/lib/dateUtils';
 import { toast } from 'sonner';
-import { Sparkles, Check, X, RefreshCw, Lock, Unlock, ChevronLeft, ChevronRight, AlertTriangle, BarChart3 } from 'lucide-react';
+import { Sparkles, Check, X, RefreshCw, Lock, Unlock, ChevronLeft, ChevronRight, AlertTriangle, BarChart3, Layers } from 'lucide-react';
 
 interface WeekGeneratorModalProps {
   isOpen: boolean;
@@ -40,6 +40,15 @@ export default function WeekGeneratorModal({
   const [locked, setLocked] = useState<Set<number>>(new Set());
   const { create } = useActions({});
   const [saving, setSaving] = useState(false);
+  const [selectedPillars, setSelectedPillars] = useState<Set<string>>(new Set());
+
+  // Inicializa com todos os pilares ativos selecionados ao abrir
+  useEffect(() => {
+    if (isOpen) {
+      const activeIds = pillars.filter(p => p.is_active).map(p => p.id);
+      setSelectedPillars(new Set(activeIds));
+    }
+  }, [isOpen, pillars]);
 
   const handleGenerate = () => {
     if (!profile) {
@@ -47,13 +56,19 @@ export default function WeekGeneratorModal({
       return;
     }
 
+    if (selectedPillars.size === 0) {
+      toast.error('Selecione pelo menos um pilar.');
+      return;
+    }
+
+    const filteredPillars = pillars.filter(p => selectedPillars.has(p.id));
     const recentFormats = existingActions.map(a => a.format).filter(Boolean) as ContentFormat[];
     const recentPillars = existingActions.map(a => a.editorial_pillar_id).filter(Boolean) as string[];
     const recentObjectives = existingActions.map(a => a.objective).filter(Boolean) as Objective[];
 
     const generated = generateWeek({
       profile,
-      pillars,
+      pillars: filteredPillars,
       existingActions,
       strategicDates,
       activeCampaigns,
@@ -76,9 +91,10 @@ export default function WeekGeneratorModal({
     const keptObjectives = kept.map(a => a.objective) as Objective[];
 
     if (!profile) return;
+    const filteredPillars = pillars.filter(p => selectedPillars.has(p.id));
     const newResult = generateWeek({
       profile,
-      pillars,
+      pillars: filteredPillars,
       existingActions: [...existingActions, ...kept] as Action[],
       strategicDates,
       activeCampaigns,
@@ -172,6 +188,44 @@ export default function WeekGeneratorModal({
             <p className="text-sm text-amber-900">
               Este cliente ainda não possui perfil editorial. Configure em <strong>Linha Editorial</strong>.
             </p>
+          </div>
+        )}
+
+        {/* Pillar selection */}
+        {profile && !result && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-xs font-medium text-gray-600">Pilares para esta semana</span>
+              <span className="text-[10px] text-gray-400 ml-1">
+                ({selectedPillars.size} de {pillars.filter(p => p.is_active).length} selecionados)
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {pillars.filter(p => p.is_active).map(pillar => {
+                const isSelected = selectedPillars.has(pillar.id);
+                return (
+                  <button
+                    key={pillar.id}
+                    onClick={() => {
+                      setSelectedPillars(prev => {
+                        const next = new Set(prev);
+                        if (isSelected) next.delete(pillar.id);
+                        else next.add(pillar.id);
+                        return next;
+                      });
+                    }}
+                    className={`px-3 py-1.5 text-xs rounded-full border transition-all ${
+                      isSelected
+                        ? 'bg-primary-50 border-primary-300 text-primary-700 font-medium'
+                        : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-500'
+                    }`}
+                  >
+                    {pillar.name}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
