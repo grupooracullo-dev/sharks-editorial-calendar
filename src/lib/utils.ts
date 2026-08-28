@@ -9,8 +9,18 @@ export function generateId(): string {
   return crypto.randomUUID();
 }
 
+function toValidDate(date: string | Date): Date | null {
+  if (typeof date === 'string') {
+    if (!date) return null;
+    const d = new Date(date + 'T00:00:00');
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return date instanceof Date && !isNaN(date.getTime()) ? date : null;
+}
+
 export function formatDate(date: string | Date): string {
-  const d = typeof date === 'string' ? new Date(date + 'T00:00:00') : date;
+  const d = toValidDate(date);
+  if (!d) return '';
   return d.toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: '2-digit',
@@ -19,7 +29,8 @@ export function formatDate(date: string | Date): string {
 }
 
 export function formatDateLong(date: string | Date): string {
-  const d = typeof date === 'string' ? new Date(date + 'T00:00:00') : date;
+  const d = toValidDate(date);
+  if (!d) return '';
   return d.toLocaleDateString('pt-BR', {
     weekday: 'long',
     day: 'numeric',
@@ -29,7 +40,8 @@ export function formatDateLong(date: string | Date): string {
 }
 
 export function formatDateShort(date: string | Date): string {
-  const d = typeof date === 'string' ? new Date(date + 'T00:00:00') : date;
+  const d = toValidDate(date);
+  if (!d) return '';
   return d.toLocaleDateString('pt-BR', {
     day: 'numeric',
     month: 'short',

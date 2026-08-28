@@ -269,7 +269,9 @@ export default function DashboardOverview({
               {data.next7Days.map(action => (
                 <div key={action.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                   <div className="w-10 h-10 rounded-lg bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold shrink-0">
-                    {format(parseISO(action.action_date + 'T00:00:00'), 'dd/MM', { locale: ptBR })}
+                    {action.action_date
+                      ? format(parseISO(action.action_date + 'T00:00:00'), 'dd/MM', { locale: ptBR })
+                      : '—'}
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{action.title}</p>
