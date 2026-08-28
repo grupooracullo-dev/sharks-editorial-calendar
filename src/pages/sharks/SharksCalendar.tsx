@@ -44,6 +44,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
   const { currentWorkspace } = useWorkspace();
   const { integration } = useIntegration(currentWorkspace?.id);
   const [syncing, setSyncing] = useState(false);
+  const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
   const filterObj = useMemo(() => ({
     workspaceId: currentWorkspace?.id,
@@ -58,6 +59,18 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
   const activeCampaigns = useActiveCampaigns(currentWorkspace?.id);
   const { dates: strategicDates } = useStrategicDates(currentWorkspace?.id);
   const channels = useChannels(currentWorkspace?.id);
+
+  const STATUS_DOT_COLORS: Record<string, string> = {
+    draft: 'bg-gray-400',
+    briefing: 'bg-blue-500',
+    in_production: 'bg-yellow-500',
+    sharks_review: 'bg-purple-500',
+    scheduled: 'bg-indigo-500',
+    published: 'bg-green-500',
+    completed: 'bg-emerald-500',
+    cancelled: 'bg-red-400',
+    overdue: 'bg-orange-500',
+  };
 
   const weekStep = isMobile ? 3 : 7;
   const goToToday = () => setCurrentDate(new Date());
@@ -159,6 +172,11 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
       }
     });
   };
+
+  // Reset expanded day when navigating months
+  useEffect(() => {
+    setExpandedDay(null);
+  }, [currentDate.getMonth(), currentDate.getFullYear()]);
 
   const calendarDays = getCalendarDays(currentDate);
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -345,21 +363,56 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                         )}
                       </div>
                     )}
-                    <div className="space-y-0.5 sm:space-y-1">
-                      {dayActions.slice(0, isMobile ? 2 : 4).map(action => (
-                        <CalendarEvent
-                          key={action.id}
-                          action={action}
-                          onClick={() => handleActionClick(action)}
-                          onQuickStatus={handleQuickStatus}
-                          compact
-                          showClient={isAdmin}
-                        />
-                      ))}
-                      {dayActions.length > (isMobile ? 2 : 4) && (
-                        <p className="text-[9px] sm:text-[10px] text-gray-400 text-center">+{dayActions.length - (isMobile ? 2 : 4)}</p>
-                      )}
-                    </div>
+                    {(() => {
+                        const maxVisible = isMobile ? 3 : 4;
+                        const isExpanded = expandedDay === dateStr;
+                        const hiddenCount = dayActions.length - maxVisible;
+                        return (
+                          <div className="space-y-0.5">
+                            {/* Pills compactas (estado colapsado) */}
+                            {!isExpanded && dayActions.slice(0, maxVisible).map(action => (
+                              <div
+                                key={action.id}
+                                onClick={(e) => { e.stopPropagation(); handleActionClick(action); }}
+                                className="flex items-center gap-1 px-1 py-0.5 rounded cursor-pointer hover:bg-gray-100 transition-colors"
+                              >
+                                <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', STATUS_DOT_COLORS[action.status] || 'bg-gray-400')} />
+                                <span className="text-[10px] font-medium truncate">{action.title}</span>
+                              </div>
+                            ))}
+                            {/* Botão "Ver todas" */}
+                            {!isExpanded && hiddenCount > 0 && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setExpandedDay(dateStr); }}
+                                className="w-full text-[9px] sm:text-[10px] text-primary-600 font-medium hover:text-primary-700 py-0.5 transition-colors"
+                              >
+                                Ver todas ({hiddenCount}+)
+                              </button>
+                            )}
+                            {/* Estado expandido: todas as ações com scroll */}
+                            {isExpanded && (
+                              <div className="max-h-32 overflow-y-auto space-y-0.5 border-t border-gray-100 pt-1">
+                                {dayActions.map(action => (
+                                  <div
+                                    key={action.id}
+                                    onClick={(e) => { e.stopPropagation(); handleActionClick(action); }}
+                                    className="flex items-center gap-1 px-1 py-0.5 rounded cursor-pointer hover:bg-gray-100 transition-colors"
+                                  >
+                                    <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', STATUS_DOT_COLORS[action.status] || 'bg-gray-400')} />
+                                    <span className="text-[10px] font-medium truncate">{action.title}</span>
+                                  </div>
+                                ))}
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setExpandedDay(null); }}
+                                  className="w-full text-[9px] text-gray-400 hover:text-gray-600 py-0.5 transition-colors"
+                                >
+                                  Recolher
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                   </div>
                 );
               })}

@@ -1,25 +1,79 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useEditorial } from '@/hooks/useEditorial';
 import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
-import Input from '@/components/ui/Input';
-import Select from '@/components/ui/Select';
 import Button from '@/components/ui/Button';
-import Badge from '@/components/ui/Badge';
 import EmptyState from '@/components/ui/EmptyState';
 import StrategicDatesSection from '@/components/editorial/StrategicDatesSection';
 import FormatFrequencyStepper from '@/components/editorial/FormatFrequencyStepper';
-import type { FormatFrequency } from '@/types';
+import { MARKETING_PLAN_PILLARS, marketingPillarsMissing } from '@/lib/editorialPillars';
+import type { FormatFrequency, EditorialPillar } from '@/types';
 import { DAYS_OF_WEEK } from '@/lib/constants';
 import { toast } from 'sonner';
-import { BookOpen, Target, Clock, Ban, Plus, Trash2 } from 'lucide-react';
+import { BookOpen, Target, Clock, Ban, Plus, Trash2, Sparkles } from 'lucide-react';
+
+function PillarPercentageInput({ pillar, onSave }: { pillar: EditorialPillar; onSave: (id: string, percentage: number) => void }) {
+  const [draft, setDraft] = useState(String(pillar.percentage));
+
+  const commit = () => {
+    const n = Math.max(0, Math.min(100, Math.floor(Number(draft) || 0)));
+    if (n !== pillar.percentage) onSave(pillar.id, n);
+    setDraft(String(pillar.percentage));
+  };
+
+  return (
+    <div className="flex items-center gap-1 shrink-0">
+      <input
+        type="number"
+        min={0}
+        max={100}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        }}
+        className="w-14 text-center text-sm font-semibold text-gray-900 tabular-nums border border-gray-200 rounded-md py-1 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+        aria-label="Percentual do pilar"
+      />
+      <span className="text-xs text-gray-400">%</span>
+    </div>
+  );
+}
 
 export default function SharksEditorial() {
   const { currentWorkspace } = useWorkspace();
-  const { pillars, profile, updateProfile, createPillar, deletePillar } = useEditorial(currentWorkspace?.id);
+  const { pillars, profile, updateProfile, createPillar, updatePillar, deletePillar } = useEditorial(currentWorkspace?.id);
   const [newPillarName, setNewPillarName] = useState('');
   const [audienceDraft, setAudienceDraft] = useState<string | null>(null);
   const [restrictionsDraft, setRestrictionsDraft] = useState<string | null>(null);
+  const [seeding, setSeeding] = useState(false);
+
+  const missing = marketingPillarsMissing(pillars);
+
+  const seedMarketingPillars = useCallback(async () => {
+    if (!currentWorkspace || seeding) return;
+    setSeeding(true);
+    const toAdd = marketingPillarsMissing(pillars);
+    let ok = 0;
+    for (const p of toAdd) {
+      const res = await createPillar({
+        workspace_id: currentWorkspace.id,
+        name: p.name,
+        description: p.description,
+        color: p.color,
+        percentage: p.percentage,
+      });
+      if (res.ok) ok++;
+    }
+    if (ok > 0) toast.success(`${ok} pilar(es) do plano de marketing adicionados`);
+    setSeeding(false);
+  }, [currentWorkspace, pillars, createPillar, seeding]);
+
+  // Cliente sem pilares recebe os 6 pilares do plano de marketing automaticamente
+  useEffect(() => {
+    if (currentWorkspace && pillars.length === 0 && !seeding) seedMarketingPillars();
+  }, [currentWorkspace, pillars.length, seeding, seedMarketingPillars]);
 
   if (!currentWorkspace) {
     return (
@@ -136,7 +190,17 @@ export default function SharksEditorial() {
       <Card>
         <CardHeader>
           <CardTitle>Pilares Editoriais</CardTitle>
-          <span className="text-xs text-gray-400">{pillars.length} pilares</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">{pillars.length} pilares</span>
+            {missing.length > 0 && (
+              <Button variant="outline" size="sm" loading={seeding} onClick={seedMarketingPillars}>
+                <Sparkles className="w-3.5 h-3.5" />
+                {missing.length === MARKETING_PLAN_PILLARS.length
+                  ? 'Adicionar plano de marketing (6 pilares)'
+                  : `Adicionar ${missing.length} pilar(es) do plano`}
+              </Button>
+            )}
+          </div>
         </CardHeader>
 
         <div className="space-y-2">
@@ -144,9 +208,13 @@ export default function SharksEditorial() {
             <div key={p.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg group">
               <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
+                {p.description && <p className="text-xs text-gray-400 truncate">{p.description}</p>}
               </div>
-              <Badge variant="primary">{p.percentage}%</Badge>
+              <PillarPercentageInput
+                pillar={p}
+                onSave={(id, percentage) => updatePillar(id, { percentage })}
+              />
               <button
                 onClick={() => deletePillar(p.id)}
                 className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 text-gray-300 hover:text-red-500 transition-all"

@@ -13,13 +13,13 @@ const ZONES: { key: FormatFrequencyZone; label: string; hint: string; icon: type
   { key: 'reels',  label: 'Reels',  hint: 'Reels',                     icon: Clapperboard },
 ];
 
-const MAX_PER_ZONE = 9;
+const clampCount = (n: number) => (Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0);
 
 export function normalizeFormatFrequency(ff: FormatFrequency): FormatFrequency {
   return {
-    feed: Math.max(0, Math.min(MAX_PER_ZONE, ff.feed ?? 0)),
-    story: Math.max(0, Math.min(MAX_PER_ZONE, ff.story ?? 0)),
-    reels: Math.max(0, Math.min(MAX_PER_ZONE, ff.reels ?? 0)),
+    feed: clampCount(ff.feed ?? 0),
+    story: clampCount(ff.story ?? 0),
+    reels: clampCount(ff.reels ?? 0),
   };
 }
 
@@ -32,12 +32,18 @@ export function defaultFormatFrequency(): FormatFrequency {
 }
 
 export default function FormatFrequencyStepper({ value, onChange, disabled }: Props) {
+  const updateValue = (key: FormatFrequencyZone, raw: string | number) => {
+    const nextCount = clampCount(Number(raw));
+    const total = formatFrequencyTotal({ ...value, [key]: nextCount });
+    if (total < 1) return;
+    onChange({ ...value, [key]: nextCount });
+  };
+
   const update = (key: FormatFrequencyZone, delta: number) => {
     const current = value[key] ?? 0;
     const nextCount = current + delta;
-    if (nextCount < 0 || nextCount > MAX_PER_ZONE) return;
-    const total = formatFrequencyTotal({ ...value, [key]: nextCount });
-    if (total < 1) return;
+    if (nextCount < 0) return;
+    if (formatFrequencyTotal({ ...value, [key]: nextCount }) < 1) return;
     onChange({ ...value, [key]: nextCount });
   };
 
@@ -73,11 +79,19 @@ export default function FormatFrequencyStepper({ value, onChange, disabled }: Pr
                 >
                   <Minus className="w-3.5 h-3.5" />
                 </button>
-                <span className="w-8 text-center text-sm font-semibold text-gray-900 tabular-nums">{count}</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={Number.isFinite(count) ? count : 0}
+                  disabled={disabled}
+                  onChange={(e) => updateValue(key, e.target.value)}
+                  className="w-14 text-center text-sm font-semibold text-gray-900 tabular-nums border border-gray-200 rounded-md py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 disabled:opacity-50"
+                  aria-label={`Quantidade semanal de ${label}`}
+                />
                 <button
                   type="button"
                   onClick={() => update(key, 1)}
-                  disabled={disabled || count >= MAX_PER_ZONE || formatFrequencyTotal({ ...value, [key]: count + 1 }) > 14}
+                  disabled={disabled}
                   className="w-7 h-7 rounded-md bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   aria-label={`Adicionar ${label}`}
                 >

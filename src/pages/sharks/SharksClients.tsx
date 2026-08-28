@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Plus, Building2, MapPin, ChevronRight, CalendarDays, CheckSquare, Square, Info, Pencil, Trash2 } from 'lucide-react';
 import FormatFrequencyStepper, { normalizeFormatFrequency, formatFrequencyTotal, defaultFormatFrequency } from '@/components/editorial/FormatFrequencyStepper';
+import { MARKETING_PLAN_PILLARS } from '@/lib/editorialPillars';
 import type { FormatFrequency } from '@/types';
 
 const wizardSteps = ['Empresa', 'Localização', 'Linha Editorial', 'Frequência', 'Datas', 'Google Calendar'];
@@ -49,14 +50,7 @@ const CITIES_BY_STATE: Record<string, string[]> = {
   TO: ['Palmas', 'Araguaína', 'Gurupi', 'Porto Nacional'],
 };
 
-const DEFAULT_PILLARS_DEF = [
-  { name: 'Marca & Essência', description: 'Conteúdo sobre a marca, valores e cultura', color: '#0066FF', percentage: 20 },
-  { name: 'Autoridade & Educação', description: 'Conteúdo educativo e de autoridade', color: '#7C3AED', percentage: 25 },
-  { name: 'Produto & Solução', description: 'Apresentação de produtos e serviços', color: '#059669', percentage: 20 },
-  { name: 'Prova & Confiança', description: 'Depoimentos, cases e prova social', color: '#D97706', percentage: 15 },
-  { name: 'Relacionamento & Comunidade', description: 'Engajamento e comunidade', color: '#EC4899', percentage: 10 },
-  { name: 'Oferta & Conversão', description: 'Ofertas e conversão de vendas', color: '#EF4444', percentage: 10 },
-];
+const DEFAULT_PILLARS_DEF = MARKETING_PLAN_PILLARS;
 
 function slugify(name: string): string {
   return name
