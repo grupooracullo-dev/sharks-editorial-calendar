@@ -186,7 +186,7 @@ const goNext = () => {
       {view === 'week' && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
           <div className="flex-1 min-h-0 overflow-auto">
-            <div className={cn('h-full flex flex-col', isMobile && 'min-w-[720px]')}>
+            <div className={cn('min-h-full flex flex-col', isMobile && 'min-w-[720px]')}>
               <div className="sticky top-0 z-10 bg-white grid grid-cols-7 border-b border-gray-100 shrink-0">
                 {weekDayWindow.map((day, i) => (
                   <div key={i} className="py-2 text-center border-r last:border-r-0">
