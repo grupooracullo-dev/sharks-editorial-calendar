@@ -511,12 +511,14 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
                         />
                       ))}
                       {dayActions.length === 0 && (
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleCreateAtDate(dateStr)}
-                          className="w-full text-center text-[10px] text-gray-300 hover:text-gray-500 hover:bg-gray-50 rounded-md py-1.5 transition-colors"
+                          className="w-full text-[10px] text-gray-300 hover:text-gray-500 py-1 px-1"
                         >
                           + Nova ação
-                        </button>
+                        </Button>
                       )}
                     </div>
                   );
