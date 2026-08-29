@@ -37,24 +37,6 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
   const campaigns = useActiveCampaigns(workspaceId);
   const { create, update, remove } = useActions({});
 
-  // Team members (admin + team) for responsible selector — filtered by environment
-  const [teamMembers, setTeamMembers] = useState<Array<{ id: string; full_name: string }>>([]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    supabase
-      .from('user_environments')
-      .select('user_id, users!inner(id, full_name)')
-      .eq('environment', environment)
-      .in('role', ['admin', 'team'])
-      .order('full_name', { foreignTable: 'users' })
-      .then(({ data }) => {
-        if (data) setTeamMembers(
-          data.map((ue: any) => ({ id: ue.users.id, full_name: ue.users.full_name }))
-        );
-      });
-  }, [isOpen, environment]);
-
   // Form state
   const [formData, setFormData] = useState({
     title: '',
@@ -81,6 +63,40 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
     responsible_id: '' as string,
     internal_deadline: '' as string,
   });
+
+  // Team members (admin + team) for responsible selector —
+  // filtered by environment AND workspace managers only (migration 037+)
+  const [teamMembers, setTeamMembers] = useState<Array<{ id: string; full_name: string }>>([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const ws = formData.workspace_id;
+    if (!ws) { setTeamMembers([]); return; }
+
+    // 1) Buscar user_ids dos managers do workspace selecionado
+    supabase
+      .from('memberships')
+      .select('user_id')
+      .eq('workspace_id', ws)
+      .eq('role', 'manager')
+      .then(({ data: members }) => {
+        const ids = members?.map(m => m.user_id) ?? [];
+        if (ids.length === 0) { setTeamMembers([]); return; }
+        // 2) Filtrar staff do ambiente que É manager do workspace
+        return supabase
+          .from('user_environments')
+          .select('user_id, users!inner(id, full_name)')
+          .eq('environment', environment)
+          .in('role', ['admin', 'team'])
+          .in('user_id', ids)
+          .order('full_name', { foreignTable: 'users' });
+      })
+      .then((res) => {
+        if (res?.data) setTeamMembers(
+          res.data.map((ue: any) => ({ id: ue.users.id, full_name: ue.users.full_name }))
+        );
+      });
+  }, [isOpen, environment, formData.workspace_id]);
 
   useEffect(() => {
     if (isOpen) {
