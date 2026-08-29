@@ -321,8 +321,8 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
         </nav>
 
         {/* Footer */}
-        <div className={cn('border-t border-gray-100 p-3', collapsed && 'p-2')}>
-          <div className={cn('flex items-center gap-3', collapsed && 'flex-col gap-2')}>
+        <div className={cn('border-t border-gray-100 p-3', collapsed && 'lg:p-2')}>
+          <div className={cn('flex items-center gap-3', collapsed && 'lg:flex-col lg:gap-2')}>
             <Avatar name={user?.full_name || 'U'} src={user?.avatar_url} size="sm" />
             {!collapsed && (
               <div className="flex-1 min-w-0">
@@ -332,12 +332,21 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
             )}
             <button
               onClick={handleSignOut}
-              className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              className="hidden lg:block p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
               title="Sair"
             >
               <LogOut className="w-4 h-4" />
             </button>
           </div>
+
+          {/* Mobile (drawer): botão de sair com rótulo, área de toque generosa */}
+          <button
+            onClick={handleSignOut}
+            className="lg:hidden mt-3 w-full flex items-center justify-center gap-2 px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-200 bg-gray-50 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200 active:bg-red-100 transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Sair da conta
+          </button>
         </div>
 
         {/* Collapse toggle */}
