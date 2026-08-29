@@ -1,4 +1,4 @@
-import { ReactNode, useState, useRef, useEffect } from 'react';
+import { ReactNode, useState, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 interface TooltipProps {
@@ -26,14 +26,13 @@ export default function Tooltip({ content, children, position = 'top' }: Tooltip
       onMouseLeave={() => setVisible(false)}
     >
       {children}
-      {visible && (
-        <div className={cn(
-          'absolute z-50 px-2 py-1 text-xs text-white bg-gray-900 rounded-md whitespace-nowrap pointer-events-none',
-          positions[position]
-        )}>
-          {content}
-        </div>
-      )}
+      <div className={cn(
+        'absolute z-50 px-2 py-1 text-xs text-white bg-gray-900 rounded-md whitespace-nowrap pointer-events-none transition-opacity duration-150',
+        positions[position],
+        visible ? 'opacity-100' : 'opacity-0'
+      )}>
+        {content}
+      </div>
     </div>
   );
 }

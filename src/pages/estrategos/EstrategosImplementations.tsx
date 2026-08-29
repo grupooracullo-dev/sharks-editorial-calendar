@@ -37,6 +37,8 @@ export default function EstrategosImplementations() {
   const workspaces = workspacesByEnv('estrategos');
   const [modal, setModal] = useState<{ open: boolean; editing: EstrategosImplementation | null }>({ open: false, editing: null });
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
+  const [deletingConfirm, setDeletingConfirm] = useState(false);
   const [form, setForm] = useState({ workspace_id: '', project_id: '', name: '', description: '', system_name: '', status: 'pending', target_date: '' });
 
   useEffect(() => {
@@ -103,13 +105,17 @@ export default function EstrategosImplementations() {
     }
   };
 
-  const handleDelete = async (i: EstrategosImplementation) => {
-    if (!window.confirm(`Excluir a implantação "${i.name}"?`)) return;
+  const handleDelete = async () => {
+    if (!deleting) return;
+    setDeletingConfirm(true);
     try {
-      await deleteImplementation(i.id);
+      await deleteImplementation(deleting.id);
       toast.success('Implantação excluída.');
+      setDeleting(null);
     } catch (e) {
       toast.error((e as Error).message);
+    } finally {
+      setDeletingConfirm(false);
     }
   };
 
@@ -155,7 +161,7 @@ export default function EstrategosImplementations() {
                   <button onClick={() => openEdit(i)} className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
                     <Pencil className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDelete(i)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                  <button onClick={() => setDeleting({ id: i.id, name: i.name })} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -219,6 +225,17 @@ export default function EstrategosImplementations() {
             <Button variant="ghost" onClick={() => setModal({ open: false, editing: null })}>Cancelar</Button>
             <Button onClick={handleSave} loading={saving}>{modal.editing ? 'Salvar' : 'Criar'}</Button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={!!deleting} onClose={() => setDeleting(null)} title="Confirmar exclusão" size="sm">
+        <p className="text-sm text-gray-600">
+          Tem certeza que deseja excluir <strong>{deleting?.name}</strong>?
+          Esta ação não pode ser desfeita.
+        </p>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="ghost" onClick={() => setDeleting(null)}>Cancelar</Button>
+          <Button variant="danger" loading={deletingConfirm} onClick={handleDelete}>Excluir</Button>
         </div>
       </Modal>
     </div>

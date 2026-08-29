@@ -29,6 +29,8 @@ export default function EstrategosProjects() {
   const workspaces = workspacesByEnv('estrategos');
   const [modal, setModal] = useState<{ open: boolean; editing: EstrategosProject | null }>({ open: false, editing: null });
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
+  const [deletingConfirm, setDeletingConfirm] = useState(false);
   const [form, setForm] = useState({ workspace_id: '', name: '', description: '', status: 'planning', start_date: '', end_date: '' });
 
   useEffect(() => {
@@ -88,13 +90,17 @@ export default function EstrategosProjects() {
     }
   };
 
-  const handleDelete = async (p: EstrategosProject) => {
-    if (!window.confirm(`Excluir o projeto "${p.name}"?`)) return;
+  const handleDelete = async () => {
+    if (!deleting) return;
+    setDeletingConfirm(true);
     try {
-      await deleteProject(p.id);
+      await deleteProject(deleting.id);
       toast.success('Projeto excluído.');
+      setDeleting(null);
     } catch (e) {
       toast.error((e as Error).message);
+    } finally {
+      setDeletingConfirm(false);
     }
   };
 
@@ -134,7 +140,7 @@ export default function EstrategosProjects() {
                   <button onClick={() => openEdit(p)} className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
                     <Pencil className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDelete(p)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                  <button onClick={() => setDeleting({ id: p.id, name: p.name })} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -190,6 +196,17 @@ export default function EstrategosProjects() {
             <Button variant="ghost" onClick={() => setModal({ open: false, editing: null })}>Cancelar</Button>
             <Button onClick={handleSave} loading={saving}>{modal.editing ? 'Salvar' : 'Criar'}</Button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={!!deleting} onClose={() => setDeleting(null)} title="Confirmar exclusão" size="sm">
+        <p className="text-sm text-gray-600">
+          Tem certeza que deseja excluir <strong>{deleting?.name}</strong>?
+          Esta ação não pode ser desfeita.
+        </p>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="ghost" onClick={() => setDeleting(null)}>Cancelar</Button>
+          <Button variant="danger" loading={deletingConfirm} onClick={handleDelete}>Excluir</Button>
         </div>
       </Modal>
     </div>

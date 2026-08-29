@@ -35,6 +35,8 @@ export default function EstrategosMeetings() {
   const workspaces = workspacesByEnv('estrategos');
   const [modal, setModal] = useState<{ open: boolean; editing: EstrategosMeeting | null }>({ open: false, editing: null });
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
+  const [deletingConfirm, setDeletingConfirm] = useState(false);
   const [form, setForm] = useState({ workspace_id: '', project_id: '', title: '', description: '', meeting_date: '', meeting_time: '', duration_minutes: 60, location: '', status: 'scheduled' });
 
   useEffect(() => {
@@ -104,13 +106,17 @@ export default function EstrategosMeetings() {
     }
   };
 
-  const handleDelete = async (m: EstrategosMeeting) => {
-    if (!window.confirm(`Excluir a reunião "${m.title}"?`)) return;
+  const handleDelete = async () => {
+    if (!deleting) return;
+    setDeletingConfirm(true);
     try {
-      await deleteMeeting(m.id);
+      await deleteMeeting(deleting.id);
       toast.success('Reunião excluída.');
+      setDeleting(null);
     } catch (e) {
       toast.error((e as Error).message);
+    } finally {
+      setDeletingConfirm(false);
     }
   };
 
@@ -156,7 +162,7 @@ export default function EstrategosMeetings() {
                   <button onClick={() => openEdit(m)} className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
                     <Pencil className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDelete(m)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                  <button onClick={() => setDeleting({ id: m.id, name: m.title })} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -235,6 +241,17 @@ export default function EstrategosMeetings() {
             <Button variant="ghost" onClick={() => setModal({ open: false, editing: null })}>Cancelar</Button>
             <Button onClick={handleSave} loading={saving}>{modal.editing ? 'Salvar' : 'Criar'}</Button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={!!deleting} onClose={() => setDeleting(null)} title="Confirmar exclusão" size="sm">
+        <p className="text-sm text-gray-600">
+          Tem certeza que deseja excluir <strong>{deleting?.name}</strong>?
+          Esta ação não pode ser desfeita.
+        </p>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="ghost" onClick={() => setDeleting(null)}>Cancelar</Button>
+          <Button variant="danger" loading={deletingConfirm} onClick={handleDelete}>Excluir</Button>
         </div>
       </Modal>
     </div>

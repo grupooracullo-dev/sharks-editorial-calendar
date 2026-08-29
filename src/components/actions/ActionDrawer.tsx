@@ -5,6 +5,7 @@ import Modal from '@/components/ui/Modal';
 import StatusBadge from './StatusBadge';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import Select from '@/components/ui/Select';
 import Avatar from '@/components/ui/Avatar';
 import { CONTENT_FORMATS, OBJECTIVES, FUNNEL_STAGES, ACTION_TYPES, ACTION_STATUSES } from '@/lib/constants';
 import { formatDate, formatTime, cn } from '@/lib/utils';
@@ -88,19 +89,16 @@ export default function ActionDrawer({ action, isOpen, onClose, onEdit, onDelete
             )}
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-gray-400 uppercase tracking-wider shrink-0">Status</span>
-              <select
+              <Select
                 value={action.status}
                 disabled={updating}
                 onChange={(e) => {
                   const newStatus = e.target.value as Action['status'];
                   if (newStatus !== action.status) applyStatus(newStatus, 'Status atualizado!');
                 }}
-                className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/20 disabled:opacity-50"
-              >
-                {Object.entries(ACTION_STATUSES).map(([value, conf]) => (
-                  <option key={value} value={value}>{conf.label}</option>
-                ))}
-              </select>
+                options={Object.entries(ACTION_STATUSES).map(([value, conf]) => ({ value, label: conf.label }))}
+                className="flex-1"
+              />
             </div>
           </div>
         )}

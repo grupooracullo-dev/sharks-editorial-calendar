@@ -6,6 +6,7 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import AvatarUploader from '@/components/ui/AvatarUploader';
 import Badge from '@/components/ui/Badge';
+import Switch from '@/components/ui/Switch';
 import { USER_ROLES } from '@/lib/constants';
 import { toast } from 'sonner';
 import {
@@ -36,25 +37,6 @@ function loadPrefs(): NotifPrefs {
   } catch {
     return DEFAULT_PREFS;
   }
-}
-
-function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint: string }) {
-  return (
-    <button
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className="flex items-center justify-between w-full p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-left"
-    >
-      <div className="min-w-0 pr-3">
-        <p className="text-sm font-medium text-gray-900">{label}</p>
-        <p className="text-xs text-gray-500">{hint}</p>
-      </div>
-      <span className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${checked ? 'bg-primary-500' : 'bg-gray-300'}`}>
-        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
-      </span>
-    </button>
-  );
 }
 
 export default function SharksSettings() {
@@ -198,23 +180,23 @@ export default function SharksSettings() {
           </CardTitle>
         </CardHeader>
         <div className="space-y-2">
-          <Toggle
+          <Switch
             checked={prefs.chat}
             onChange={v => savePrefs({ ...prefs, chat: v })}
             label="Mensagens do chat"
-            hint="Avisar quando clientes ou a equipe enviarem mensagens"
+            description="Avisar quando clientes ou a equipe enviarem mensagens"
           />
-          <Toggle
+          <Switch
             checked={prefs.overdue}
             onChange={v => savePrefs({ ...prefs, overdue: v })}
             label="Ações atrasadas"
-            hint="Alertar sobre ações que passaram da data sem publicação"
+            description="Alertar sobre ações que passaram da data sem publicação"
           />
-          <Toggle
+          <Switch
             checked={prefs.sync}
             onChange={v => savePrefs({ ...prefs, sync: v })}
             label="Sincronização Google Calendar"
-            hint="Avisar sobre falhas de sincronização com a agenda"
+            description="Avisar sobre falhas de sincronização com a agenda"
           />
         </div>
         <p className="text-[11px] text-gray-400 mt-3 flex items-center gap-1">

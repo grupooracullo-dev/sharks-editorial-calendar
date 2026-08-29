@@ -19,6 +19,7 @@ import {
   type GoogleCalendarOption,
 } from '@/lib/googleSync';
 import SyncModeSelector, { EnvSyncToggles } from '@/components/integrations/SyncModeSelector';
+import Switch from '@/components/ui/Switch';
 import WorkspaceLogo from '@/components/ui/WorkspaceLogo';
 import { toast } from 'sonner';
 import type { SyncMode, EnvironmentType } from '@/types';
@@ -502,31 +503,12 @@ export default function SharksIntegrations() {
                 </div>
                 <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
               </button>
-              <button
-                role="switch"
-                aria-checked={!!integration?.auto_sync}
-                onClick={handleToggleAuto}
-                className="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-left"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <Zap className={`w-4 h-4 shrink-0 ${integration?.auto_sync ? 'text-primary-500' : 'text-gray-400'}`} />
-                  <div className="min-w-0">
-                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">Sync automático</p>
-                    <p className="text-sm text-gray-900">{integration?.auto_sync ? 'Ativado' : 'Pausado'}</p>
-                  </div>
-                </div>
-                <span
-                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                    integration?.auto_sync ? 'bg-primary-500' : 'bg-gray-300'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-                      integration?.auto_sync ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                    }`}
-                  />
-                </span>
-              </button>
+              <Switch
+                checked={!!integration?.auto_sync}
+                onChange={handleToggleAuto}
+                label="Sync automático"
+                description={integration?.auto_sync ? 'Ativado' : 'Pausado'}
+              />
             </div>
 
             {/* Seletor de agenda */}
