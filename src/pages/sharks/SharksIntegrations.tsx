@@ -120,10 +120,14 @@ export default function SharksIntegrations() {
       ? integration.google_calendar_name
       : 'Primária';
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     if (!user) return;
     // Global mode when no workspace selected
-    startGoogleConnect(sharksWs?.id ?? null, user.id, '/sharks/integrations', syncMode);
+    try {
+      await startGoogleConnect(sharksWs?.id ?? null, '/sharks/integrations', syncMode);
+    } catch (e) {
+      toast.error(`Erro ao iniciar conexão: ${(e as Error).message}`);
+    }
   };
 
   const handleToggleEnv = async (env: EnvironmentType, enabled: boolean) => {

@@ -70,9 +70,13 @@ export default function EstrategosIntegrations() {
 
   const isConnected = !!integration?.is_connected;
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     if (!user) return;
-    startGoogleConnect(ws.id, user.id, '/estrategos/integrations', syncMode);
+    try {
+      await startGoogleConnect(ws.id, '/estrategos/integrations', syncMode);
+    } catch (e) {
+      toast.error(`Erro ao iniciar conexão: ${(e as Error).message}`);
+    }
   };
 
   const handleSyncNow = async () => {

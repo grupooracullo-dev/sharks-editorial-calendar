@@ -94,19 +94,23 @@ async function callFn<T>(body: Record<string, unknown>): Promise<T> {
 
 // ---------- public API ----------
 
-export function startGoogleConnect(
+export async function startGoogleConnect(
   workspaceId: string | null,
-  userId: string,
   returnTo = '/sharks/integrations',
   syncMode: SyncMode = 'unified',
-): void {
+): Promise<void> {
   const wsParam = workspaceId ?? 'global';
-  window.location.href =
-    `${FN_BASE}/google-oauth-start` +
-    `?workspace_id=${encodeURIComponent(wsParam)}` +
-    `&user_id=${encodeURIComponent(userId)}` +
-    `&return_to=${encodeURIComponent(returnTo)}` +
-    `&sync_mode=${syncMode}`;
+  const { data, error } = await supabase.functions.invoke('google-oauth-start', {
+    body: {
+      workspace_id: wsParam,
+      return_to: returnTo,
+      sync_mode: syncMode,
+    },
+  });
+  if (error) throw new Error(error.message);
+  if (data?.error) throw new Error(data.error);
+  if (!data?.url) throw new Error('URL de consentimento não retornada');
+  window.location.href = data.url as string;
 }
 
 export interface SyncResult {

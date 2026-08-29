@@ -89,9 +89,13 @@ export default function ClientIntegrations() {
       ? integration.google_calendar_name
       : 'Primária';
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     if (!user) return;
-    startGoogleConnect(currentWorkspace.id, user.id, '/client/integrations', syncMode);
+    try {
+      await startGoogleConnect(currentWorkspace.id, '/client/integrations', syncMode);
+    } catch (e) {
+      toast.error(`Erro ao iniciar conexão: ${(e as Error).message}`);
+    }
   };
 
   const handleToggleEnv = async (env: EnvironmentType, enabled: boolean) => {
