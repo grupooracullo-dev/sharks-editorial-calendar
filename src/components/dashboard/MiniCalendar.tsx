@@ -209,7 +209,7 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate, camp
                   onClick={() => handleDayTap(dateStr)}
                   title={dayActions.length > 0 ? dayActions.map(a => a.title).join('\n') : undefined}
                   className={cn(
-                    'calendar-cell relative flex flex-col items-stretch text-left p-1 sm:p-1.5 min-h-[72px] sm:min-h-[96px] md:min-h-[110px] group',
+                    'calendar-cell relative flex flex-col items-stretch text-left p-1 sm:p-1.5 min-h-[72px] sm:min-h-[96px] md:min-h-[110px] group overflow-y-auto',
                     inMonth && !isWeekend && 'bg-white hover:bg-primary-50/60',
                     inMonth && isWeekend && 'bg-orange-50 hover:bg-orange-100/70',
                     !inMonth && 'bg-gray-100/60 text-gray-300 hover:bg-gray-100',
@@ -249,14 +249,14 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate, camp
 
                   {/* Chips de acao (estilo Google) */}
                   <div className="flex flex-col gap-0.5 mt-0.5 min-w-0 flex-1">
-                    {dayActions.slice(0, 3).map((action, i) => {
+                    {dayActions.slice(0, 5).map((action, i) => {
                       const color = ACTION_STATUS_DOT_HEX[action.status] || '#9ca3af';
                       return (
                         <span
                           key={action.id}
                           className={cn(
                             'flex items-center gap-1 rounded-md px-1 py-0.5 leading-none overflow-hidden ring-1 ring-black/[0.03]',
-                            i === 2 && 'hidden sm:flex'
+                            i >= 3 && 'hidden sm:flex'
                           )}
                           style={{ backgroundColor: `${color}1F` }}
                         >

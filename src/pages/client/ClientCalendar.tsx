@@ -23,6 +23,7 @@ const [currentDate, setCurrentDate] = useState(new Date());
 const [view, setView] = useState<CalendarViewType>('month');
   const [selectedAction, setSelectedAction] = useState<Action | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
   const { actions } = useActions(currentWorkspace ? { workspaceId: currentWorkspace.id } : {});
   const activeCampaigns = useActiveCampaigns(currentWorkspace?.id);
@@ -108,7 +109,7 @@ const goNext = () => {
                     backgroundImage: `linear-gradient(${dayCampaigns[0].color || '#3B82F6'}0F, ${dayCampaigns[0].color || '#3B82F6'}0F)`,
                   } : undefined}
                   className={cn(
-                    'min-h-0 overflow-hidden border-r border-b last:border-r-0 p-1.5',
+                    'min-h-0 overflow-y-auto border-r border-b last:border-r-0 p-1.5',
                     !isCurrentMonth && 'bg-gray-50/50',
                     isToday && 'bg-primary-50/30'
                   )}
@@ -155,13 +156,40 @@ const goNext = () => {
                       )}
                     </div>
                   )}
-                  <div className="space-y-1">
-                    {dayActions.slice(0, 3).map(action => (
-                      <CalendarEvent key={action.id} action={action} onClick={() => handleActionClick(action)} compact />
-                    ))}
-                    {dayActions.length > 3 && (
-                      <p className="text-[10px] text-gray-400">+{dayActions.length - 3}</p>
-                    )}
+                  <div className="space-y-0.5">
+                    {(() => {
+                      const maxVisible = isMobile ? 3 : 4;
+                      const isExpanded = expandedDay === dateStr;
+                      const hiddenCount = dayActions.length - maxVisible;
+                      return (
+                        <>
+                          {!isExpanded && dayActions.slice(0, maxVisible).map(action => (
+                            <CalendarEvent key={action.id} action={action} onClick={() => handleActionClick(action)} compact />
+                          ))}
+                          {!isExpanded && hiddenCount > 0 && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setExpandedDay(dateStr); }}
+                              className="w-full text-[9px] sm:text-[10px] text-primary-600 font-medium hover:text-primary-700 py-0.5 transition-colors"
+                            >
+                              Ver todas ({hiddenCount}+)
+                            </button>
+                          )}
+                          {isExpanded && (
+                            <div className="space-y-0.5 border-t border-gray-100 pt-1">
+                              {dayActions.map(action => (
+                                <CalendarEvent key={action.id} action={action} onClick={() => handleActionClick(action)} compact />
+                              ))}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setExpandedDay(null); }}
+                                className="w-full text-[9px] text-gray-400 hover:text-gray-600 py-0.5 transition-colors"
+                              >
+                                Recolher
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               );
@@ -207,7 +235,7 @@ const goNext = () => {
                   });
 
                   return (
-                    <div key={i} className="border-r last:border-r-0 p-2">
+                    <div key={i} className="border-r last:border-r-0 p-2 overflow-y-auto max-h-48">
                       <div className="space-y-1">
                         {dayCampaigns.length > 0 && (
                           <div className="flex flex-col gap-0.5">

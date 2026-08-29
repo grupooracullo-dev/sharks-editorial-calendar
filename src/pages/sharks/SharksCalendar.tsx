@@ -296,7 +296,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
                       backgroundImage: `linear-gradient(${dayCampaigns[0].color || '#3B82F6'}0F, ${dayCampaigns[0].color || '#3B82F6'}0F)`,
                     } : undefined}
                     className={cn(
-                      'min-h-0 overflow-hidden border-r border-b last:border-r-0 p-1 sm:p-1.5 transition-colors',
+                      'min-h-0 overflow-y-auto border-r border-b last:border-r-0 p-1 sm:p-1.5 transition-colors',
                       !isCurrentMonth && 'bg-gray-50/50',
                       isToday && 'bg-primary-50/30',
                       dayActions.length === 0 && 'cursor-pointer',
@@ -389,7 +389,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
                             )}
                             {/* Estado expandido: todas as ações com scroll */}
                             {isExpanded && (
-                              <div className="max-h-32 overflow-y-auto space-y-0.5 border-t border-gray-100 pt-1">
+                              <div className="space-y-0.5 border-t border-gray-100 pt-1">
                                 {dayActions.map(action => (
                                   <div
                                     key={action.id}
@@ -470,7 +470,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
                       <div
                         key={i}
                         id={dateStr}
-                        className="border-r last:border-r-0 p-1.5 sm:p-2 space-y-1 sm:space-y-2"
+                        className="border-r last:border-r-0 p-1.5 sm:p-2 space-y-1 sm:space-y-2 overflow-y-auto max-h-48"
                       >
                         {dayStrategic.length > 0 && (
                           <div className="flex flex-col gap-0.5">
