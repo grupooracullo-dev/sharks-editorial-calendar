@@ -64,8 +64,8 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
     internal_deadline: '' as string,
   });
 
-  // Team members (admin + team) for responsible selector —
-  // filtered by environment AND workspace managers only (migration 037+)
+  // Team members for responsible selector — staff de ambos os ambientes
+  // que são managers do workspace selecionado
   const [teamMembers, setTeamMembers] = useState<Array<{ id: string; full_name: string }>>([]);
 
   useEffect(() => {
@@ -82,21 +82,27 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
       .then(({ data: members }) => {
         const ids = members?.map(m => m.user_id) ?? [];
         if (ids.length === 0) { setTeamMembers([]); return; }
-        // 2) Filtrar staff do ambiente que É manager do workspace
+        // 2) Filtrar staff de qualquer ambiente que É manager do workspace
         return supabase
           .from('user_environments')
           .select('user_id, users!inner(id, full_name)')
-          .eq('environment', environment)
+          .in('environment', ['sharks_company', 'estrategos'])
           .in('role', ['admin', 'team'])
           .in('user_id', ids)
           .order('full_name', { foreignTable: 'users' });
       })
       .then((res) => {
-        if (res?.data) setTeamMembers(
-          res.data.map((ue: any) => ({ id: ue.users.id, full_name: ue.users.full_name }))
-        );
+        if (res?.data) {
+          // Deduplicar por user_id (um user pode ter row em ambos os ambientes)
+          const seen = new Set<string>();
+          setTeamMembers(
+            res.data
+              .filter((ue: any) => { if (seen.has(ue.user_id)) return false; seen.add(ue.user_id); return true; })
+              .map((ue: any) => ({ id: ue.users.id, full_name: ue.users.full_name }))
+          );
+        }
       });
-  }, [isOpen, environment, formData.workspace_id]);
+  }, [isOpen, formData.workspace_id]);
 
   useEffect(() => {
     if (isOpen) {
