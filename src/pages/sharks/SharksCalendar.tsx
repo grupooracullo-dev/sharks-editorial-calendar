@@ -39,6 +39,7 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editingAction, setEditingAction] = useState<Action | null>(null);
+  const [formDefaultDate, setFormDefaultDate] = useState<string | undefined>(undefined);
   const [draggedAction, setDraggedAction] = useState<Action | null>(null);
   const [generatorOpen, setGeneratorOpen] = useState(false);
   const { currentWorkspace } = useWorkspace();
@@ -88,11 +89,13 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
 
   const handleCreate = () => {
     setEditingAction(null);
+    setFormDefaultDate(undefined);
     setFormOpen(true);
   };
 
   const handleCreateAtDate = (dateStr: string) => {
-    setEditingAction({ action_date: dateStr } as Action);
+    setEditingAction(null);
+    setFormDefaultDate(dateStr);
     setFormOpen(true);
   };
 
@@ -624,7 +627,8 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
       <ActionForm
         action={editingAction}
         isOpen={formOpen}
-        onClose={() => { setFormOpen(false); setEditingAction(null); }}
+        defaultDate={formDefaultDate}
+        onClose={() => { setFormOpen(false); setEditingAction(null); setFormDefaultDate(undefined); }}
         environment={environment}
       />
 

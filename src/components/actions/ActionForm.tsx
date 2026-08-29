@@ -86,12 +86,12 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
     if (isOpen) {
       if (action) {
         setFormData({
-          title: action.title,
+          title: action.title ?? '',
           description: action.description || '',
-          workspace_id: action.workspace_id,
-          action_date: action.action_date,
+          workspace_id: action.workspace_id ?? workspaceId,
+          action_date: action.action_date || defaultDate || new Date().toISOString().split('T')[0],
           action_time: action.action_time?.slice(0, 5) || '09:00',
-          action_type: action.action_type,
+          action_type: action.action_type || (environment === 'estrategos' ? 'meeting' : 'content') as ActionType,
           format: action.format || '',
           channel: action.channel || '',
           campaign_id: action.campaign_id || '',
@@ -105,7 +105,7 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
           main_message: action.main_message || '',
           copy_text: action.copy_text || '',
           cta: action.cta || '',
-          status: action.status,
+          status: action.status || 'draft',
           observations: action.observations || '',
           responsible_id: (action as any).responsible_id || '',
           internal_deadline: (action as any).internal_deadline || '',
@@ -145,7 +145,7 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
   };
 
   const handleSave = async (asDraft = false) => {
-    if (!formData.title.trim()) return;
+    if (!(formData.title ?? '').trim()) return;
 
     setSaving(true);
     try {
@@ -452,11 +452,11 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
 
         {/* Actions */}
         <div className="border-t border-gray-100 pt-4 flex flex-wrap gap-2 sticky bottom-0 bg-white">
-          <Button onClick={() => handleSave(false)} loading={saving} disabled={!formData.title.trim()}>
+          <Button onClick={() => handleSave(false)} loading={saving} disabled={!(formData.title ?? '').trim()}>
             Salvar ação
           </Button>
           {!isEditing && (
-            <Button variant="secondary" onClick={() => handleSave(true)} disabled={!formData.title.trim()}>
+            <Button variant="secondary" onClick={() => handleSave(true)} disabled={!(formData.title ?? '').trim()}>
               Salvar como rascunho
             </Button>
           )}
