@@ -454,7 +454,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
                     </div>
                   ))}
                 </div>
-                <div className="grid grid-cols-7 auto-rows-fr flex-1">
+                <div className="flex flex-1 min-h-0">
                   {weekDayWindow.map((day, i) => {
                     const dateStr = formatCalendarDate(day);
                     const dayActions = actions.filter(a => a.action_date === dateStr);
@@ -470,7 +470,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
                       <div
                         key={i}
                         id={dateStr}
-                        className="border-r last:border-r-0 p-1.5 sm:p-2 space-y-1 sm:space-y-2 overflow-y-auto max-h-48"
+                        className="flex-1 min-w-0 min-h-0 border-r last:border-r-0 p-1.5 sm:p-2 space-y-1 sm:space-y-2 overflow-y-auto"
                       >
                         {dayStrategic.length > 0 && (
                           <div className="flex flex-col gap-0.5">

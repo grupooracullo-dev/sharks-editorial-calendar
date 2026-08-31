@@ -225,7 +225,7 @@ const goNext = () => {
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-7 auto-rows-fr flex-1">
+              <div className="flex flex-1 min-h-0">
                 {weekDayWindow.map((day, i) => {
                   const dateStr = formatCalendarDate(day);
                   const dayActions = actions.filter(a => a.action_date === dateStr);
@@ -235,7 +235,7 @@ const goNext = () => {
                   });
 
                   return (
-                    <div key={i} className="border-r last:border-r-0 p-2 overflow-y-auto max-h-48">
+                    <div key={i} className="flex-1 min-w-0 min-h-0 border-r last:border-r-0 p-2 overflow-y-auto">
                       <div className="space-y-1">
                         {dayCampaigns.length > 0 && (
                           <div className="flex flex-col gap-0.5">
