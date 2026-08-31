@@ -77,7 +77,8 @@ function json(status: number, body: unknown, origin: string | null): Response {
 Deno.serve(async req => {
   const origin = req.headers.get('Origin');
   if (req.method === 'OPTIONS') {
-    return json(204, {}, origin);
+    // Preflight: 200 COM body (204 nunca pode ter body — TypeError no Deno)
+    return json(200, { ok: true }, origin);
   }
   if (req.method !== 'POST') {
     return json(405, { error: 'Use POST' }, origin);
