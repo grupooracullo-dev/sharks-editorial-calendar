@@ -73,6 +73,8 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
     const ws = formData.workspace_id;
     if (!ws) { setTeamMembers([]); return; }
 
+    type UeRow = { user_id: string; users: { id: string; full_name: string } };
+
     // 1) Buscar user_ids dos managers do workspace selecionado
     supabase
       .from('memberships')
@@ -92,15 +94,14 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
           .order('full_name', { foreignTable: 'users' });
       })
       .then((res) => {
-        if (res?.data) {
-          // Deduplicar por user_id (um user pode ter row em ambos os ambientes)
-          const seen = new Set<string>();
-          setTeamMembers(
-            res.data
-              .filter((ue: any) => { if (seen.has(ue.user_id)) return false; seen.add(ue.user_id); return true; })
-              .map((ue: any) => ({ id: ue.users.id, full_name: ue.users.full_name }))
-          );
-        }
+        const rows = (res?.data ?? []) as unknown as UeRow[];
+        // Deduplicar por user_id (um user pode ter row em ambos os ambientes)
+        const seen = new Set<string>();
+        setTeamMembers(
+          rows
+            .filter(ue => { if (seen.has(ue.user_id)) return false; seen.add(ue.user_id); return true; })
+            .map(ue => ({ id: ue.users.id, full_name: ue.users.full_name }))
+        );
       });
   }, [isOpen, formData.workspace_id]);
 
@@ -129,8 +130,8 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
           cta: action.cta || '',
           status: action.status || 'draft',
           observations: action.observations || '',
-          responsible_id: (action as any).responsible_id || '',
-          internal_deadline: (action as any).internal_deadline || '',
+          responsible_id: action.responsible_id || '',
+          internal_deadline: action.internal_deadline || '',
         });
       } else {
         setFormData({

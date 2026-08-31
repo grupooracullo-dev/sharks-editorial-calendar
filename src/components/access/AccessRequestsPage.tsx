@@ -17,6 +17,7 @@ import {
   UserPlus, Check, X, Mail, Building2, Phone,
   MessageSquare, Calendar, Eye, EyeOff, Copy,
   Loader2, Inbox, ShieldCheck, Briefcase, UserCog, Plus,
+  type LucideIcon,
 } from 'lucide-react';
 import type { EnvironmentType } from '@/types';
 
@@ -790,7 +791,7 @@ export default function AccessRequestsPage({ environment }: AccessRequestsPagePr
   );
 }
 
-function DetailRow({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+function DetailRow({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
     <div className="flex items-start gap-3">
       <Icon className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />

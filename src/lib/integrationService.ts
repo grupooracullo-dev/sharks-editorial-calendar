@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { markIntegrationConnected, type GoogleIntegration } from '@/lib/googleSync';
+import { registerRealtimeReset } from '@/lib/realtimeCleanup';
 
 // ==========================================
 // INTEGRATION SERVICE
@@ -173,3 +174,16 @@ function ensureChannel(): void {
     )
     .subscribe();
 }
+
+/** Logout: limpa channel + caches (registered em realtimeCleanup). */
+export function resetIntegrationsRealtime(): void {
+  if (channel) {
+    supabase.removeChannel(channel);
+    channel = null;
+  }
+  cache.clear();
+  globalCache = null;
+  loadingPromises.clear();
+  notify();
+}
+registerRealtimeReset(resetIntegrationsRealtime);

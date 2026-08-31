@@ -25,7 +25,7 @@ export default function LogoUploader({ name, logoUrl, onChange }: LogoUploaderPr
     }
     setUploading(true);
     try {
-      const url = await uploadWorkspaceLogo(file);
+      const url = await uploadWorkspaceLogo(file, logoUrl);
       onChange(url);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Erro ao enviar o logo');

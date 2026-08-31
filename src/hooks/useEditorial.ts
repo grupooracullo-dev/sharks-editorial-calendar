@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { EditorialPillar, EditorialProfile } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { registerRealtimeReset } from '@/lib/realtimeCleanup';
 
 // ==========================================
 // EDITORIAL SERVICE (pillars + profile) - Supabase-backed cache
@@ -54,6 +55,19 @@ export async function loadEditorial(workspaceId?: string | null): Promise<void> 
       .subscribe();
   }
 }
+
+/** Logout: limpa channel + cache (registered em realtimeCleanup). */
+export function resetEditorialRealtime(): void {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
+  pillarsStore = [];
+  profilesStore = [];
+  currentScope = undefined;
+  notifyListeners();
+}
+registerRealtimeReset(resetEditorialRealtime);
 
 export function getPillars(workspaceId?: string): EditorialPillar[] {
   if (workspaceId) {

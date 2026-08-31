@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Campaign } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { registerRealtimeReset } from '@/lib/realtimeCleanup';
 
 // ==========================================
 // CAMPAIGNS SERVICE - Supabase-backed cache
@@ -51,6 +52,18 @@ export async function loadCampaigns(workspaceId?: string | null): Promise<void> 
       .subscribe();
   }
 }
+
+/** Logout: limpa channel + cache (registered em realtimeCleanup). */
+export function resetCampaignsRealtime(): void {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
+  campaignsStore = [];
+  currentScope = undefined;
+  notifyListeners();
+}
+registerRealtimeReset(resetCampaignsRealtime);
 
 export function getCampaigns(workspaceId?: string): Campaign[] {
   let result = [...campaignsStore];

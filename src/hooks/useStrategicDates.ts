@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { StrategicDate } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { registerRealtimeReset } from '@/lib/realtimeCleanup';
 
 // ==========================================
 // STRATEGIC DATES SERVICE
@@ -72,6 +73,20 @@ function ensureChannel(): void {
     )
     .subscribe();
 }
+
+/** Logout: limpa channel + cache (registered em realtimeCleanup). */
+export function resetStrategicDatesRealtime(): void {
+  if (channel) {
+    supabase.removeChannel(channel);
+    channel = null;
+  }
+  store = [];
+  currentScope = undefined;
+  loaded = false;
+  loadingPromise = null;
+  notify();
+}
+registerRealtimeReset(resetStrategicDatesRealtime);
 
 // ---------- mutations ----------
 

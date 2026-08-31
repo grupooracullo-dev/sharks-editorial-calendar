@@ -18,19 +18,26 @@ export async function uploadAvatar(file: File, userId: string): Promise<string> 
   if (error) throw new Error(error.message);
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(pathFor(userId, fileName));
+  if (!data?.publicUrl) throw new Error('Não foi possível obter a URL do avatar.');
 
-  // Upload ok → remove arquivos antigos (mantém apenas o novo)
-  await removeAvatar(userId, [fileName]);
+  // Upload ok → remove arquivos antigos (best-effort; não invalida o upload)
+  try {
+    await removeAvatar(userId, [fileName]);
+  } catch (e) {
+    console.error('[avatar] cleanup error:', e);
+  }
 
   return data.publicUrl;
 }
 
 export async function removeAvatar(userId: string, keep?: string[]): Promise<void> {
-  const { data: existing } = await supabase.storage.from(BUCKET).list(userId);
+  const { data: existing, error: listError } = await supabase.storage.from(BUCKET).list(userId);
+  if (listError) throw new Error(listError.message);
   if (!existing || existing.length === 0) return;
   const toRemove = existing
     .filter(f => !keep?.includes(f.name) && !f.name.startsWith('.'))
     .map(f => pathFor(userId, f.name));
   if (toRemove.length === 0) return;
-  await supabase.storage.from(BUCKET).remove(toRemove);
+  const { error: rmError } = await supabase.storage.from(BUCKET).remove(toRemove);
+  if (rmError) throw new Error(rmError.message);
 }

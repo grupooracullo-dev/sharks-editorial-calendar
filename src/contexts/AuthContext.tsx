@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { User } from '@supabase/supabase-js';
 import { User as Profile, UserEnvironment, EnvironmentType, EnvironmentRole } from '@/types';
 import { supabase, authState } from '@/lib/supabase';
+import { resetAllRealtime } from '@/lib/realtimeCleanup';
 
 interface AuthContextType {
   /** Profile row (public.users). Null when not approved yet. */
@@ -152,6 +153,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    // Encerra canais realtime singleton + limpa caches entre sessoes
+    await resetAllRealtime();
     authState.userId = null;
     setAuthUser(null);
     setUser(null);

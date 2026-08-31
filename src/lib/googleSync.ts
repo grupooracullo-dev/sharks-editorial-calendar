@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { SyncMode, EnvironmentType } from '@/types';
+import { registerRealtimeReset } from '@/lib/realtimeCleanup';
 
 // ==========================================
 // GOOGLE SYNC CLIENT
@@ -53,6 +54,15 @@ export function isConnected(wsId?: string | null): boolean {
   if (wsId === null || wsId === undefined) return connectedGlobal;
   return connectedWorkspaces.has(wsId);
 }
+
+/** Logout: limpa registro de conexoes e timers pendentes (via realtimeCleanup). */
+export function resetGoogleSyncState(): void {
+  connectedWorkspaces.clear();
+  connectedGlobal = false;
+  timers.forEach(t => clearTimeout(t));
+  timers.clear();
+}
+registerRealtimeReset(resetGoogleSyncState);
 
 // ---------- debounced processing ----------
 // Rapid edits collapse: only one request per

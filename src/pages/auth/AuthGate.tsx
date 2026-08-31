@@ -56,14 +56,14 @@ export default function AuthGate() {
     const channel = supabase
       .channel(`auth-gate-${email}`)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'access_requests', filter: `email=eq.${email}` }, (payload: any) => {
+      .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'access_requests', filter: `email=eq.${email}` }, (payload: { new: { status?: string; rejected_reason?: string | null } | null }) => {
         const row = payload.new;
         if (!row) return;
           if (row.status === 'pending') {
             setPhase('pending');
           } else if (row.status === 'rejected') {
             setPhase('rejected');
-            setReason(row.rejected_reason);
+            setReason(row.rejected_reason ?? null);
           } else if (row.status === 'approved') {
             // Profile row was created just before the request update.
             // Small retry to avoid a visibility race with the event.

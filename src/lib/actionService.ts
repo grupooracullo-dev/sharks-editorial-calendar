@@ -1,6 +1,7 @@
 import { Action, ActionFilters } from '@/types';
 import { supabase, authState } from '@/lib/supabase';
 import { notifyActionChanged } from '@/lib/googleSync';
+import { registerRealtimeReset } from '@/lib/realtimeCleanup';
 
 // ==========================================
 // ACTIONS SERVICE - Supabase-backed cache
@@ -118,6 +119,20 @@ export async function loadActions(workspaceId?: string | null, environment?: str
       .subscribe();
   }
 }
+
+/** Logout: limpa channel + cache (registered em realtimeCleanup). */
+export function resetActionsRealtime(): void {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
+  actionsStore = [];
+  currentScope = undefined;
+  loadStatus = 'idle';
+  loadSeq++;
+  notifyListeners();
+}
+registerRealtimeReset(resetActionsRealtime);
 
 export async function reloadActions(): Promise<void> {
   if (currentScope !== undefined) {
