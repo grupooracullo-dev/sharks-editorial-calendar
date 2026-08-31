@@ -76,18 +76,19 @@ Deno.serve(async req => {
           );
         if (error) throw error;
 
-        // Papel primario global acompanha o primeiro acesso staff
-        // (mantem UX e Edge Functions legadas coerentes).
+        // Papel primario global acompanha o acesso staff. O mapeamento
+        // reflete o cargo mais alto do usuario; aplica SEMPRE que o
+        // global calculado for mais privilegiado que o atual
+        // (antes: admin de estrategos nunca promovia — bug que deixava
+        // admins do ambiente com role global 'client').
         if (role === 'admin' || role === 'team') {
           const { data: cur } = await admin.from('users').select('role').eq('id', userId).maybeSingle();
           const newGlobal =
             role === 'admin' && env === 'sharks_company' ? 'admin_sharks'
             : role === 'admin' && env === 'estrategos' ? 'oracullo_admin'
             : 'sharks_team';
-          const upgrade =
-            (cur?.role === 'client') ||
-            (cur?.role === 'sharks_team' && newGlobal === 'admin_sharks');
-          if (upgrade) {
+          const rank: Record<string, number> = { client: 0, sharks_team: 1, admin_sharks: 2, oracullo_admin: 3 };
+          if ((rank[newGlobal] ?? 0) > (rank[cur?.role ?? 'client'] ?? 0)) {
             await admin.from('users').update({ role: newGlobal, updated_at: new Date().toISOString() }).eq('id', userId);
           }
         }

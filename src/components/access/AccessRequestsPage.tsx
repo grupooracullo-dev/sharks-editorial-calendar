@@ -58,7 +58,7 @@ interface AccessRequestsPageProps {
 }
 
 export default function AccessRequestsPage({ environment }: AccessRequestsPageProps) {
-  const { user, isAdmin, isOracullo } = useAuth();
+  const { user, isAdmin, isOracullo, hasAccess } = useAuth();
   const { refreshWorkspaces } = useWorkspace();
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [workspaces, setWorkspaces] = useState<WorkspaceWithEnv[]>([]);
@@ -83,7 +83,11 @@ export default function AccessRequestsPage({ environment }: AccessRequestsPagePr
   const [wsSelected, setWsSelected] = useState<Record<string, string>>({});
   const [wsNewName, setWsNewName] = useState<Record<string, string>>({});
 
-  const canManage = environment === 'all' ? isOracullo : isAdmin;
+  // Visao por ambiente: admin DO AMBIENTE gerencia (hasAccess ja aceita
+  // guardiao). O server revalida — aqui evitamos abrir modal que falharia 403.
+  const canManage = environment === 'all'
+    ? isOracullo
+    : hasAccess(environment, ['admin']);
 
   const openApprove = (req: AccessRequest) => {
     setApproveModal(req);

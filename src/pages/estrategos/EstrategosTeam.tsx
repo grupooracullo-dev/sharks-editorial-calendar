@@ -1,0 +1,745 @@
+import { useState, useEffect, useCallback } from 'react';
+import Card from '@/components/ui/Card';
+import Modal from '@/components/ui/Modal';
+import Input from '@/components/ui/Input';
+import Button from '@/components/ui/Button';
+import Avatar from '@/components/ui/Avatar';
+import EmptyState from '@/components/ui/EmptyState';
+import Badge from '@/components/ui/Badge';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import {
+  PERMISSION_META, ALL_PERMISSIONS, defaultPermissions, togglePerm, permCount,
+  type Permission,
+} from '@/lib/permissions';
+import { toast } from 'sonner';
+import {
+  Plus, Users, Pencil, Trash2, Shield, UserCheck, Mail,
+  ChevronDown, ChevronRight, Eye, EyeOff, Check,
+  Settings, Building2, CheckCircle2,
+} from 'lucide-react';
+
+/* ─── Types ─── */
+interface EnvMember {
+  id: string;
+  email: string;
+  full_name: string;
+  global_role: string;
+  env_role: 'admin' | 'team';
+  avatar_url?: string;
+}
+
+interface Workspace {
+  id: string;
+  name: string;
+  segment?: string;
+}
+
+interface MemberWithAccess extends EnvMember {
+  permissions: Permission[];
+  workspaces: Workspace[];
+}
+
+/* ─── Component ─── */
+export default function EstrategosTeam() {
+  const { user: currentUser, hasAccess, isOracullo } = useAuth();
+  const { refreshWorkspaces } = useWorkspace();
+  // Mutacoes exigem admin DO AMBIENTE estrategos (ou guardiao)
+  const isEnvAdmin = isOracullo || hasAccess('estrategos', ['admin']);
+  const [members, setMembers] = useState<MemberWithAccess[]>([]);
+  const [allWorkspaces, setAllWorkspaces] = useState<Workspace[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Modals
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<MemberWithAccess | null>(null);
+  const [removeConfirm, setRemoveConfirm] = useState<MemberWithAccess | null>(null);
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+
+  // Invite form
+  const [inviteStep, setInviteStep] = useState(0);
+  const [inviteForm, setInviteForm] = useState({
+    full_name: '',
+    email: '',
+    password: '',
+    showPassword: false,
+    permissions: [] as Permission[],
+    workspace_ids: [] as string[],
+  });
+
+  // Edit form
+  const [editForm, setEditForm] = useState({
+    full_name: '',
+    permissions: [] as Permission[],
+    workspace_ids: [] as string[],
+  });
+
+  const [submitting, setSubmitting] = useState(false);
+
+  /* ─── Load data ─── */
+  const loadData = useCallback(async () => {
+    setLoading(true);
+
+    // Membros do ambiente: user_environments estrategos com role admin/team
+    const [ueRes, wsRes, envMapRes] = await Promise.all([
+      supabase
+        .from('user_environments')
+        .select('user_id, role, users!inner(id, email, full_name, role, avatar_url)')
+        .eq('environment', 'estrategos')
+        .in('role', ['admin', 'team']),
+      supabase.from('workspaces').select('id, name, segment').eq('is_active', true).order('name'),
+      supabase.rpc('ws_env_map'),
+    ]);
+
+    const sharksIds = new Set(
+      ((envMapRes.data ?? []) as Array<{ id: string; environment: string }>)
+        .filter(r => r.environment === 'estrategos')
+        .map(r => r.id),
+    );
+    const wsList = ((wsRes.data as unknown as Workspace[]) || []).filter(w => sharksIds.has(w.id));
+    setAllWorkspaces(wsList);
+
+    const ueRows = (ueRes.data as unknown as Array<{
+      user_id: string;
+      role: 'admin' | 'team';
+      users: { id: string; email: string; full_name: string; role: string; avatar_url: string | null };
+    }>) ?? [];
+
+    // Deduplica (uma row por usuário/ambiente — mas protege contra duplicatas)
+    const seen = new Set<string>();
+    const baseMembers: EnvMember[] = [];
+    for (const row of ueRows) {
+      if (seen.has(row.user_id)) continue;
+      seen.add(row.user_id);
+      baseMembers.push({
+        id: row.users.id,
+        email: row.users.email,
+        full_name: row.users.full_name,
+        global_role: row.users.role,
+        env_role: row.role,
+        avatar_url: row.users.avatar_url ?? undefined,
+      });
+    }
+
+    // Permissões + workspaces estrategos atribuídos
+    const enriched: MemberWithAccess[] = await Promise.all(
+      baseMembers.map(async m => {
+        const [permsRes, memRes] = await Promise.all([
+          supabase.from('team_member_access').select('*').eq('user_id', m.id),
+          supabase
+            .from('memberships')
+            .select('workspace_id, workspace:workspaces(id, name)')
+            .eq('user_id', m.id)
+            .eq('role', 'manager'),
+        ]);
+        return {
+          ...m,
+          permissions: (permsRes.data as unknown as Permission[]) || [],
+          workspaces: ((memRes.data as unknown as { workspace: Workspace | null }[]) || [])
+            .map(r => r.workspace)
+            .filter((ws): ws is Workspace => !!ws && sharksIds.has(ws.id)),
+        };
+      }),
+    );
+
+    setMembers(enriched);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  /* ─── Helpers ─── */
+  async function functionErrorMessage(error: unknown): Promise<string> {
+    if (error && typeof error === 'object' && 'context' in error) {
+      try {
+        const body = await (error as { context: Response }).context.clone().json();
+        if (body && typeof body.error === 'string') return body.error;
+      } catch {
+        // resposta não-JSON — usa a mensagem padrão abaixo
+      }
+    }
+    return error instanceof Error ? error.message : 'Erro inesperado';
+  }
+
+  /* ─── Handlers ─── */
+  const handleInvite = async () => {
+    if (!inviteForm.full_name.trim() || !inviteForm.email.trim() || !inviteForm.password.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-create-user', {
+        body: {
+          email: inviteForm.email.trim(),
+          password: inviteForm.password,
+          full_name: inviteForm.full_name.trim(),
+          role: 'sharks_team',
+          environment: 'estrategos',
+          env_role: 'team',
+          permissions: inviteForm.permissions.length > 0 ? inviteForm.permissions : defaultPermissions(),
+          workspace_ids: inviteForm.workspace_ids,
+        },
+      });
+
+      if (error) throw new Error(await functionErrorMessage(error));
+      if (data?.error) throw new Error(data.error);
+
+      toast.success(`"${inviteForm.full_name}" entrou no time Estrategos!`);
+      setInviteOpen(false);
+      resetInviteForm();
+      await loadData();
+      await refreshWorkspaces();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao criar usuário');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const resetInviteForm = () => {
+    setInviteForm({
+      full_name: '', email: '', password: '', showPassword: false,
+      permissions: defaultPermissions(), workspace_ids: [],
+    });
+    setInviteStep(0);
+  };
+
+  const openInvite = () => {
+    resetInviteForm();
+    setInviteOpen(true);
+  };
+
+  const openEdit = (member: MemberWithAccess) => {
+    setEditingMember(member);
+    setEditForm({
+      full_name: member.full_name,
+      permissions: member.permissions.length > 0 ? member.permissions : defaultPermissions(),
+      workspace_ids: member.workspaces.map(w => w.id),
+    });
+    setEditOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!editingMember || !editForm.full_name.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-update-user', {
+        body: {
+          user_id: editingMember.id,
+          full_name: editForm.full_name.trim(),
+          role: 'sharks_team',
+          environment: 'estrategos',
+          permissions: editForm.permissions,
+          workspace_ids: editForm.workspace_ids,
+        },
+      });
+
+      if (error) throw new Error(await functionErrorMessage(error));
+      if (data?.error) throw new Error(data.error);
+
+      toast.success('Membro atualizado!');
+      setEditOpen(false);
+      setEditingMember(null);
+      await loadData();
+      await refreshWorkspaces();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao atualizar');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRemove = async (member: MemberWithAccess) => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-link-user-env', {
+        body: { op: 'unlink', user_id: member.id, environment: 'estrategos' },
+      });
+      if (error) throw new Error(await functionErrorMessage(error));
+      if (data?.error) throw new Error(data.error);
+      toast.success(`"${member.full_name}" saiu do time Estrategos.`);
+      setRemoveConfirm(null);
+      await loadData();
+      await refreshWorkspaces();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao remover');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /* ─── Render ─── */
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Time Estrategos</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Gerencie membros, permissões e acesso aos clientes do ambiente</p>
+        </div>
+        {isEnvAdmin && (
+          <Button onClick={openInvite}>
+            <Plus className="w-4 h-4" />
+            Novo membro
+          </Button>
+        )}
+      </div>
+
+      {/* Content */}
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
+        </div>
+      ) : members.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={Users}
+            title="Nenhum membro no time"
+            description="Adicione membros da equipe Estrategos para começar a trabalhar juntos."
+            action={isEnvAdmin ? <Button onClick={openInvite}>+ Novo membro</Button> : undefined}
+          />
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {members.map(member => {
+            const isExpanded = expandedCard === member.id;
+            const clientCount = member.workspaces.length;
+            const permSummary = member.permissions.filter(p => permCount(p) > 1).length;
+
+            return (
+              <Card key={member.id} className="overflow-hidden">
+                {/* Main row */}
+                <div
+                  className="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50/50 transition-colors"
+                  onClick={() => setExpandedCard(isExpanded ? null : member.id)}
+                >
+                  <Avatar name={member.full_name} src={member.avatar_url} size="lg" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-gray-900">{member.full_name}</h3>
+                      {member.env_role === 'admin' ? (
+                        <Badge variant="primary"><Shield className="w-3 h-3 mr-1" />Admin do ambiente</Badge>
+                      ) : (
+                        <Badge variant="info"><UserCheck className="w-3 h-3 mr-1" />Time</Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                      <Mail className="w-3 h-3" />
+                      {member.email}
+                    </p>
+                  </div>
+
+                  {/* Summary badges */}
+                  <div className="hidden sm:flex items-center gap-2">
+                    {clientCount > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-blue-50 text-blue-700">
+                        <Building2 className="w-3 h-3" />
+                        {clientCount} cliente{clientCount > 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {permSummary > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-green-50 text-green-700">
+                        <Settings className="w-3 h-3" />
+                        {permSummary} módulo{permSummary > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  {isEnvAdmin && (
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => openEdit(member)}
+                        className="p-2 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                        title="Editar"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      {member.id !== currentUser?.id && (
+                        <button
+                          onClick={() => setRemoveConfirm(member)}
+                          className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title="Remover do ambiente"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="text-gray-400">
+                    {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                  </div>
+                </div>
+
+                {/* Expanded details */}
+                {isExpanded && (
+                  <div className="border-t border-gray-100 p-4 bg-gray-50/30 space-y-4">
+                    {/* Permissions grid */}
+                    {member.permissions.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Permissões</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {member.permissions.map(perm => {
+                            const meta = PERMISSION_META[perm.permission];
+                            if (!meta) return null;
+                            const Icon = meta.icon;
+                            return (
+                              <div key={perm.permission} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-gray-200">
+                                <Icon className="w-4 h-4 text-gray-400 shrink-0" />
+                                <span className="text-sm font-medium text-gray-700 flex-1">{meta.label}</span>
+                                <div className="flex items-center gap-0.5">
+                                  {perm.can_create && <span className="text-[10px] px-1 py-0.5 rounded bg-green-100 text-green-700">C</span>}
+                                  {perm.can_read && <span className="text-[10px] px-1 py-0.5 rounded bg-blue-100 text-blue-700">L</span>}
+                                  {perm.can_update && <span className="text-[10px] px-1 py-0.5 rounded bg-yellow-100 text-yellow-700">U</span>}
+                                  {perm.can_delete && <span className="text-[10px] px-1 py-0.5 rounded bg-red-100 text-red-700">D</span>}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Assigned clients */}
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                        {member.env_role === 'admin' ? 'Clientes (visibilidade total do ambiente)' : 'Clientes atribuídos'}
+                      </h4>
+                      {member.env_role === 'admin' ? (
+                        <div className="flex flex-wrap gap-2">
+                          {allWorkspaces.map(ws => (
+                            <span key={ws.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-primary-50 text-primary-700 font-medium">
+                              <CheckCircle2 className="w-3 h-3" />
+                              {ws.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : member.workspaces.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {member.workspaces.map(ws => (
+                            <span key={ws.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-700 font-medium">
+                              <Building2 className="w-3 h-3" />
+                              {ws.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 italic">Nenhum cliente atribuído</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ═══════ INVITE MODAL ═══════ */}
+      <Modal isOpen={inviteOpen} onClose={() => setInviteOpen(false)} title="Novo Membro do Time Estrategos" size="lg">
+        {/* Step indicator */}
+        <div className="flex items-center gap-2 mb-6">
+          {['Dados pessoais', 'Permissões', 'Clientes'].map((step, i) => (
+            <button
+              key={step}
+              onClick={() => setInviteStep(i)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                inviteStep === i
+                  ? 'bg-primary-500 text-white'
+                  : inviteStep > i
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-500'
+              }`}
+            >
+              {inviteStep > i ? <Check className="w-3 h-3" /> : <span>{i + 1}</span>}
+              {step}
+            </button>
+          ))}
+        </div>
+
+        {/* Step 0: Basic info */}
+        {inviteStep === 0 && (
+          <div className="space-y-4">
+            <Input
+              label="Nome completo"
+              value={inviteForm.full_name}
+              onChange={(e) => setInviteForm(p => ({ ...p, full_name: e.target.value }))}
+              placeholder="Ex: João Silva"
+            />
+            <Input
+              label="E-mail"
+              type="email"
+              value={inviteForm.email}
+              onChange={(e) => setInviteForm(p => ({ ...p, email: e.target.value }))}
+              placeholder="email@exemplo.com"
+            />
+            <div className="relative">
+              <Input
+                label="Senha"
+                type={inviteForm.showPassword ? 'text' : 'password'}
+                value={inviteForm.password}
+                onChange={(e) => setInviteForm(p => ({ ...p, password: e.target.value }))}
+                placeholder="Mínimo 6 caracteres"
+              />
+              <button
+                type="button"
+                onClick={() => setInviteForm(p => ({ ...p, showPassword: !p.showPassword }))}
+                className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+                tabIndex={-1}
+              >
+                {inviteForm.showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+              O membro entra como <strong>Time</strong> no ambiente Estrategos. Promoção a Admin do
+              ambiente é feita pelo Oracullo.
+            </p>
+          </div>
+        )}
+
+        {/* Step 1: Permissions */}
+        {inviteStep === 1 && (
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500">Defina o que este membro pode fazer em cada módulo:</p>
+            {ALL_PERMISSIONS.map(perm => {
+              const meta = PERMISSION_META[perm];
+              const Icon = meta.icon;
+              const p = inviteForm.permissions.find(x => x.permission === perm) || { permission: perm, can_create: false, can_read: true, can_update: false, can_delete: false };
+              return (
+                <div key={perm} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white border border-gray-200 hover:border-gray-300 transition-colors">
+                  <Icon className="w-4 h-4 text-gray-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium text-gray-700">{meta.label}</span>
+                    <p className="text-[11px] text-gray-400">{meta.description}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {(['can_create', 'can_read', 'can_update', 'can_delete'] as const).map(action => {
+                      const label = action === 'can_create' ? 'Criar' : action === 'can_read' ? 'Ver' : action === 'can_update' ? 'Editar' : 'Excluir';
+                      return (
+                        <button
+                          key={action}
+                          onClick={() => setInviteForm(f => ({
+                            ...f,
+                            permissions: togglePerm(f.permissions, perm, action),
+                          }))}
+                          className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+                            p[action]
+                              ? action === 'can_delete' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                              : 'bg-gray-100 text-gray-400'
+                          }`}
+                          title={label}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Step 2: Client assignment */}
+        {inviteStep === 2 && (
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500">Selecione os clientes Estrategos que este membro irá gerenciar:</p>
+            {allWorkspaces.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">Nenhum cliente cadastrado</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {allWorkspaces.map(ws => {
+                  const selected = inviteForm.workspace_ids.includes(ws.id);
+                  return (
+                    <button
+                      key={ws.id}
+                      onClick={() => setInviteForm(f => ({
+                        ...f,
+                        workspace_ids: selected
+                          ? f.workspace_ids.filter(id => id !== ws.id)
+                          : [...f.workspace_ids, ws.id],
+                      }))}
+                      className={`flex items-center gap-3 px-3 py-3 rounded-lg border text-left transition-all ${
+                        selected
+                          ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-200'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${
+                        selected ? 'bg-primary-500 text-white' : 'border-2 border-gray-300'
+                      }`}>
+                        {selected && <Check className="w-3 h-3" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{ws.name}</p>
+                        {ws.segment && <p className="text-[11px] text-gray-400 truncate">{ws.segment}</p>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {inviteForm.workspace_ids.length > 0 && (
+              <p className="text-xs text-primary-600 font-medium">
+                {inviteForm.workspace_ids.length} cliente{inviteForm.workspace_ids.length > 1 ? 's' : ''} selecionado{inviteForm.workspace_ids.length > 1 ? 's' : ''}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex justify-between mt-6 pt-4 border-t border-gray-100">
+          <div>
+            {inviteStep > 0 && (
+              <Button variant="ghost" onClick={() => setInviteStep(s => s - 1)}>
+                Voltar
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setInviteOpen(false)}>Cancelar</Button>
+            {inviteStep < 2 ? (
+              <Button onClick={() => setInviteStep(s => s + 1)}>
+                Próximo
+              </Button>
+            ) : (
+              <Button
+                onClick={handleInvite}
+                loading={submitting}
+                disabled={!inviteForm.full_name.trim() || !inviteForm.email.trim() || !inviteForm.password.trim()}
+              >
+                Criar membro
+              </Button>
+            )}
+          </div>
+        </div>
+      </Modal>
+
+      {/* ═══════ EDIT MODAL ═══════ */}
+      <Modal isOpen={editOpen} onClose={() => setEditOpen(false)} title={`Editar: ${editingMember?.full_name}`} size="lg">
+        <div className="space-y-6">
+          {/* Basic info */}
+          <Input
+            label="Nome completo"
+            value={editForm.full_name}
+            onChange={(e) => setEditForm(p => ({ ...p, full_name: e.target.value }))}
+          />
+
+          {editingMember && (
+            <p className="text-xs text-gray-400">
+              E-mail: {editingMember.email} (não pode ser alterado) · Papel no ambiente:{' '}
+              {editingMember.env_role === 'admin' ? 'Admin' : 'Time'}
+            </p>
+          )}
+
+          {/* Permissions */}
+          <div>
+            <h4 className="text-sm font-semibold text-gray-900 mb-3">Permissões por módulo</h4>
+            <div className="space-y-2">
+              {ALL_PERMISSIONS.map(perm => {
+                const meta = PERMISSION_META[perm];
+                const Icon = meta.icon;
+                const p = editForm.permissions.find(x => x.permission === perm) || { permission: perm, can_create: false, can_read: true, can_update: false, can_delete: false };
+                return (
+                  <div key={perm} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100/80 transition-colors">
+                    <Icon className="w-4 h-4 text-gray-400 shrink-0" />
+                    <span className="text-sm font-medium text-gray-700 flex-1">{meta.label}</span>
+                    <div className="flex items-center gap-1">
+                      {(['can_create', 'can_read', 'can_update', 'can_delete'] as const).map(action => {
+                        const label = action === 'can_create' ? 'C' : action === 'can_read' ? 'L' : action === 'can_update' ? 'U' : 'D';
+                        const fullLabel = action === 'can_create' ? 'Criar' : action === 'can_read' ? 'Ver' : action === 'can_update' ? 'Editar' : 'Excluir';
+                        return (
+                          <button
+                            key={action}
+                            onClick={() => setEditForm(f => ({
+                              ...f,
+                              permissions: togglePerm(f.permissions, perm, action),
+                            }))}
+                            className={`w-7 h-7 rounded text-[11px] font-bold transition-colors ${
+                              p[action]
+                                ? action === 'can_delete' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                                : 'bg-gray-200 text-gray-400'
+                            }`}
+                            title={fullLabel}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Client assignment */}
+          <div>
+            <h4 className="text-sm font-semibold text-gray-900 mb-3">Clientes atribuídos (Estrategos)</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {allWorkspaces.map(ws => {
+                const selected = editForm.workspace_ids.includes(ws.id);
+                return (
+                  <button
+                    key={ws.id}
+                    onClick={() => setEditForm(f => ({
+                      ...f,
+                      workspace_ids: selected
+                        ? f.workspace_ids.filter(id => id !== ws.id)
+                        : [...f.workspace_ids, ws.id],
+                    }))}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-all ${
+                      selected
+                        ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-200'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${
+                      selected ? 'bg-primary-500 text-white' : 'border-2 border-gray-300'
+                    }`}>
+                      {selected && <Check className="w-3 h-3" />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{ws.name}</p>
+                      {ws.segment && <p className="text-[11px] text-gray-400 truncate">{ws.segment}</p>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100">
+          <Button variant="ghost" onClick={() => setEditOpen(false)}>Cancelar</Button>
+          <Button onClick={handleUpdate} loading={submitting} disabled={!editForm.full_name.trim()}>
+            Salvar alterações
+          </Button>
+        </div>
+      </Modal>
+
+      {/* ═══════ REMOVE CONFIRMATION ═══════ */}
+      <Modal isOpen={!!removeConfirm} onClose={() => setRemoveConfirm(null)} title="Remover do Ambiente" size="sm">
+        <p className="text-sm text-gray-600">
+          Remover <strong>{removeConfirm?.full_name}</strong> do ambiente Estrategos?
+        </p>
+        <p className="text-xs text-gray-400 mt-2">
+          O usuário perde o acesso ao ambiente Estrategos e aos vínculos com clientes dele. A conta
+          permanece ativa caso tenha acesso a outros ambientes.
+        </p>
+        <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100">
+          <Button variant="ghost" onClick={() => setRemoveConfirm(null)}>Cancelar</Button>
+          <Button
+            variant="danger"
+            onClick={() => removeConfirm && handleRemove(removeConfirm)}
+            loading={submitting}
+          >
+            Remover
+          </Button>
+        </div>
+      </Modal>
+    </div>
+  );
+}

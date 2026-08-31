@@ -9,6 +9,7 @@ function json(status: number, body: unknown) {
 }
 
 const VALID_ROLES = ['admin_sharks', 'sharks_team'];
+const VALID_ENVS = ['sharks_company', 'estrategos'];
 const VALID_PERMISSIONS = ['calendar', 'campaigns', 'editorial', 'templates', 'history', 'chat', 'clients', 'integrations', 'team'];
 
 const DEFAULT_PERMISSIONS = [
@@ -37,15 +38,32 @@ Deno.serve(async req => {
   if (!userData?.user) return json(401, { error: 'Token invalido' });
 
   const { data: caller } = await admin.from('users').select('role, is_guardian').eq('id', userData.user.id).maybeSingle();
-  const isStaff = !!caller?.is_guardian || caller?.role === 'oracullo_admin' || caller?.role === 'admin_sharks';
-  if (!isStaff) {
-    return json(403, { error: 'Apenas administradores podem criar usuarios' });
-  }
+  const guardian = !!caller?.is_guardian || caller?.role === 'oracullo_admin';
 
   const body = await req.json().catch(() => null);
   if (!body) return json(400, { error: 'JSON invalido' });
 
   const { email, password, full_name, role, permissions, workspace_ids } = body;
+  const environment: string = VALID_ENVS.includes(body?.environment) ? body.environment : 'sharks_company';
+
+  // Gate POR AMBIENTE: guardiao OU admin global sharks (so para sharks_company)
+  // OU admin do ambiente-alvo (user_environments.role = 'admin').
+  let isEnvAdmin = false;
+  if (!guardian) {
+    const { data: callerEnvs } = await admin
+      .from('user_environments')
+      .select('environment, role')
+      .eq('user_id', userData.user.id)
+      .eq('role', 'admin');
+    isEnvAdmin = (callerEnvs ?? []).some((e: { environment: string }) => e.environment === environment);
+  }
+  const allowed =
+    guardian ||
+    isEnvAdmin ||
+    (environment === 'sharks_company' && caller?.role === 'admin_sharks');
+  if (!allowed) {
+    return json(403, { error: `Apenas guardiao ou admin do ambiente ${environment} pode criar usuarios nele` });
+  }
 
   if (!email || !password || !full_name) {
     return json(400, { error: 'email, password e full_name sao obrigatorios' });
@@ -61,6 +79,20 @@ Deno.serve(async req => {
       if (!p?.permission || !VALID_PERMISSIONS.includes(p.permission)) {
         return json(400, { error: `permission invalido: ${p?.permission}` });
       }
+    }
+  }
+
+  // Workspaces precisam pertencer a org do ambiente (evita cross-env)
+  if (Array.isArray(workspace_ids) && workspace_ids.length > 0) {
+    const { data: org } = await admin.from('organizations').select('id').eq('environment', environment).maybeSingle();
+    const { data: envWs } = await admin
+      .from('workspaces')
+      .select('id')
+      .eq('organization_id', org?.id ?? '00000000-0000-0000-0000-000000000000');
+    const validIds = new Set((envWs ?? []).map((w: { id: string }) => w.id));
+    const invalid = workspace_ids.filter((id: string) => !validIds.has(id));
+    if (invalid.length > 0) {
+      return json(400, { error: `Um ou mais clientes nao pertencem ao ambiente ${environment}` });
     }
   }
 
@@ -86,6 +118,24 @@ Deno.serve(async req => {
   if (profileError) {
     await admin.auth.admin.deleteUser(authUser.user.id).catch(() => {});
     return json(500, { error: `Perfil: ${profileError.message}` });
+  }
+
+  // 2.1 Acesso ao ambiente (user_environments) — sem isso o usuario
+  //     nasce sem acesso a qualquer ambiente e fica travado no login.
+  const envRole: 'admin' | 'team' =
+    environment === 'estrategos'
+      ? (body?.env_role === 'admin' ? 'admin' : 'team')
+      : (role === 'admin_sharks' ? 'admin' : 'team');
+  const { error: envError } = await admin
+    .from('user_environments')
+    .upsert(
+      { user_id: authUser.user.id, environment, role: envRole, granted_by: userData.user.id },
+      { onConflict: 'user_id,environment' },
+    );
+  if (envError) {
+    await admin.from('users').delete().eq('id', authUser.user.id).catch(() => {});
+    await admin.auth.admin.deleteUser(authUser.user.id).catch(() => {});
+    return json(500, { error: `Ambiente: ${envError.message}` });
   }
 
   // 3. Create permissions (rollback everything on failure)
@@ -125,7 +175,9 @@ Deno.serve(async req => {
   try {
     const mail = welcomeEmail({
       name: full_name,
-      roleLabel: role === 'admin_sharks' ? 'Administrador' : 'Time Sharks',
+      roleLabel: role === 'admin_sharks'
+        ? 'Administrador'
+        : environment === 'estrategos' ? 'Time Estrategos' : 'Time Sharks',
       password: String(password),
     });
     const mailResult = await sendEmail({ to: String(email).trim().toLowerCase(), subject: mail.subject, html: mail.html });

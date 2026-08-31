@@ -8,6 +8,7 @@ function json(status: number, body: unknown) {
 }
 
 const VALID_ROLES = ['admin_sharks', 'sharks_team'];
+const VALID_ENVS = ['sharks_company', 'estrategos'];
 const VALID_PERMISSIONS = ['calendar', 'campaigns', 'editorial', 'templates', 'history', 'chat', 'clients', 'integrations', 'team'];
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -24,16 +25,33 @@ Deno.serve(async req => {
   const { data: userData } = await admin.auth.getUser(token);
   if (!userData?.user) return json(401, { error: 'Token invalido' });
 
-  const { data: caller } = await admin.from('users').select('role, is_guardian').eq('id', userData.user.id).maybeSingle();
-  const isStaff = !!caller?.is_guardian || caller?.role === 'oracullo_admin' || caller?.role === 'admin_sharks';
-  if (!isStaff) {
-    return json(403, { error: 'Apenas administradores podem alterar permissoes' });
-  }
-
   const body = await req.json().catch(() => null);
   if (!body) return json(400, { error: 'JSON invalido' });
 
   const { user_id, full_name, role, permissions, workspace_ids } = body;
+  // Escopo por ambiente: admin global sharks so gerencia sharks_company;
+  // admin do ambiente estrategos gerencia estrategos. Memberships sao
+  // editadas SOMENTE dentro do ambiente (nao apaga vinculos do outro).
+  const environment: string = VALID_ENVS.includes(body?.environment) ? body.environment : 'sharks_company';
+
+  const { data: caller } = await admin.from('users').select('role, is_guardian').eq('id', userData.user.id).maybeSingle();
+  const guardian = !!caller?.is_guardian || caller?.role === 'oracullo_admin';
+  let isEnvAdmin = false;
+  if (!guardian) {
+    const { data: callerEnvs } = await admin
+      .from('user_environments')
+      .select('environment, role')
+      .eq('user_id', userData.user.id)
+      .eq('role', 'admin');
+    isEnvAdmin = (callerEnvs ?? []).some((e: { environment: string }) => e.environment === environment);
+  }
+  const allowed =
+    guardian ||
+    isEnvAdmin ||
+    (environment === 'sharks_company' && caller?.role === 'admin_sharks');
+  if (!allowed) {
+    return json(403, { error: `Apenas guardiao ou admin do ambiente ${environment} pode editar membros dele` });
+  }
 
   if (!user_id || !UUID_RE.test(user_id)) return json(400, { error: 'user_id (UUID) obrigatorio' });
   if (role && !VALID_ROLES.includes(role)) {
@@ -88,9 +106,31 @@ Deno.serve(async req => {
     }
   }
 
-  // 3. Update client assignments (replace all manager memberships)
+  // 3. Update client assignments — scoped ao ambiente:
+  //    substitui APENAS as memberships manager de workspaces da org
+  //    deste ambiente (preserva vinculos do outro ambiente).
+  const scopeEnv = async (): Promise<Set<string> | null> => {
+    const { data: org } = await admin.from('organizations').select('id').eq('environment', environment).maybeSingle();
+    if (!org) return null;
+    const { data: envWs } = await admin.from('workspaces').select('id').eq('organization_id', org.id);
+    return new Set((envWs ?? []).map((w: { id: string }) => w.id));
+  };
+
   if (workspace_ids) {
-    const { error: delError } = await admin.from('memberships').delete().eq('user_id', user_id).eq('role', 'manager');
+    const envWsIds = await scopeEnv();
+    if (!envWsIds) return json(500, { error: `Organizacao do ambiente ${environment} nao encontrada` });
+
+    const invalid = workspace_ids.filter((id: string) => !envWsIds.has(id));
+    if (invalid.length > 0) {
+      return json(400, { error: `Um ou mais clientes nao pertencem ao ambiente ${environment}` });
+    }
+
+    const { error: delError } = await admin
+      .from('memberships')
+      .delete()
+      .eq('user_id', user_id)
+      .eq('role', 'manager')
+      .in('workspace_id', [...envWsIds]);
     if (delError) return json(500, { error: `Limpar clientes: ${delError.message}` });
 
     if (workspace_ids.length > 0) {
@@ -104,5 +144,5 @@ Deno.serve(async req => {
     }
   }
 
-  return json(200, { ok: true });
+  return json(200, { ok: true, environment });
 });

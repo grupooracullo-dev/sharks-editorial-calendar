@@ -65,6 +65,7 @@ const estrategosNavItems = [
   { icon: Rocket, label: 'Implementações', path: '/estrategos/implementations' },
   { icon: MessageSquare, label: 'Chat', path: '/estrategos/chat' },
   { icon: Users, label: 'Clientes', path: '/estrategos/clients', adminOnly: true },
+  { icon: UserCog, label: 'Time', path: '/estrategos/team' },
   { icon: UserPlus, label: 'Acessos', path: '/estrategos/access-requests', adminOnly: true },
   { icon: Link2, label: 'Integrações', path: '/estrategos/integrations' },
 ];

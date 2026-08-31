@@ -51,6 +51,7 @@ const EstrategosProjects = lazy(() => import('@/pages/estrategos/EstrategosProje
 const EstrategosChat = lazy(() => import('@/pages/estrategos/EstrategosChat'));
 const EstrategosClients = lazy(() => import('@/pages/estrategos/EstrategosClients'));
 const EstrategosAccessRequests = lazy(() => import('@/pages/estrategos/EstrategosAccessRequests'));
+const EstrategosTeam = lazy(() => import('@/pages/estrategos/EstrategosTeam'));
 const EstrategosIntegrations = lazy(() => import('@/pages/estrategos/EstrategosIntegrations'));
 const EstrategosMeetings = lazy(() => import('@/pages/estrategos/EstrategosMeetings'));
 const EstrategosImplementations = lazy(() => import('@/pages/estrategos/EstrategosImplementations'));
@@ -178,6 +179,7 @@ function AppRoutes() {
         <Route path="/estrategos/meetings" element={<EstrategosLayout><EstrategosMeetings /></EstrategosLayout>} />
         <Route path="/estrategos/implementations" element={<EstrategosLayout><EstrategosImplementations /></EstrategosLayout>} />
         <Route path="/estrategos/access-requests" element={<EstrategosLayout><EstrategosAccessRequests /></EstrategosLayout>} />
+        <Route path="/estrategos/team" element={<EstrategosLayout><EstrategosTeam /></EstrategosLayout>} />
 
         {/* Legal (público, exigência OAuth Google) */}
         <Route path="/privacy" element={<PrivacyPolicy />} />

@@ -131,14 +131,25 @@ Deno.serve(async req => {
   }
 
   // 4. Resolve workspaces per role
+  // Orgs dos ambientes concedidos — usado para validar pertencimento
+  // (server-side: a UI filtra, mas a API nao podia confiar nisso).
+  const { data: grantedOrgs } = await admin
+    .from('organizations')
+    .select('id, environment')
+    .in('environment', environments);
+  const grantedOrgIds = new Set((grantedOrgs ?? []).map(o => o.id));
+
   let clientWorkspaceId: string | null = null;
   if (role === 'client') {
     const candidate = (typeof body.workspace_id === 'string' && UUID_RE.test(body.workspace_id))
       ? body.workspace_id
       : reqRow.workspace_id;
     if (candidate) {
-      const { data: ws } = await admin.from('workspaces').select('id').eq('id', candidate).maybeSingle();
+      const { data: ws } = await admin.from('workspaces').select('id, organization_id').eq('id', candidate).maybeSingle();
       if (!ws) return json(400, { error: 'Cliente (workspace) selecionado nao existe' });
+      if (!grantedOrgIds.has(ws.organization_id)) {
+        return json(400, { error: 'O cliente selecionado nao pertence aos ambientes concedidos' });
+      }
       clientWorkspaceId = candidate;
     }
   }
@@ -149,9 +160,12 @@ Deno.serve(async req => {
       body.workspace_ids.filter((w: unknown) => typeof w === 'string' && UUID_RE.test(w as string)),
     )];
     if (teamWorkspaceIds.length > 0) {
-      const { data: wsRows } = await admin.from('workspaces').select('id').in('id', teamWorkspaceIds);
+      const { data: wsRows } = await admin.from('workspaces').select('id, organization_id').in('id', teamWorkspaceIds);
       if (!wsRows || wsRows.length !== teamWorkspaceIds.length) {
         return json(400, { error: 'Um ou mais clientes atribuidos nao existem' });
+      }
+      if (wsRows.some(w => !grantedOrgIds.has(w.organization_id))) {
+        return json(400, { error: 'Um ou mais clientes atribuidos nao pertencem aos ambientes concedidos' });
       }
     }
   }
