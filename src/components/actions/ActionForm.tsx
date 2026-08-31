@@ -64,46 +64,30 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
     internal_deadline: '' as string,
   });
 
-  // Team members for responsible selector — staff de ambos os ambientes
-  // que são managers do workspace selecionado
+  // Time de Produção para o seletor de responsável — admins + equipe,
+  // independente do cliente selecionado (mesma lista da página Time)
   const [teamMembers, setTeamMembers] = useState<Array<{ id: string; full_name: string }>>([]);
 
   useEffect(() => {
     if (!isOpen) return;
-    const ws = formData.workspace_id;
-    if (!ws) { setTeamMembers([]); return; }
-
-    type UeRow = { user_id: string; users: { id: string; full_name: string } };
-
-    // 1) Buscar user_ids dos managers do workspace selecionado
+    let active = true;
     supabase
-      .from('memberships')
-      .select('user_id')
-      .eq('workspace_id', ws)
-      .eq('role', 'manager')
-      .then(({ data: members }) => {
-        const ids = members?.map(m => m.user_id) ?? [];
-        if (ids.length === 0) { setTeamMembers([]); return; }
-        // 2) Filtrar staff de qualquer ambiente que É manager do workspace
-        return supabase
-          .from('user_environments')
-          .select('user_id, users!inner(id, full_name)')
-          .in('environment', ['sharks_company', 'estrategos'])
-          .in('role', ['admin', 'team'])
-          .in('user_id', ids)
-          .order('full_name', { foreignTable: 'users' });
-      })
-      .then((res) => {
-        const rows = (res?.data ?? []) as unknown as UeRow[];
-        // Deduplicar por user_id (um user pode ter row em ambos os ambientes)
-        const seen = new Set<string>();
-        setTeamMembers(
-          rows
-            .filter(ue => { if (seen.has(ue.user_id)) return false; seen.add(ue.user_id); return true; })
-            .map(ue => ({ id: ue.users.id, full_name: ue.users.full_name }))
-        );
+      .from('users')
+      .select('id, full_name')
+      .in('role', ['admin_sharks', 'sharks_team'])
+      .order('full_name')
+      .then(({ data }) => {
+        if (!active) return;
+        const list = (data ?? []).map(u => ({ id: u.id, full_name: u.full_name }));
+        // Preserva o responsável atual (edição) mesmo se não estiver na lista
+        const currentId = action?.responsible_id;
+        if (currentId && action?.responsible && !list.some(m => m.id === currentId)) {
+          list.push({ id: action.responsible.id, full_name: action.responsible.full_name });
+        }
+        setTeamMembers(list);
       });
-  }, [isOpen, formData.workspace_id]);
+    return () => { active = false; };
+  }, [isOpen, action?.responsible_id]);
 
   useEffect(() => {
     if (isOpen) {
