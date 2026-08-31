@@ -191,7 +191,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
       ];
 
   return (
-    <div className="flex flex-col gap-4 h-[calc(100dvh-9.5rem)] lg:h-[calc(100dvh-6.5rem)]">
+    <div className="flex flex-col gap-4 h-[calc(100dvh-12.5rem)] lg:h-[calc(100dvh-6.5rem)]">
       <DndContext collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         {/* Header */}
         <div className="flex flex-col gap-3 shrink-0">

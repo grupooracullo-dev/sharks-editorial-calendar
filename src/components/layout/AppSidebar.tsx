@@ -285,70 +285,73 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
           )}
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 py-4 px-2 overflow-y-auto">
-          <ul className="space-y-1">
-            {navItems.map((item) => (
-              <li key={item.path}>
-                <NavLink
-                  to={item.path}
-                  end={item.path === '/sharks' || item.path === '/client' || item.path === '/estrategos' || item.path === '/oracullo'}
-                  onClick={onClose}
-                  className={({ isActive }) =>
-                    cn(
-                      'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
-                      isActive
-                        ? 'bg-primary-50 text-primary-600'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
-                      collapsed && 'justify-center px-2'
-                    )
-                  }
-                >
-                  <item.icon className="w-5 h-5 flex-shrink-0" />
-                  {!collapsed && <span>{item.label}</span>}
-                  {item.path.endsWith('/access-requests') && pendingRequests > 0 && (
-                    <span
-                      className={cn(
-                        'ml-auto min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold',
-                        collapsed && 'absolute -top-0.5 -right-0.5 ml-0 w-5 px-0'
-                      )}
-                    >
-                      {pendingRequests > 9 ? '9+' : pendingRequests}
-                    </span>
-                  )}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        {/* Scrollable area: nav + footer together so footer is always reachable */}
+        <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
+          {/* Navigation */}
+          <nav className="flex-1 py-4 px-2">
+            <ul className="space-y-1">
+              {navItems.map((item) => (
+                <li key={item.path}>
+                  <NavLink
+                    to={item.path}
+                    end={item.path === '/sharks' || item.path === '/client' || item.path === '/estrategos' || item.path === '/oracullo'}
+                    onClick={onClose}
+                    className={({ isActive }) =>
+                      cn(
+                        'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+                        isActive
+                          ? 'bg-primary-50 text-primary-600'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                        collapsed && 'justify-center px-2'
+                      )
+                    }
+                  >
+                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                    {!collapsed && <span>{item.label}</span>}
+                    {item.path.endsWith('/access-requests') && pendingRequests > 0 && (
+                      <span
+                        className={cn(
+                          'ml-auto min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold',
+                          collapsed && 'absolute -top-0.5 -right-0.5 ml-0 w-5 px-0'
+                        )}
+                      >
+                        {pendingRequests > 9 ? '9+' : pendingRequests}
+                      </span>
+                    )}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </nav>
 
-        {/* Footer */}
-        <div className={cn('border-t border-gray-100 p-3', collapsed && 'lg:p-2')}>
-          <div className={cn('flex items-center gap-3', collapsed && 'lg:flex-col lg:gap-2')}>
-            <Avatar name={user?.full_name || 'U'} src={user?.avatar_url} size="sm" />
-            {!collapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{user?.full_name}</p>
-                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-              </div>
-            )}
+          {/* Footer */}
+          <div className={cn('border-t border-gray-100 p-3', collapsed && 'lg:p-2')}>
+            <div className={cn('flex items-center gap-3', collapsed && 'lg:flex-col lg:gap-2')}>
+              <Avatar name={user?.full_name || 'U'} src={user?.avatar_url} size="sm" />
+              {!collapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{user?.full_name}</p>
+                  <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                </div>
+              )}
+              <button
+                onClick={handleSignOut}
+                className="hidden lg:block p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                title="Sair"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Mobile (drawer): botão de sair com rótulo, área de toque generosa */}
             <button
               onClick={handleSignOut}
-              className="hidden lg:block p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-              title="Sair"
+              className="lg:hidden mt-3 w-full flex items-center justify-center gap-2 px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-200 bg-gray-50 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200 active:bg-red-100 transition-colors"
             >
               <LogOut className="w-4 h-4" />
+              Sair da conta
             </button>
           </div>
-
-          {/* Mobile (drawer): botão de sair com rótulo, área de toque generosa */}
-          <button
-            onClick={handleSignOut}
-            className="lg:hidden mt-3 w-full flex items-center justify-center gap-2 px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-200 bg-gray-50 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200 active:bg-red-100 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            Sair da conta
-          </button>
         </div>
 
         {/* Collapse toggle */}

@@ -34,7 +34,7 @@ export default function ClientChat() {
         </p>
       </div>
 
-      <div className="h-[calc(100vh-260px)] min-h-[450px]">
+      <div className="h-[calc(100vh-316px)] min-h-[350px]">
         <ChatPanel
           messages={messages}
           currentUser={user!}

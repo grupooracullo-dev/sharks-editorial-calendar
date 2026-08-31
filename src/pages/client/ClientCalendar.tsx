@@ -50,7 +50,7 @@ const goNext = () => {
   };
 
   return (
-    <div className="flex flex-col gap-4 h-[calc(100dvh-9.5rem)] lg:h-[calc(100dvh-6.5rem)]">
+    <div className="flex flex-col gap-4 h-[calc(100dvh-12.5rem)] lg:h-[calc(100dvh-6.5rem)]">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shrink-0">
         <h1 className="text-2xl font-bold text-gray-900 capitalize">Meu Calendário — {monthLabel}</h1>

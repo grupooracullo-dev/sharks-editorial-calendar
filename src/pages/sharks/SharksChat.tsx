@@ -131,7 +131,7 @@ export default function SharksChat() {
           </Card>
         )}
 
-        <div className={isMobile ? 'h-[calc(100vh-240px)] min-h-[350px]' : 'lg:col-span-2 h-[calc(100vh-260px)] min-h-[450px]'}>
+        <div className={isMobile ? 'h-[calc(100vh-296px)] min-h-[350px]' : 'lg:col-span-2 h-[calc(100vh-260px)] min-h-[450px]'}>
           {!activeWsId ? (
             <Card padding="sm" className="h-full flex items-center justify-center">
               <EmptyState
