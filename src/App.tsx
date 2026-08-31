@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense } from 'react';
+import { useEffect, lazy, Suspense, type ComponentType } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -17,45 +17,73 @@ import EnvironmentSelector from '@/pages/auth/EnvironmentSelector';
 
 // Code-splitting por rota: cada página vira um chunk carregado sob demanda,
 // reduzindo o bundle inicial (auditoria 2026-08-29).
-const PrivacyPolicy = lazy(() => import('@/pages/legal/PrivacyPolicy'));
-const TermsOfService = lazy(() => import('@/pages/legal/TermsOfService'));
+const CHUNK_RELOAD_KEY = 'chunk-reload-attempt';
 
-const OraculloDashboard = lazy(() => import('@/pages/oracullo/OraculloDashboard'));
-const OraculloClients = lazy(() => import('@/pages/oracullo/OraculloClients'));
-const OraculloAccess = lazy(() => import('@/pages/oracullo/OraculloAccess'));
-const OraculloAccessRequests = lazy(() => import('@/pages/oracullo/OraculloAccessRequests'));
-const OraculloUsers = lazy(() => import('@/pages/oracullo/OraculloUsers'));
-const OraculloTeam = lazy(() => import('@/pages/oracullo/OraculloTeam'));
+/**
+ * lazy com recuperação de chunk obsoleto: após um deploy, uma SPA já aberta
+ * referencia hashes antigos que não existem mais ("Failed to fetch dynamically
+ * imported module"). Recarrega a página uma única vez para buscar o index.html
+ * novo; o flag em sessionStorage impede loop em caso de falha real.
+ */
+function lazyPage<T extends ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+) {
+  return lazy(() =>
+    factory().then(
+      (mod) => {
+        sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+        return mod;
+      },
+      (err: unknown) => {
+        if (!sessionStorage.getItem(CHUNK_RELOAD_KEY)) {
+          sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
+          window.location.reload();
+        }
+        throw err;
+      },
+    ),
+  );
+}
 
-const SharksDashboard = lazy(() => import('@/pages/sharks/SharksDashboard'));
-const SharksCalendarPage = lazy(() => import('@/pages/sharks/SharksCalendar'));
-const SharksClients = lazy(() => import('@/pages/sharks/SharksClients'));
-const SharksCampaigns = lazy(() => import('@/pages/sharks/SharksCampaigns'));
-const SharksEditorial = lazy(() => import('@/pages/sharks/SharksEditorial'));
-const SharksTemplates = lazy(() => import('@/pages/sharks/SharksTemplates'));
-const SharksHistory = lazy(() => import('@/pages/sharks/SharksHistory'));
-const SharksChat = lazy(() => import('@/pages/sharks/SharksChat'));
-const SharksIntegrations = lazy(() => import('@/pages/sharks/SharksIntegrations'));
-const SharksSettings = lazy(() => import('@/pages/sharks/SharksSettings'));
-const SharksTeam = lazy(() => import('@/pages/sharks/SharksTeam'));
-const SharksAccessRequests = lazy(() => import('@/pages/sharks/SharksAccessRequests'));
+const PrivacyPolicy = lazyPage(() => import('@/pages/legal/PrivacyPolicy'));
+const TermsOfService = lazyPage(() => import('@/pages/legal/TermsOfService'));
 
-const ClientDashboard = lazy(() => import('@/pages/client/ClientDashboard'));
-const ClientCalendar = lazy(() => import('@/pages/client/ClientCalendar'));
-const ClientHistory = lazy(() => import('@/pages/client/ClientHistory'));
-const ClientChat = lazy(() => import('@/pages/client/ClientChat'));
-const ClientIntegrations = lazy(() => import('@/pages/client/ClientIntegrations'));
+const OraculloDashboard = lazyPage(() => import('@/pages/oracullo/OraculloDashboard'));
+const OraculloClients = lazyPage(() => import('@/pages/oracullo/OraculloClients'));
+const OraculloAccess = lazyPage(() => import('@/pages/oracullo/OraculloAccess'));
+const OraculloAccessRequests = lazyPage(() => import('@/pages/oracullo/OraculloAccessRequests'));
+const OraculloUsers = lazyPage(() => import('@/pages/oracullo/OraculloUsers'));
+const OraculloTeam = lazyPage(() => import('@/pages/oracullo/OraculloTeam'));
 
-const EstrategosDashboard = lazy(() => import('@/pages/estrategos/EstrategosDashboard'));
-const EstrategosCalendar = lazy(() => import('@/pages/estrategos/EstrategosCalendar'));
-const EstrategosProjects = lazy(() => import('@/pages/estrategos/EstrategosProjects'));
-const EstrategosChat = lazy(() => import('@/pages/estrategos/EstrategosChat'));
-const EstrategosClients = lazy(() => import('@/pages/estrategos/EstrategosClients'));
-const EstrategosAccessRequests = lazy(() => import('@/pages/estrategos/EstrategosAccessRequests'));
-const EstrategosTeam = lazy(() => import('@/pages/estrategos/EstrategosTeam'));
-const EstrategosIntegrations = lazy(() => import('@/pages/estrategos/EstrategosIntegrations'));
-const EstrategosMeetings = lazy(() => import('@/pages/estrategos/EstrategosMeetings'));
-const EstrategosImplementations = lazy(() => import('@/pages/estrategos/EstrategosImplementations'));
+const SharksDashboard = lazyPage(() => import('@/pages/sharks/SharksDashboard'));
+const SharksCalendarPage = lazyPage(() => import('@/pages/sharks/SharksCalendar'));
+const SharksClients = lazyPage(() => import('@/pages/sharks/SharksClients'));
+const SharksCampaigns = lazyPage(() => import('@/pages/sharks/SharksCampaigns'));
+const SharksEditorial = lazyPage(() => import('@/pages/sharks/SharksEditorial'));
+const SharksTemplates = lazyPage(() => import('@/pages/sharks/SharksTemplates'));
+const SharksHistory = lazyPage(() => import('@/pages/sharks/SharksHistory'));
+const SharksChat = lazyPage(() => import('@/pages/sharks/SharksChat'));
+const SharksIntegrations = lazyPage(() => import('@/pages/sharks/SharksIntegrations'));
+const SharksSettings = lazyPage(() => import('@/pages/sharks/SharksSettings'));
+const SharksTeam = lazyPage(() => import('@/pages/sharks/SharksTeam'));
+const SharksAccessRequests = lazyPage(() => import('@/pages/sharks/SharksAccessRequests'));
+
+const ClientDashboard = lazyPage(() => import('@/pages/client/ClientDashboard'));
+const ClientCalendar = lazyPage(() => import('@/pages/client/ClientCalendar'));
+const ClientHistory = lazyPage(() => import('@/pages/client/ClientHistory'));
+const ClientChat = lazyPage(() => import('@/pages/client/ClientChat'));
+const ClientIntegrations = lazyPage(() => import('@/pages/client/ClientIntegrations'));
+
+const EstrategosDashboard = lazyPage(() => import('@/pages/estrategos/EstrategosDashboard'));
+const EstrategosCalendar = lazyPage(() => import('@/pages/estrategos/EstrategosCalendar'));
+const EstrategosProjects = lazyPage(() => import('@/pages/estrategos/EstrategosProjects'));
+const EstrategosChat = lazyPage(() => import('@/pages/estrategos/EstrategosChat'));
+const EstrategosClients = lazyPage(() => import('@/pages/estrategos/EstrategosClients'));
+const EstrategosAccessRequests = lazyPage(() => import('@/pages/estrategos/EstrategosAccessRequests'));
+const EstrategosTeam = lazyPage(() => import('@/pages/estrategos/EstrategosTeam'));
+const EstrategosIntegrations = lazyPage(() => import('@/pages/estrategos/EstrategosIntegrations'));
+const EstrategosMeetings = lazyPage(() => import('@/pages/estrategos/EstrategosMeetings'));
+const EstrategosImplementations = lazyPage(() => import('@/pages/estrategos/EstrategosImplementations'));
 
 function PageFallback() {
   return (

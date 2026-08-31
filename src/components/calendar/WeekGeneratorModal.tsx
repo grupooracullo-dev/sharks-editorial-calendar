@@ -156,8 +156,17 @@ export default function WeekGeneratorModal({
 
     setSaving(true);
     try {
+      // Rede de segurança: nunca criar duas ações com mesma data+título
+      const seen = new Set<string>();
+      const uniqueActions = result.actions.filter(ga => {
+        const key = `${ga.action_date}|${(ga.title || '').toLowerCase()}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
       let created = 0;
-      for (const ga of result.actions) {
+      for (const ga of uniqueActions) {
         const res = await create({
           ...ga,
           workspace_id: workspaceId,

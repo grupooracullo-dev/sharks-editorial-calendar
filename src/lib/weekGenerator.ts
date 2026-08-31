@@ -416,6 +416,10 @@ export function generateWeek(input: GeneratorInput): WeekGeneratorResult {
   }
 
   const generated: GeneratedAction[] = [];
+  // Anti-duplicação: mesma data não pode gerar o mesmo título 2x
+  // (datas estratégicas + multi-slot sorteam do mesmo pool de templates).
+  const usedTitleKeys = new Set<string>();
+  const titleKey = (dateStr: string, t: string) => `${dateStr}|${t.toLowerCase()}`;
 
   for (let i = 0; i < slots.length; i++) {
     const slot = slots[i];
@@ -451,11 +455,25 @@ export function generateWeek(input: GeneratorInput): WeekGeneratorResult {
       ? channels[Math.floor(Math.random() * channels.length)]
       : 'Instagram';
 
-    // Título contextual
-    const title = generateContextualTitle(
+    // Título contextual (com retry anti-duplicação na mesma data)
+    let title = generateContextualTitle(
       selectedFormat, pillar.name, selectedObjective, slot.time,
       slot.strategicDate, channel,
     );
+    let titleAttempts = 0;
+    while (usedTitleKeys.has(titleKey(slot.dateStr, title)) && titleAttempts < 5) {
+      title = generateContextualTitle(
+        selectedFormat, pillar.name, selectedObjective, slot.time,
+        slot.strategicDate, channel,
+      );
+      titleAttempts++;
+    }
+    if (usedTitleKeys.has(titleKey(slot.dateStr, title))) {
+      let n = 2;
+      while (usedTitleKeys.has(titleKey(slot.dateStr, `${title} (${n})`))) n++;
+      title = `${title} (${n})`;
+    }
+    usedTitleKeys.add(titleKey(slot.dateStr, title));
 
     // Justificativas
     const reasons: string[] = [];
