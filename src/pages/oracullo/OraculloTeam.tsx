@@ -16,7 +16,7 @@ import {
 import { ENVIRONMENT_META, type EnvironmentType } from '@/types';
 import { toast } from 'sonner';
 import {
-  Plus, Users, Pencil, Trash2, Shield, UserCheck, Mail,
+  Plus, Users, Pencil, Trash2, Shield, Mail,
   ChevronDown, ChevronRight, Eye, EyeOff, Check,
   Settings, Building2, CheckCircle2, Link2, Unlink,
 } from 'lucide-react';
@@ -68,6 +68,7 @@ export default function OraculloTeam() {
   const { user: currentUser, isOracullo } = useAuth();
   const [members, setMembers] = useState<MemberWithAccess[]>([]);
   const [allWorkspaces, setAllWorkspaces] = useState<Workspace[]>([]);
+  const [wsEnvById, setWsEnvById] = useState<Map<string, EnvironmentType>>(new Map());
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<EnvironmentType>('sharks_company');
 
@@ -84,10 +85,19 @@ export default function OraculloTeam() {
     email: '',
     password: '',
     showPassword: false,
-    environment: 'sharks_company' as EnvironmentType,
-    env_role: 'team' as 'admin' | 'team',
+    environments: ['sharks_company'] as EnvironmentType[],
+    envRoles: {
+      sharks_company: 'team',
+      estrategos: 'team',
+    } as Record<EnvironmentType, 'admin' | 'team'>,
     permissions: [] as Permission[],
     workspace_ids: [] as string[],
+  });
+
+  // Role escolhida ao vincular um membro existente a um ambiente ausente
+  const [linkRoles, setLinkRoles] = useState<Record<EnvironmentType, 'admin' | 'team'>>({
+    sharks_company: 'team',
+    estrategos: 'team',
   });
 
   // Edit form
@@ -106,7 +116,7 @@ export default function OraculloTeam() {
     const [ueRes, wsRes, envMapRes] = await Promise.all([
       supabase
         .from('user_environments')
-        .select('user_id, role, users!inner(id, email, full_name, role, avatar_url)')
+        .select('environment, role, user_id, users!inner(id, email, full_name, role, avatar_url)')
         .in('role', ['admin', 'team']),
       supabase.from('workspaces').select('id, name, segment').eq('is_active', true).order('name'),
       supabase.rpc('ws_env_map'),
@@ -115,31 +125,21 @@ export default function OraculloTeam() {
     const wsList = (wsRes.data as unknown as Workspace[]) || [];
     setAllWorkspaces(wsList);
 
+    // ws_env_map: workspace_id → environment (join workspaces × organizations)
+    const wsEnv = new Map<string, EnvironmentType>();
+    for (const r of ((envMapRes.data ?? []) as Array<{ id: string; environment: string }>)) {
+      wsEnv.set(r.id, r.environment as EnvironmentType);
+    }
+    setWsEnvById(wsEnv);
+
+    // Cada linha de user_environments já traz o ambiente — agrupar por usuário
     const ueRows = (ueRes.data as unknown as Array<{
       user_id: string;
+      environment: string;
       role: 'admin' | 'team';
       users: { id: string; email: string; full_name: string; role: string; avatar_url: string | null };
     }>) ?? [];
 
-    // Group by user_id
-    const userMap = new Map<string, {
-      user: { id: string; email: string; full_name: string; role: string; avatar_url: string | null };
-      envs: EnvMembership[];
-    }>();
-
-    for (const row of ueRows) {
-      const existing = userMap.get(row.user_id);
-      if (existing) {
-        existing.envs.push({ environment: row.role === 'admin' ? (ueRows.find(r => r.user_id === row.user_id && r.role === row.role) ? 'sharks_company' : 'estrategos') : 'sharks_company', role: row.role });
-      } else {
-        userMap.set(row.user_id, {
-          user: row.users,
-          envs: [{ environment: 'sharks_company', role: row.role }],
-        });
-      }
-    }
-
-    // Rebuild properly — each user may have rows in both environments
     const enrichedMap = new Map<string, MemberWithAccess>();
 
     for (const row of ueRows) {
@@ -157,44 +157,34 @@ export default function OraculloTeam() {
         });
       }
       const member = enrichedMap.get(uid)!;
-      // Dedupe environments
-      if (!member.environments.some(e => e.role === row.role)) {
-        // Determine environment from ueRow — use env map
-        const envFromMap = ((envMapRes.data ?? []) as Array<{ id: string; environment: string }>)
-          .find(r => r.id === uid);
-        const env: EnvironmentType = (envFromMap?.environment as EnvironmentType) || 'sharks_company';
-        if (!member.environments.some(e => e.environment === env)) {
-          member.environments.push({ environment: env, role: row.role });
-        }
+      const env = row.environment as EnvironmentType;
+      if (!member.environments.some(e => e.environment === env)) {
+        member.environments.push({ environment: env, role: row.role });
       }
     }
 
-    // Load permissions + workspaces per environment per member
+    // Permissões (globais por usuário) + clientes atribuídos por ambiente
     const enriched: MemberWithAccess[] = await Promise.all(
       Array.from(enrichedMap.values()).map(async m => {
+        const [permsRes, memRes] = await Promise.all([
+          supabase.from('team_member_access').select('*').eq('user_id', m.id),
+          supabase
+            .from('memberships')
+            .select('workspace_id, workspace:workspaces(id, name)')
+            .eq('user_id', m.id)
+            .eq('role', 'manager'),
+        ]);
+
+        const perms = (permsRes.data as unknown as Permission[]) || [];
+        const allMemWs = ((memRes.data as unknown as { workspace: Workspace | null }[]) || [])
+          .map(r => r.workspace)
+          .filter((ws): ws is Workspace => !!ws);
+
         const perEnvPerms: Record<string, Permission[]> = {};
         const perEnvWs: Record<string, Workspace[]> = {};
-
         for (const env of m.environments) {
-          const [permsRes, memRes] = await Promise.all([
-            supabase.from('team_member_access').select('*').eq('user_id', m.id),
-            supabase
-              .from('memberships')
-              .select('workspace_id, workspace:workspaces(id, name)')
-              .eq('user_id', m.id)
-              .eq('role', 'manager'),
-          ]);
-
-          perEnvPerms[env.environment] = (permsRes.data as unknown as Permission[]) || [];
-
-          const envWsIds = new Set(
-            ((envMapRes.data ?? []) as Array<{ id: string; environment: string }>)
-              .filter(r => r.environment === env.environment)
-              .map(r => r.id),
-          );
-          perEnvWs[env.environment] = ((memRes.data as unknown as { workspace: Workspace | null }[]) || [])
-            .map(r => r.workspace)
-            .filter((ws): ws is Workspace => !!ws && envWsIds.has(ws.id));
+          perEnvPerms[env.environment] = perms;
+          perEnvWs[env.environment] = allMemWs.filter(ws => wsEnv.get(ws.id) === env.environment);
         }
 
         return {
@@ -222,31 +212,49 @@ export default function OraculloTeam() {
     return error instanceof Error ? error.message : 'Erro inesperado';
   }
 
-  const userEnvsOf = (userId: string) => {
-    const m = members.find(x => x.id === userId);
-    return m?.environments ?? [];
-  };
-
   /* ─── Handlers ─── */
   const handleInvite = async () => {
+    const envs = inviteForm.environments;
     if (!inviteForm.full_name.trim() || !inviteForm.email.trim() || !inviteForm.password.trim() || submitting) return;
+    if (envs.length === 0) {
+      toast.error('Selecione pelo menos um ambiente');
+      setInviteStep(1);
+      return;
+    }
     setSubmitting(true);
     try {
+      const primaryEnv = envs[0];
       const { data, error } = await supabase.functions.invoke('admin-create-user', {
         body: {
           email: inviteForm.email.trim(),
           password: inviteForm.password,
           full_name: inviteForm.full_name.trim(),
           role: 'sharks_team',
-          environment: inviteForm.environment,
-          env_role: inviteForm.env_role,
+          environment: primaryEnv,
+          env_role: inviteForm.envRoles[primaryEnv],
           permissions: inviteForm.permissions.length > 0 ? inviteForm.permissions : defaultPermissions(),
           workspace_ids: inviteForm.workspace_ids,
         },
       });
       if (error) throw new Error(await functionErrorMessage(error));
       if (data?.error) throw new Error(data.error);
-      toast.success(`"${inviteForm.full_name}" adicionado ao time ${ENVIRONMENT_META[inviteForm.environment].short}!`);
+
+      // Ambientes adicionais: vincular o usuário recém-criado
+      for (const env of envs.slice(1)) {
+        const linkRes = await supabase.functions.invoke('admin-link-user-env', {
+          body: {
+            op: 'link',
+            user_id: data?.user_id,
+            environment: env,
+            env_role: inviteForm.envRoles[env],
+          },
+        });
+        if (linkRes.error) throw new Error(await functionErrorMessage(linkRes.error));
+        if (linkRes.data?.error) throw new Error(linkRes.data.error);
+      }
+
+      const envLabels = envs.map(e => ENVIRONMENT_META[e].short).join(' + ');
+      toast.success(`"${inviteForm.full_name}" criado e vinculado a ${envLabels}!`);
       setInviteOpen(false);
       resetInviteForm();
       await loadData();
@@ -260,7 +268,8 @@ export default function OraculloTeam() {
   const resetInviteForm = () => {
     setInviteForm({
       full_name: '', email: '', password: '', showPassword: false,
-      environment: 'sharks_company', env_role: 'team',
+      environments: ['sharks_company'],
+      envRoles: { sharks_company: 'team', estrategos: 'team' },
       permissions: defaultPermissions(), workspace_ids: [],
     });
     setInviteStep(0);
@@ -304,6 +313,24 @@ export default function OraculloTeam() {
     }
   };
 
+  const handleLink = async (member: MemberWithAccess, env: EnvironmentType) => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-link-user-env', {
+        body: { op: 'link', user_id: member.id, environment: env, env_role: linkRoles[env] },
+      });
+      if (error) throw new Error(await functionErrorMessage(error));
+      if (data?.error) throw new Error(data.error);
+      toast.success(`"${member.full_name}" vinculado a ${ENVIRONMENT_META[env].short}.`);
+      await loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao vincular');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleUnlink = async (member: MemberWithAccess, env: EnvironmentType) => {
     if (submitting) return;
     setSubmitting(true);
@@ -341,12 +368,7 @@ export default function OraculloTeam() {
 
   /* ─── Derived ─── */
   const filteredMembers = members.filter(m => m.environments.some(e => e.environment === activeTab));
-  const envWorkspaces = allWorkspaces.filter(w => {
-    const wsEnv = ((w as unknown as { environment?: string }).environment) as EnvironmentType | undefined;
-    return wsEnv === activeTab || true; // show all if no env field — filter via env map
-  });
-
-  const inviteEnvWorkspaces = allWorkspaces.filter(() => true); // simplified — env map filter happens server-side
+  const envWorkspaces = allWorkspaces.filter(w => wsEnvById.get(w.id) === activeTab);
 
   /* ─── Render ─── */
   return (
@@ -412,6 +434,7 @@ export default function OraculloTeam() {
             const clientCount = member.workspaces[activeTab]?.length ?? 0;
             const perms = member.permissions[activeTab] ?? [];
             const permSummary = perms.filter(p => permCount(p) > 1).length;
+            const missingEnvs = ENV_ORDER.filter(env => !member.environments.some(e => e.environment === env));
 
             return (
               <Card key={member.id} className="overflow-hidden">
@@ -498,6 +521,35 @@ export default function OraculloTeam() {
                           </span>
                         ))}
                       </div>
+
+                      {/* Vincular a ambientes ausentes */}
+                      {isOracullo && missingEnvs.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-xs text-gray-400">Vincular a outro ambiente:</p>
+                          {missingEnvs.map(env => (
+                            <div key={env} className="flex items-center gap-2">
+                              <select
+                                value={linkRoles[env]}
+                                onChange={(e) => setLinkRoles(p => ({ ...p, [env]: e.target.value as 'admin' | 'team' }))}
+                                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-600"
+                              >
+                                <option value="team">Time</option>
+                                <option value="admin">Admin do ambiente</option>
+                              </select>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleLink(member, env)}
+                                loading={submitting}
+                                disabled={submitting}
+                              >
+                                <Link2 className="w-3.5 h-3.5" />
+                                {ENVIRONMENT_META[env].emoji} Vincular a {ENVIRONMENT_META[env].short}
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Permissions for active environment */}
@@ -567,7 +619,7 @@ export default function OraculloTeam() {
       <Modal isOpen={inviteOpen} onClose={() => setInviteOpen(false)} title="Novo Membro do Time" size="lg">
         {/* Step indicator */}
         <div className="flex items-center gap-2 mb-6">
-          {['Dados pessoais', 'Ambiente e função', 'Permissões'].map((step, i) => (
+          {['Dados pessoais', 'Ambientes e funções', 'Permissões'].map((step, i) => (
             <button
               key={step}
               onClick={() => setInviteStep(i)}
@@ -621,29 +673,72 @@ export default function OraculloTeam() {
           </div>
         )}
 
-        {/* Step 1: Environment + role */}
+        {/* Step 1: Environments (1 ou ambos) + roles */}
         {inviteStep === 1 && (
           <div className="space-y-4">
-            <Select
-              label="Ambiente"
-              value={inviteForm.environment}
-              onChange={(e) => setInviteForm(p => ({ ...p, environment: e.target.value as EnvironmentType }))}
-              options={ENV_ORDER.map(env => ({ value: env, label: `${ENVIRONMENT_META[env].emoji} ${ENVIRONMENT_META[env].label}` }))}
-            />
-            <Select
-              label="Função no ambiente"
-              value={inviteForm.env_role}
-              onChange={(e) => setInviteForm(p => ({ ...p, env_role: e.target.value as 'admin' | 'team' }))}
-              options={[
-                { value: 'team', label: 'Time — acesso conforme permissões' },
-                { value: 'admin', label: 'Admin do ambiente — acesso total' },
-              ]}
-            />
-            <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
-              {inviteForm.env_role === 'admin'
-                ? `O membro terá acesso total ao ambiente ${ENVIRONMENT_META[inviteForm.environment].short}.`
-                : `O membro terá acesso ao ambiente ${ENVIRONMENT_META[inviteForm.environment].short} conforme as permissões definidas no próximo passo.`}
-            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ambientes <span className="text-gray-400 font-normal">(1 ou ambos)</span>
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {ENV_ORDER.map(env => {
+                  const selected = inviteForm.environments.includes(env);
+                  const meta = ENVIRONMENT_META[env];
+                  return (
+                    <button
+                      key={env}
+                      type="button"
+                      onClick={() => setInviteForm(f => ({
+                        ...f,
+                        environments: selected
+                          ? f.environments.filter(e => e !== env)
+                          : [...f.environments, env],
+                      }))}
+                      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border text-sm font-medium text-left transition-all ${
+                        selected
+                          ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-200 text-primary-700'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${
+                        selected ? 'bg-primary-500 text-white' : 'border-2 border-gray-300'
+                      }`}>
+                        {selected && <Check className="w-3 h-3" />}
+                      </div>
+                      <span>{meta.emoji} {meta.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {inviteForm.environments.map(env => (
+              <Select
+                key={env}
+                label={`Função no ambiente ${ENVIRONMENT_META[env].emoji} ${ENVIRONMENT_META[env].short}`}
+                value={inviteForm.envRoles[env]}
+                onChange={(e) => setInviteForm(f => ({
+                  ...f,
+                  envRoles: { ...f.envRoles, [env]: e.target.value as 'admin' | 'team' },
+                }))}
+                options={[
+                  { value: 'team', label: 'Time — acesso conforme permissões' },
+                  { value: 'admin', label: 'Admin do ambiente — acesso total' },
+                ]}
+              />
+            ))}
+
+            {inviteForm.environments.length === 0 ? (
+              <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">
+                Selecione pelo menos um ambiente.
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+                {inviteForm.environments.length === 2
+                  ? 'O membro será criado nos dois ambientes com as funções definidas acima.'
+                  : `O membro será criado apenas no ambiente ${ENVIRONMENT_META[inviteForm.environments[0]].short}.`}
+              </p>
+            )}
           </div>
         )}
 
@@ -651,7 +746,10 @@ export default function OraculloTeam() {
         {inviteStep === 2 && (
           <div className="space-y-3">
             <p className="text-xs text-gray-500">
-              Defina o que este membro pode fazer em cada módulo ({ENVIRONMENT_META[inviteForm.environment].short}):
+              Defina o que este membro pode fazer em cada módulo
+              {inviteForm.environments.length === 2
+                ? ' (aplicado aos dois ambientes)'
+                : ` (${ENVIRONMENT_META[inviteForm.environments[0]]?.short ?? ''})`}:
             </p>
             {ALL_PERMISSIONS.map(perm => {
               const meta = PERMISSION_META[perm];
@@ -704,14 +802,17 @@ export default function OraculloTeam() {
           <div className="flex gap-2">
             <Button variant="ghost" onClick={() => setInviteOpen(false)}>Cancelar</Button>
             {inviteStep < 2 ? (
-              <Button onClick={() => setInviteStep(s => s + 1)}>
+              <Button
+                onClick={() => setInviteStep(s => s + 1)}
+                disabled={inviteStep === 1 && inviteForm.environments.length === 0}
+              >
                 Próximo
               </Button>
             ) : (
               <Button
                 onClick={handleInvite}
                 loading={submitting}
-                disabled={!inviteForm.full_name.trim() || !inviteForm.email.trim() || !inviteForm.password.trim()}
+                disabled={!inviteForm.full_name.trim() || !inviteForm.email.trim() || !inviteForm.password.trim() || inviteForm.environments.length === 0}
               >
                 Criar membro
               </Button>
@@ -840,4 +941,3 @@ export default function OraculloTeam() {
     </div>
   );
 }
-
