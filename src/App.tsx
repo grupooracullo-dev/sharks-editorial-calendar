@@ -25,6 +25,7 @@ const OraculloClients = lazy(() => import('@/pages/oracullo/OraculloClients'));
 const OraculloAccess = lazy(() => import('@/pages/oracullo/OraculloAccess'));
 const OraculloAccessRequests = lazy(() => import('@/pages/oracullo/OraculloAccessRequests'));
 const OraculloUsers = lazy(() => import('@/pages/oracullo/OraculloUsers'));
+const OraculloTeam = lazy(() => import('@/pages/oracullo/OraculloTeam'));
 
 const SharksDashboard = lazy(() => import('@/pages/sharks/SharksDashboard'));
 const SharksCalendarPage = lazy(() => import('@/pages/sharks/SharksCalendar'));
@@ -147,6 +148,7 @@ function AppRoutes() {
         <Route path="/oracullo/access-requests" element={<OraculloLayout><OraculloAccessRequests /></OraculloLayout>} />
         <Route path="/oracullo/users" element={<OraculloLayout><OraculloUsers /></OraculloLayout>} />
         <Route path="/oracullo/clients" element={<OraculloLayout><OraculloClients /></OraculloLayout>} />
+        <Route path="/oracullo/team" element={<OraculloLayout><OraculloTeam /></OraculloLayout>} />
 
         {/* Sharks routes */}
         <Route path="/sharks" element={<SharksLayout><SharksDashboard /></SharksLayout>} />

@@ -75,6 +75,7 @@ const oraculloNavItems = [
   { icon: ShieldCheck, label: 'Acessos', path: '/oracullo/access' },
   { icon: UserPlus, label: 'Solicitações', path: '/oracullo/access-requests' },
   { icon: Users, label: 'Usuários', path: '/oracullo/users' },
+  { icon: UserCog, label: 'Time', path: '/oracullo/team' },
   { icon: Building2, label: 'Clientes', path: '/oracullo/clients' },
 ];
 

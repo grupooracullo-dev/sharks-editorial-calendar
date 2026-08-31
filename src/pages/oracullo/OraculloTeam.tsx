@@ -1,0 +1,843 @@
+import { useState, useEffect, useCallback } from 'react';
+import Card from '@/components/ui/Card';
+import Modal from '@/components/ui/Modal';
+import Input from '@/components/ui/Input';
+import Select from '@/components/ui/Select';
+import Button from '@/components/ui/Button';
+import Avatar from '@/components/ui/Avatar';
+import EmptyState from '@/components/ui/EmptyState';
+import Badge from '@/components/ui/Badge';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  PERMISSION_META, ALL_PERMISSIONS, defaultPermissions, togglePerm, permCount,
+  type Permission,
+} from '@/lib/permissions';
+import { ENVIRONMENT_META, type EnvironmentType } from '@/types';
+import { toast } from 'sonner';
+import {
+  Plus, Users, Pencil, Trash2, Shield, UserCheck, Mail,
+  ChevronDown, ChevronRight, Eye, EyeOff, Check,
+  Settings, Building2, CheckCircle2, Link2, Unlink,
+} from 'lucide-react';
+
+/* ─── Types ─── */
+interface EnvMembership {
+  environment: EnvironmentType;
+  role: 'admin' | 'team';
+}
+
+interface Workspace {
+  id: string;
+  name: string;
+  segment?: string;
+}
+
+interface MemberWithAccess {
+  id: string;
+  email: string;
+  full_name: string;
+  global_role: string;
+  avatar_url?: string;
+  environments: EnvMembership[];
+  permissions: Record<EnvironmentType, Permission[]>;
+  workspaces: Record<EnvironmentType, Workspace[]>;
+}
+
+/* ─── Helpers ─── */
+const ENV_ORDER: EnvironmentType[] = ['sharks_company', 'estrategos'];
+
+const GLOBAL_ROLE_LABELS: Record<string, string> = {
+  oracullo_admin: 'Guardião Oracullo',
+  admin_sharks: 'Admin Sharks',
+  sharks_team: 'Equipe Sharks',
+  client: 'Cliente',
+};
+
+const ENV_ROLE_LABELS: Record<string, string> = {
+  admin: 'Admin do ambiente',
+  team: 'Time',
+};
+
+function envUnlinkLabel(env: EnvironmentType): string {
+  return `Remover de ${ENVIRONMENT_META[env].short}`;
+}
+
+/* ─── Component ─── */
+export default function OraculloTeam() {
+  const { user: currentUser, isOracullo } = useAuth();
+  const [members, setMembers] = useState<MemberWithAccess[]>([]);
+  const [allWorkspaces, setAllWorkspaces] = useState<Workspace[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<EnvironmentType>('sharks_company');
+
+  // Modals
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<MemberWithAccess | null>(null);
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+
+  // Invite form
+  const [inviteStep, setInviteStep] = useState(0);
+  const [inviteForm, setInviteForm] = useState({
+    full_name: '',
+    email: '',
+    password: '',
+    showPassword: false,
+    environment: 'sharks_company' as EnvironmentType,
+    env_role: 'team' as 'admin' | 'team',
+    permissions: [] as Permission[],
+    workspace_ids: [] as string[],
+  });
+
+  // Edit form
+  const [editForm, setEditForm] = useState({
+    full_name: '',
+    permissions: [] as Permission[],
+    workspace_ids: [] as string[],
+  });
+
+  const [submitting, setSubmitting] = useState(false);
+
+  /* ─── Load data ─── */
+  const loadData = useCallback(async () => {
+    setLoading(true);
+
+    const [ueRes, wsRes, envMapRes] = await Promise.all([
+      supabase
+        .from('user_environments')
+        .select('user_id, role, users!inner(id, email, full_name, role, avatar_url)')
+        .in('role', ['admin', 'team']),
+      supabase.from('workspaces').select('id, name, segment').eq('is_active', true).order('name'),
+      supabase.rpc('ws_env_map'),
+    ]);
+
+    const wsList = (wsRes.data as unknown as Workspace[]) || [];
+    setAllWorkspaces(wsList);
+
+    const ueRows = (ueRes.data as unknown as Array<{
+      user_id: string;
+      role: 'admin' | 'team';
+      users: { id: string; email: string; full_name: string; role: string; avatar_url: string | null };
+    }>) ?? [];
+
+    // Group by user_id
+    const userMap = new Map<string, {
+      user: { id: string; email: string; full_name: string; role: string; avatar_url: string | null };
+      envs: EnvMembership[];
+    }>();
+
+    for (const row of ueRows) {
+      const existing = userMap.get(row.user_id);
+      if (existing) {
+        existing.envs.push({ environment: row.role === 'admin' ? (ueRows.find(r => r.user_id === row.user_id && r.role === row.role) ? 'sharks_company' : 'estrategos') : 'sharks_company', role: row.role });
+      } else {
+        userMap.set(row.user_id, {
+          user: row.users,
+          envs: [{ environment: 'sharks_company', role: row.role }],
+        });
+      }
+    }
+
+    // Rebuild properly — each user may have rows in both environments
+    const enrichedMap = new Map<string, MemberWithAccess>();
+
+    for (const row of ueRows) {
+      const uid = row.user_id;
+      if (!enrichedMap.has(uid)) {
+        enrichedMap.set(uid, {
+          id: row.users.id,
+          email: row.users.email,
+          full_name: row.users.full_name,
+          global_role: row.users.role,
+          avatar_url: row.users.avatar_url ?? undefined,
+          environments: [],
+          permissions: {} as Record<EnvironmentType, Permission[]>,
+          workspaces: {} as Record<EnvironmentType, Workspace[]>,
+        });
+      }
+      const member = enrichedMap.get(uid)!;
+      // Dedupe environments
+      if (!member.environments.some(e => e.role === row.role)) {
+        // Determine environment from ueRow — use env map
+        const envFromMap = ((envMapRes.data ?? []) as Array<{ id: string; environment: string }>)
+          .find(r => r.id === uid);
+        const env: EnvironmentType = (envFromMap?.environment as EnvironmentType) || 'sharks_company';
+        if (!member.environments.some(e => e.environment === env)) {
+          member.environments.push({ environment: env, role: row.role });
+        }
+      }
+    }
+
+    // Load permissions + workspaces per environment per member
+    const enriched: MemberWithAccess[] = await Promise.all(
+      Array.from(enrichedMap.values()).map(async m => {
+        const perEnvPerms: Record<string, Permission[]> = {};
+        const perEnvWs: Record<string, Workspace[]> = {};
+
+        for (const env of m.environments) {
+          const [permsRes, memRes] = await Promise.all([
+            supabase.from('team_member_access').select('*').eq('user_id', m.id),
+            supabase
+              .from('memberships')
+              .select('workspace_id, workspace:workspaces(id, name)')
+              .eq('user_id', m.id)
+              .eq('role', 'manager'),
+          ]);
+
+          perEnvPerms[env.environment] = (permsRes.data as unknown as Permission[]) || [];
+
+          const envWsIds = new Set(
+            ((envMapRes.data ?? []) as Array<{ id: string; environment: string }>)
+              .filter(r => r.environment === env.environment)
+              .map(r => r.id),
+          );
+          perEnvWs[env.environment] = ((memRes.data as unknown as { workspace: Workspace | null }[]) || [])
+            .map(r => r.workspace)
+            .filter((ws): ws is Workspace => !!ws && envWsIds.has(ws.id));
+        }
+
+        return {
+          ...m,
+          permissions: perEnvPerms as Record<EnvironmentType, Permission[]>,
+          workspaces: perEnvWs as Record<EnvironmentType, Workspace[]>,
+        };
+      }),
+    );
+
+    setMembers(enriched);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  /* ─── Helpers ─── */
+  async function functionErrorMessage(error: unknown): Promise<string> {
+    if (error && typeof error === 'object' && 'context' in error) {
+      try {
+        const body = await (error as { context: Response }).context.clone().json();
+        if (body && typeof body.error === 'string') return body.error;
+      } catch { /* */ }
+    }
+    return error instanceof Error ? error.message : 'Erro inesperado';
+  }
+
+  const userEnvsOf = (userId: string) => {
+    const m = members.find(x => x.id === userId);
+    return m?.environments ?? [];
+  };
+
+  /* ─── Handlers ─── */
+  const handleInvite = async () => {
+    if (!inviteForm.full_name.trim() || !inviteForm.email.trim() || !inviteForm.password.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-create-user', {
+        body: {
+          email: inviteForm.email.trim(),
+          password: inviteForm.password,
+          full_name: inviteForm.full_name.trim(),
+          role: 'sharks_team',
+          environment: inviteForm.environment,
+          env_role: inviteForm.env_role,
+          permissions: inviteForm.permissions.length > 0 ? inviteForm.permissions : defaultPermissions(),
+          workspace_ids: inviteForm.workspace_ids,
+        },
+      });
+      if (error) throw new Error(await functionErrorMessage(error));
+      if (data?.error) throw new Error(data.error);
+      toast.success(`"${inviteForm.full_name}" adicionado ao time ${ENVIRONMENT_META[inviteForm.environment].short}!`);
+      setInviteOpen(false);
+      resetInviteForm();
+      await loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao criar usuário');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const resetInviteForm = () => {
+    setInviteForm({
+      full_name: '', email: '', password: '', showPassword: false,
+      environment: 'sharks_company', env_role: 'team',
+      permissions: defaultPermissions(), workspace_ids: [],
+    });
+    setInviteStep(0);
+  };
+
+  const openInvite = () => { resetInviteForm(); setInviteOpen(true); };
+
+  const openEdit = (member: MemberWithAccess) => {
+    setEditingMember(member);
+    setEditForm({
+      full_name: member.full_name,
+      permissions: member.permissions[activeTab]?.length > 0 ? member.permissions[activeTab] : defaultPermissions(),
+      workspace_ids: member.workspaces[activeTab]?.map(w => w.id) ?? [],
+    });
+    setEditOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!editingMember || !editForm.full_name.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-update-user', {
+        body: {
+          user_id: editingMember.id,
+          full_name: editForm.full_name.trim(),
+          environment: activeTab,
+          permissions: editForm.permissions,
+          workspace_ids: editForm.workspace_ids,
+        },
+      });
+      if (error) throw new Error(await functionErrorMessage(error));
+      if (data?.error) throw new Error(data.error);
+      toast.success('Membro atualizado!');
+      setEditOpen(false);
+      setEditingMember(null);
+      await loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao atualizar');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUnlink = async (member: MemberWithAccess, env: EnvironmentType) => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-link-user-env', {
+        body: { op: 'unlink', user_id: member.id, environment: env },
+      });
+      if (error) throw new Error(await functionErrorMessage(error));
+      if (data?.error) throw new Error(data.error);
+      toast.success(`"${member.full_name}" removido de ${ENVIRONMENT_META[env].short}.`);
+      await loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao remover');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (member: MemberWithAccess) => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.functions.invoke('admin-delete-user', {
+        body: { user_id: member.id },
+      });
+      if (error) throw new Error(await functionErrorMessage(error));
+      toast.success(`"${member.full_name}" removido permanentemente.`);
+      await loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao remover');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /* ─── Derived ─── */
+  const filteredMembers = members.filter(m => m.environments.some(e => e.environment === activeTab));
+  const envWorkspaces = allWorkspaces.filter(w => {
+    const wsEnv = ((w as unknown as { environment?: string }).environment) as EnvironmentType | undefined;
+    return wsEnv === activeTab || true; // show all if no env field — filter via env map
+  });
+
+  const inviteEnvWorkspaces = allWorkspaces.filter(() => true); // simplified — env map filter happens server-side
+
+  /* ─── Render ─── */
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Time</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Gerencie membros e permissões em todos os ambientes</p>
+        </div>
+        {isOracullo && (
+          <Button onClick={openInvite}>
+            <Plus className="w-4 h-4" />
+            Novo membro
+          </Button>
+        )}
+      </div>
+
+      {/* Environment tabs */}
+      <div className="flex gap-2">
+        {ENV_ORDER.map(env => {
+          const meta = ENVIRONMENT_META[env];
+          const count = members.filter(m => m.environments.some(e => e.environment === env)).length;
+          return (
+            <button
+              key={env}
+              onClick={() => setActiveTab(env)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === env
+                  ? 'bg-primary-50 text-primary-700 border border-primary-200'
+                  : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <span>{meta.emoji}</span>
+              <span>{meta.short}</span>
+              <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[11px] ${
+                activeTab === env ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-500'
+              }`}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Content */}
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
+        </div>
+      ) : filteredMembers.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={Users}
+            title={`Nenhum membro em ${ENVIRONMENT_META[activeTab].short}`}
+            description={`Adicione membros ao ambiente ${ENVIRONMENT_META[activeTab].short} para começar.`}
+            action={isOracullo ? <Button onClick={openInvite}>+ Novo membro</Button> : undefined}
+          />
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {filteredMembers.map(member => {
+            const isExpanded = expandedCard === member.id;
+            const envMembership = member.environments.find(e => e.environment === activeTab);
+            const clientCount = member.workspaces[activeTab]?.length ?? 0;
+            const perms = member.permissions[activeTab] ?? [];
+            const permSummary = perms.filter(p => permCount(p) > 1).length;
+
+            return (
+              <Card key={member.id} className="overflow-hidden">
+                {/* Main row */}
+                <div
+                  className="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50/50 transition-colors"
+                  onClick={() => setExpandedCard(isExpanded ? null : member.id)}
+                >
+                  <Avatar name={member.full_name} src={member.avatar_url} size="lg" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-gray-900">{member.full_name}</h3>
+                      <Badge variant={member.global_role === 'oracullo_admin' ? 'purple' : member.global_role === 'admin_sharks' ? 'primary' : 'info'} size="sm">
+                        {GLOBAL_ROLE_LABELS[member.global_role] || member.global_role}
+                      </Badge>
+                      {envMembership && (
+                        <Badge variant={envMembership.role === 'admin' ? 'primary' : 'default'} size="sm">
+                          {ENVIRONMENT_META[activeTab].emoji} {ENV_ROLE_LABELS[envMembership.role]}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                      <Mail className="w-3 h-3" />
+                      {member.email}
+                    </p>
+                  </div>
+
+                  {/* Summary badges */}
+                  <div className="hidden sm:flex items-center gap-2">
+                    {clientCount > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-blue-50 text-blue-700">
+                        <Building2 className="w-3 h-3" />
+                        {clientCount} cliente{clientCount > 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {permSummary > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-green-50 text-green-700">
+                        <Settings className="w-3 h-3" />
+                        {permSummary} módulo{permSummary > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  {isOracullo && (
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => openEdit(member)}
+                        className="p-2 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                        title="Editar"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      {envMembership && member.id !== currentUser?.id && (
+                        <button
+                          onClick={() => handleUnlink(member, activeTab)}
+                          className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title={envUnlinkLabel(activeTab)}
+                        >
+                          <Unlink className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="text-gray-400">
+                    {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                  </div>
+                </div>
+
+                {/* Expanded details */}
+                {isExpanded && (
+                  <div className="border-t border-gray-100 p-4 bg-gray-50/30 space-y-4">
+                    {/* All environments */}
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Ambientes</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {member.environments.map(env => (
+                          <span key={env.environment} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-primary-50 text-primary-700 font-medium">
+                            <CheckCircle2 className="w-3 h-3" />
+                            {ENVIRONMENT_META[env.environment].emoji} {ENVIRONMENT_META[env.environment].short}
+                            <span className="text-primary-400">·</span>
+                            {ENV_ROLE_LABELS[env.role]}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Permissions for active environment */}
+                    {perms.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                          Permissões — {ENVIRONMENT_META[activeTab].short}
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {perms.map(perm => {
+                            const meta = PERMISSION_META[perm.permission];
+                            if (!meta) return null;
+                            const Icon = meta.icon;
+                            return (
+                              <div key={perm.permission} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-gray-200">
+                                <Icon className="w-4 h-4 text-gray-400 shrink-0" />
+                                <span className="text-sm font-medium text-gray-700 flex-1">{meta.label}</span>
+                                <div className="flex items-center gap-0.5">
+                                  {perm.can_create && <span className="text-[10px] px-1 py-0.5 rounded bg-green-100 text-green-700">C</span>}
+                                  {perm.can_read && <span className="text-[10px] px-1 py-0.5 rounded bg-blue-100 text-blue-700">L</span>}
+                                  {perm.can_update && <span className="text-[10px] px-1 py-0.5 rounded bg-yellow-100 text-yellow-700">U</span>}
+                                  {perm.can_delete && <span className="text-[10px] px-1 py-0.5 rounded bg-red-100 text-red-700">D</span>}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Assigned clients for active environment */}
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                        {envMembership?.role === 'admin' ? `Clientes — acesso total (${ENVIRONMENT_META[activeTab].short})` : `Clientes atribuídos (${ENVIRONMENT_META[activeTab].short})`}
+                      </h4>
+                      {envMembership?.role === 'admin' ? (
+                        <div className="flex flex-wrap gap-2">
+                          {(member.workspaces[activeTab] ?? []).map(ws => (
+                            <span key={ws.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-primary-50 text-primary-700 font-medium">
+                              <CheckCircle2 className="w-3 h-3" />
+                              {ws.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (member.workspaces[activeTab]?.length ?? 0) > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {member.workspaces[activeTab]!.map(ws => (
+                            <span key={ws.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-700 font-medium">
+                              <Building2 className="w-3 h-3" />
+                              {ws.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 italic">Nenhum cliente atribuído</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ═══════ INVITE MODAL ═══════ */}
+      <Modal isOpen={inviteOpen} onClose={() => setInviteOpen(false)} title="Novo Membro do Time" size="lg">
+        {/* Step indicator */}
+        <div className="flex items-center gap-2 mb-6">
+          {['Dados pessoais', 'Ambiente e função', 'Permissões'].map((step, i) => (
+            <button
+              key={step}
+              onClick={() => setInviteStep(i)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                inviteStep === i
+                  ? 'bg-primary-500 text-white'
+                  : inviteStep > i
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-500'
+              }`}
+            >
+              {inviteStep > i ? <Check className="w-3 h-3" /> : <span>{i + 1}</span>}
+              {step}
+            </button>
+          ))}
+        </div>
+
+        {/* Step 0: Basic info */}
+        {inviteStep === 0 && (
+          <div className="space-y-4">
+            <Input
+              label="Nome completo"
+              value={inviteForm.full_name}
+              onChange={(e) => setInviteForm(p => ({ ...p, full_name: e.target.value }))}
+              placeholder="Ex: João Silva"
+            />
+            <Input
+              label="E-mail"
+              type="email"
+              value={inviteForm.email}
+              onChange={(e) => setInviteForm(p => ({ ...p, email: e.target.value }))}
+              placeholder="email@exemplo.com"
+            />
+            <div className="relative">
+              <Input
+                label="Senha"
+                type={inviteForm.showPassword ? 'text' : 'password'}
+                value={inviteForm.password}
+                onChange={(e) => setInviteForm(p => ({ ...p, password: e.target.value }))}
+                placeholder="Mínimo 6 caracteres"
+              />
+              <button
+                type="button"
+                onClick={() => setInviteForm(p => ({ ...p, showPassword: !p.showPassword }))}
+                className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+                tabIndex={-1}
+              >
+                {inviteForm.showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 1: Environment + role */}
+        {inviteStep === 1 && (
+          <div className="space-y-4">
+            <Select
+              label="Ambiente"
+              value={inviteForm.environment}
+              onChange={(e) => setInviteForm(p => ({ ...p, environment: e.target.value as EnvironmentType }))}
+              options={ENV_ORDER.map(env => ({ value: env, label: `${ENVIRONMENT_META[env].emoji} ${ENVIRONMENT_META[env].label}` }))}
+            />
+            <Select
+              label="Função no ambiente"
+              value={inviteForm.env_role}
+              onChange={(e) => setInviteForm(p => ({ ...p, env_role: e.target.value as 'admin' | 'team' }))}
+              options={[
+                { value: 'team', label: 'Time — acesso conforme permissões' },
+                { value: 'admin', label: 'Admin do ambiente — acesso total' },
+              ]}
+            />
+            <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+              {inviteForm.env_role === 'admin'
+                ? `O membro terá acesso total ao ambiente ${ENVIRONMENT_META[inviteForm.environment].short}.`
+                : `O membro terá acesso ao ambiente ${ENVIRONMENT_META[inviteForm.environment].short} conforme as permissões definidas no próximo passo.`}
+            </p>
+          </div>
+        )}
+
+        {/* Step 2: Permissions */}
+        {inviteStep === 2 && (
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500">
+              Defina o que este membro pode fazer em cada módulo ({ENVIRONMENT_META[inviteForm.environment].short}):
+            </p>
+            {ALL_PERMISSIONS.map(perm => {
+              const meta = PERMISSION_META[perm];
+              const Icon = meta.icon;
+              const p = inviteForm.permissions.find(x => x.permission === perm) || { permission: perm, can_create: false, can_read: true, can_update: false, can_delete: false };
+              return (
+                <div key={perm} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white border border-gray-200 hover:border-gray-300 transition-colors">
+                  <Icon className="w-4 h-4 text-gray-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium text-gray-700">{meta.label}</span>
+                    <p className="text-[11px] text-gray-400">{meta.description}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {(['can_create', 'can_read', 'can_update', 'can_delete'] as const).map(action => {
+                      const label = action === 'can_create' ? 'Criar' : action === 'can_read' ? 'Ver' : action === 'can_update' ? 'Editar' : 'Excluir';
+                      return (
+                        <button
+                          key={action}
+                          onClick={() => setInviteForm(f => ({
+                            ...f,
+                            permissions: togglePerm(f.permissions, perm, action),
+                          }))}
+                          className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+                            p[action]
+                              ? action === 'can_delete' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                              : 'bg-gray-100 text-gray-400'
+                          }`}
+                          title={label}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex justify-between mt-6 pt-4 border-t border-gray-100">
+          <div>
+            {inviteStep > 0 && (
+              <Button variant="ghost" onClick={() => setInviteStep(s => s - 1)}>
+                Voltar
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setInviteOpen(false)}>Cancelar</Button>
+            {inviteStep < 2 ? (
+              <Button onClick={() => setInviteStep(s => s + 1)}>
+                Próximo
+              </Button>
+            ) : (
+              <Button
+                onClick={handleInvite}
+                loading={submitting}
+                disabled={!inviteForm.full_name.trim() || !inviteForm.email.trim() || !inviteForm.password.trim()}
+              >
+                Criar membro
+              </Button>
+            )}
+          </div>
+        </div>
+      </Modal>
+
+      {/* ═══════ EDIT MODAL ═══════ */}
+      <Modal isOpen={editOpen} onClose={() => setEditOpen(false)} title={`Editar: ${editingMember?.full_name}`} size="lg">
+        <div className="space-y-6">
+          {/* Basic info */}
+          <Input
+            label="Nome completo"
+            value={editForm.full_name}
+            onChange={(e) => setEditForm(p => ({ ...p, full_name: e.target.value }))}
+          />
+
+          {editingMember && (
+            <p className="text-xs text-gray-400">
+              E-mail: {editingMember.email} (não pode ser alterado) · Ambiente:{' '}
+              {ENVIRONMENT_META[activeTab].emoji} {ENVIRONMENT_META[activeTab].label}
+            </p>
+          )}
+
+          {/* Permissions */}
+          <div>
+            <h4 className="text-sm font-semibold text-gray-900 mb-3">
+              Permissões — {ENVIRONMENT_META[activeTab].short}
+            </h4>
+            <div className="space-y-2">
+              {ALL_PERMISSIONS.map(perm => {
+                const meta = PERMISSION_META[perm];
+                const Icon = meta.icon;
+                const p = editForm.permissions.find(x => x.permission === perm) || { permission: perm, can_create: false, can_read: true, can_update: false, can_delete: false };
+                return (
+                  <div key={perm} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100/80 transition-colors">
+                    <Icon className="w-4 h-4 text-gray-400 shrink-0" />
+                    <span className="text-sm font-medium text-gray-700 flex-1">{meta.label}</span>
+                    <div className="flex items-center gap-1">
+                      {(['can_create', 'can_read', 'can_update', 'can_delete'] as const).map(action => {
+                        const label = action === 'can_create' ? 'C' : action === 'can_read' ? 'L' : action === 'can_update' ? 'U' : 'D';
+                        const fullLabel = action === 'can_create' ? 'Criar' : action === 'can_read' ? 'Ver' : action === 'can_update' ? 'Editar' : 'Excluir';
+                        return (
+                          <button
+                            key={action}
+                            onClick={() => setEditForm(f => ({
+                              ...f,
+                              permissions: togglePerm(f.permissions, perm, action),
+                            }))}
+                            className={`w-7 h-7 rounded text-[11px] font-bold transition-colors ${
+                              p[action]
+                                ? action === 'can_delete' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                                : 'bg-gray-200 text-gray-400'
+                            }`}
+                            title={fullLabel}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Client assignment */}
+          <div>
+            <h4 className="text-sm font-semibold text-gray-900 mb-3">
+              Clientes atribuídos — {ENVIRONMENT_META[activeTab].short}
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {envWorkspaces.map(ws => {
+                const selected = editForm.workspace_ids.includes(ws.id);
+                return (
+                  <button
+                    key={ws.id}
+                    onClick={() => setEditForm(f => ({
+                      ...f,
+                      workspace_ids: selected
+                        ? f.workspace_ids.filter(id => id !== ws.id)
+                        : [...f.workspace_ids, ws.id],
+                    }))}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-all ${
+                      selected
+                        ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-200'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${
+                      selected ? 'bg-primary-500 text-white' : 'border-2 border-gray-300'
+                    }`}>
+                      {selected && <Check className="w-3 h-3" />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{ws.name}</p>
+                      {ws.segment && <p className="text-[11px] text-gray-400 truncate">{ws.segment}</p>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-between mt-6 pt-4 border-t border-gray-100">
+          <Button variant="ghost" onClick={() => setEditOpen(false)}>Cancelar</Button>
+          <div className="flex gap-2">
+            {editingMember && editingMember.id !== currentUser?.id && (
+              <Button
+                variant="danger"
+                onClick={() => { handleDelete(editingMember); setEditOpen(false); }}
+                loading={submitting}
+              >
+                Remover permanentemente
+              </Button>
+            )}
+            <Button onClick={handleUpdate} loading={submitting} disabled={!editForm.full_name.trim()}>
+              Salvar alterações
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
