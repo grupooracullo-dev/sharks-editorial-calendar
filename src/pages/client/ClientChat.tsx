@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChat } from '@/hooks/useChat';
+import { useChatUnread } from '@/hooks/useChatUnread';
 import ChatPanel from '@/components/chat/ChatPanel';
 import { MessageType } from '@/types';
 import { toast } from 'sonner';
@@ -8,7 +10,14 @@ import { toast } from 'sonner';
 export default function ClientChat() {
   const { user } = useAuth();
   const { currentWorkspace } = useWorkspace();
-  const { messages, send, loading } = useChat(currentWorkspace?.id);
+  const { messages, send, loading, threadId } = useChat(currentWorkspace?.id, user);
+  const { markRead } = useChatUnread(user?.id);
+
+  useEffect(() => {
+    if (!threadId || !currentWorkspace?.id || loading) return;
+    const hasUnreadIncoming = messages.some(m => m.sender.id !== user?.id && m.status !== 'read');
+    if (hasUnreadIncoming) markRead(threadId, currentWorkspace.id);
+  }, [threadId, currentWorkspace?.id, messages, loading, markRead, user?.id]);
 
   const handleSend = async (content: string, type: MessageType) => {
     if (!user) return;

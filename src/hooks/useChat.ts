@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { MessageType, User } from '@/types';
+import { MessageType, MessageStatus, User } from '@/types';
 import { supabase } from '@/lib/supabase';
 
 export interface ChatMessageData {
@@ -8,9 +8,10 @@ export interface ChatMessageData {
   sender: User;
   message_type: MessageType;
   created_at: string;
+  status: MessageStatus;
 }
 
-export function useChat(workspaceId?: string | null) {
+export function useChat(workspaceId?: string | null, currentUser?: User | null) {
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,7 +29,6 @@ export function useChat(workspaceId?: string | null) {
     setLoading(true);
 
     (async () => {
-      // Find or create the thread for this workspace
       const { data: existing } = await supabase
         .from('chat_threads')
         .select('id')
@@ -57,7 +57,7 @@ export function useChat(workspaceId?: string | null) {
       const fetchMessages = async () => {
         const { data } = await supabase
           .from('chat_messages')
-          .select('id, content, message_type, created_at, sender:users(*)')
+          .select('id, content, message_type, created_at, status, sender:users(*)')
           .eq('thread_id', tid)
           .order('created_at');
 
@@ -88,6 +88,18 @@ export function useChat(workspaceId?: string | null) {
   const send = useCallback(
     async (content: string, type: MessageType) => {
       if (!threadId) return false;
+      const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      if (currentUser) {
+        const optimistic: ChatMessageData = {
+          id: tempId,
+          content,
+          message_type: type,
+          created_at: new Date().toISOString(),
+          status: 'sent',
+          sender: currentUser,
+        };
+        setMessages(prev => [...prev, optimistic]);
+      }
       const { error } = await supabase.from('chat_messages').insert({
         thread_id: threadId,
         content,
@@ -95,12 +107,13 @@ export function useChat(workspaceId?: string | null) {
       });
       if (error) {
         console.error('[chat] send error:', error.message);
+        setMessages(prev => prev.filter(m => m.id !== tempId));
         return false;
       }
       return true;
     },
-    [threadId]
+    [threadId, currentUser]
   );
 
-  return { messages, send, loading };
+  return { messages, send, loading, threadId };
 }

@@ -215,6 +215,7 @@ export interface StrategicDate {
 
 // Chat
 export type MessageType = 'message' | 'doubt' | 'suggestion';
+export type MessageStatus = 'sent' | 'read';
 
 export interface ChatThread {
   id: string;
@@ -230,6 +231,7 @@ export interface ChatMessage {
   message_type: MessageType;
   action_id: string | null;
   created_at: string;
+  status: MessageStatus;
   sender?: User;
   action?: Action;
 }

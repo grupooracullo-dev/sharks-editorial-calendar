@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChat } from '@/hooks/useChat';
+import { useChatUnread } from '@/hooks/useChatUnread';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import ChatPanel from '@/components/chat/ChatPanel';
-import Avatar from '@/components/ui/Avatar';
 import WorkspaceLogo from '@/components/ui/WorkspaceLogo';
 import Card from '@/components/ui/Card';
 import { MessageType } from '@/types';
@@ -20,8 +20,15 @@ export default function EstrategosChat() {
   const [showWsList, setShowWsList] = useState(false);
 
   const activeWsId = selectedWsId || wsList[0]?.id;
-  const { messages, send, loading } = useChat(activeWsId);
+  const { messages, send, loading, threadId } = useChat(activeWsId, user);
+  const { counts, markRead } = useChatUnread(user?.id);
   const selectedWs = wsList.find(w => w.id === activeWsId);
+
+  useEffect(() => {
+    if (!threadId || !activeWsId || loading) return;
+    const hasUnreadIncoming = messages.some(m => m.sender.id !== user?.id && m.status !== 'read');
+    if (hasUnreadIncoming) markRead(threadId, activeWsId);
+  }, [threadId, activeWsId, messages, loading, markRead, user?.id]);
 
   const handleSend = async (content: string, type: MessageType) => {
     if (!activeWsId || !user) return;
@@ -63,7 +70,12 @@ export default function EstrategosChat() {
                   className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left"
                 >
                   <WorkspaceLogo name={ws.name} logoUrl={ws.logo_url} size="sm" />
-                  <span className="truncate">{ws.name}</span>
+                  <span className="truncate flex-1">{ws.name}</span>
+                  {counts[ws.id] > 0 && (
+                    <span className="shrink-0 min-w-[20px] h-5 px-1.5 flex items-center justify-center text-[11px] font-semibold text-white bg-primary-500 rounded-full">
+                      {counts[ws.id]}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -87,7 +99,12 @@ export default function EstrategosChat() {
                   }`}
                 >
                   <WorkspaceLogo name={ws.name} logoUrl={ws.logo_url} size="sm" />
-                  <span className="truncate">{ws.name}</span>
+                  <span className="truncate flex-1">{ws.name}</span>
+                  {counts[ws.id] > 0 && (
+                    <span className="shrink-0 min-w-[20px] h-5 px-1.5 flex items-center justify-center text-[11px] font-semibold text-white bg-primary-500 rounded-full">
+                      {counts[ws.id]}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChat } from '@/hooks/useChat';
+import { useChatUnread } from '@/hooks/useChatUnread';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import ChatPanel from '@/components/chat/ChatPanel';
 import WorkspaceLogo from '@/components/ui/WorkspaceLogo';
@@ -21,8 +22,15 @@ export default function SharksChat() {
   const [showWsList, setShowWsList] = useState(false);
 
   const activeWsId = selectedWsId || currentWorkspace?.id;
-  const { messages, send, loading } = useChat(activeWsId);
+  const { messages, send, loading, threadId } = useChat(activeWsId, user);
+  const { counts, markRead } = useChatUnread(user?.id);
   const selectedWs = workspaces.find(w => w.id === activeWsId);
+
+  useEffect(() => {
+    if (!threadId || !activeWsId || loading) return;
+    const hasUnreadIncoming = messages.some(m => m.sender.id !== user?.id && m.status !== 'read');
+    if (hasUnreadIncoming) markRead(threadId, activeWsId);
+  }, [threadId, activeWsId, messages, loading, markRead, user?.id]);
 
   const handleSend = async (content: string, type: MessageType) => {
     if (!activeWsId || !user) return;
@@ -42,7 +50,6 @@ export default function SharksChat() {
         <p className="text-sm text-gray-500 mt-0.5">Converse com os clientes em tempo real</p>
       </div>
 
-      {/* Mobile workspace selector */}
       {isMobile && (
         <div className="relative">
           <button
@@ -54,6 +61,9 @@ export default function SharksChat() {
                 <>
                   <WorkspaceLogo name={selectedWs.name} logoUrl={selectedWs.logo_url} size="sm" />
                   <span className="text-sm font-medium text-gray-900 truncate">{selectedWs.name}</span>
+                  {counts[selectedWs.id] > 0 && (
+                    <Badge variant="primary" size="sm">{counts[selectedWs.id]}</Badge>
+                  )}
                 </>
               ) : (
                 <span className="text-sm text-gray-500">Selecione um cliente</span>
@@ -72,7 +82,8 @@ export default function SharksChat() {
                   }`}
                 >
                   <WorkspaceLogo name={ws.name} logoUrl={ws.logo_url} size="sm" />
-                  <span className="text-sm font-medium text-gray-900 truncate">{ws.name}</span>
+                  <span className="text-sm font-medium text-gray-900 truncate flex-1">{ws.name}</span>
+                  {counts[ws.id] > 0 && <Badge variant="primary" size="sm">{counts[ws.id]}</Badge>}
                 </button>
               ))}
             </div>
@@ -81,7 +92,6 @@ export default function SharksChat() {
       )}
 
       <div className={isMobile ? '' : 'grid grid-cols-1 lg:grid-cols-3 gap-4'}>
-        {/* Workspace list — desktop only */}
         {!isMobile && (
           <Card padding="sm" className="lg:col-span-1">
             <h3 className="font-semibold text-gray-900 mb-3 px-2">Clientes</h3>
@@ -106,6 +116,11 @@ export default function SharksChat() {
                           : 'Clique para abrir a conversa'}
                       </p>
                     </div>
+                    {counts[ws.id] > 0 && (
+                      <span className="shrink-0 min-w-[20px] h-5 px-1.5 flex items-center justify-center text-[11px] font-semibold text-white bg-primary-500 rounded-full">
+                        {counts[ws.id]}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -116,7 +131,6 @@ export default function SharksChat() {
           </Card>
         )}
 
-        {/* Chat panel */}
         <div className={isMobile ? 'h-[calc(100vh-240px)] min-h-[350px]' : 'lg:col-span-2 h-[calc(100vh-260px)] min-h-[450px]'}>
           {!activeWsId ? (
             <Card padding="sm" className="h-full flex items-center justify-center">
