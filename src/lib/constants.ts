@@ -177,6 +177,9 @@ export const NOTIFICATION_TYPES: Record<NotificationType, { label: string; icon:
   campaign_starting: { label: 'Campanha Iniciando', icon: 'megaphone' },
   sync_error: { label: 'Erro de Sincronização', icon: 'alert-triangle' },
   calendar_undefined: { label: 'Calendário Não Definido', icon: 'calendar-x' },
+  action_assigned: { label: 'Ação Atribuída', icon: 'user-check' },
+  action_status_changed: { label: 'Status da Ação', icon: 'refresh-cw' },
+  access_request: { label: 'Solicitação de Acesso', icon: 'shield-check' },
 };
 
 // Sync Status

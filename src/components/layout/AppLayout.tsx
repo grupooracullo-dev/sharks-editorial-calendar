@@ -4,6 +4,7 @@ import TopHeader from './TopHeader';
 import BottomNav from './BottomNav';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
+import { useOverdueSweep } from '@/hooks/useOverdueSweep';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -45,6 +46,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 // Layout for Sharks pages only
 export function SharksLayout({ children }: { children: ReactNode }) {
   const { isSharks, loading } = useAuth();
+  useOverdueSweep(isSharks);
 
   if (loading) return null;
   if (!isSharks) return <Navigate to="/client" replace />;
@@ -65,9 +67,11 @@ export function ClientLayout({ children }: { children: ReactNode }) {
 // Layout for Estrategos pages (staff do ambiente estrategos)
 export function EstrategosLayout({ children }: { children: ReactNode }) {
   const { hasAccess, loading } = useAuth();
+  const isEstrategos = hasAccess('estrategos', ['admin', 'team']);
+  useOverdueSweep(isEstrategos);
 
   if (loading) return null;
-  if (!hasAccess('estrategos', ['admin', 'team'])) return <Navigate to="/sharks" replace />;
+  if (!isEstrategos) return <Navigate to="/sharks" replace />;
 
   return <AppLayout>{children}</AppLayout>;
 }

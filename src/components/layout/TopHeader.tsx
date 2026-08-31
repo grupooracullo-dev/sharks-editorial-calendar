@@ -2,17 +2,43 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useNotifications } from '@/contexts/NotificationContext';
-import { ChevronDown, Bell, Search, Check, X, Menu } from 'lucide-react';
+import { ChevronDown, Bell, Search, Check, X, Menu, MessageSquare, UserCheck, RefreshCw, AlertTriangle, ShieldCheck, CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Avatar from '@/components/ui/Avatar';
 import WorkspaceLogo from '@/components/ui/WorkspaceLogo';
 import { useNavigate, useLocation } from 'react-router-dom';
-import type { EnvironmentType } from '@/types';
+import type { EnvironmentType, NotificationType } from '@/types';
+
+const NOTIF_TYPE_ICON: Record<NotificationType, typeof Bell> = {
+  message: MessageSquare,
+  suggestion: MessageSquare,
+  action_assigned: UserCheck,
+  action_status_changed: RefreshCw,
+  action_overdue: AlertTriangle,
+  action_upcoming: CalendarClock,
+  access_request: ShieldCheck,
+  sync_error: AlertTriangle,
+  calendar_generated: CalendarClock,
+  campaign_starting: CalendarClock,
+  calendar_undefined: AlertTriangle,
+};
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diff / 60_000);
+  if (min < 1) return 'agora';
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h}h`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return 'ontem';
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
 
 export default function TopHeader({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
   const { user, isSharks } = useAuth();
   const { currentWorkspace, workspacesByEnv, setCurrentWorkspace } = useWorkspace();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useNotifications();
   const [wsDropdownOpen, setWsDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -168,6 +194,14 @@ export default function TopHeader({ onOpenMobileNav }: { onOpenMobileNav?: () =>
                     >
                       Marcar todas lidas
                     </button>
+                    {notifications.length > 0 && (
+                      <button
+                        onClick={clearAll}
+                        className="text-xs text-gray-400 hover:text-red-500"
+                      >
+                        Limpar
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="max-h-80 overflow-y-auto">
@@ -176,25 +210,26 @@ export default function TopHeader({ onOpenMobileNav }: { onOpenMobileNav?: () =>
                       Nenhuma notificação
                     </div>
                   ) : (
-                    notifications.map((n) => (
-                      <button
-                        key={n.id}
-                        onClick={() => markAsRead(n.id)}
-                        className={cn(
-                          'w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-50',
-                          !n.is_read && 'bg-primary-50/30'
-                        )}
-                      >
-                        <div className={cn('w-2 h-2 rounded-full mt-1.5 flex-shrink-0', n.is_read ? 'bg-gray-300' : 'bg-primary-500')} />
-                        <div className="min-w-0 flex-1">
-                          <p className={cn('text-sm', !n.is_read && 'font-medium')}>{n.title}</p>
-                          {n.message && <p className="text-xs text-gray-500 truncate">{n.message}</p>}
-                          <p className="text-xs text-gray-400 mt-1">
-                            {new Date(n.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
-                      </button>
-                    ))
+                    notifications.map((n) => {
+                      const Icon = NOTIF_TYPE_ICON[n.type] ?? Bell;
+                      return (
+                        <button
+                          key={n.id}
+                          onClick={() => markAsRead(n.id)}
+                          className={cn(
+                            'w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-50',
+                            !n.is_read && 'bg-primary-50/30'
+                          )}
+                        >
+                          <Icon className={cn('w-4 h-4 mt-0.5 flex-shrink-0', n.is_read ? 'text-gray-300' : 'text-primary-500')} />
+                          <div className="min-w-0 flex-1">
+                            <p className={cn('text-sm', !n.is_read && 'font-medium')}>{n.title}</p>
+                            {n.message && <p className="text-xs text-gray-500 truncate">{n.message}</p>}
+                            <p className="text-xs text-gray-400 mt-1">{timeAgo(n.created_at)}</p>
+                          </div>
+                        </button>
+                      );
+                    })
                   )}
                 </div>
               </div>

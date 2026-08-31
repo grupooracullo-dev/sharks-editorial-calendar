@@ -346,7 +346,18 @@ export interface AuditLog {
 }
 
 // Notification
-export type NotificationType = 'message' | 'suggestion' | 'calendar_generated' | 'action_upcoming' | 'action_overdue' | 'campaign_starting' | 'sync_error' | 'calendar_undefined';
+export type NotificationType =
+  | 'message'
+  | 'suggestion'
+  | 'calendar_generated'
+  | 'action_upcoming'
+  | 'action_overdue'
+  | 'campaign_starting'
+  | 'sync_error'
+  | 'calendar_undefined'
+  | 'action_assigned'
+  | 'action_status_changed'
+  | 'access_request';
 
 export interface Notification {
   id: string;

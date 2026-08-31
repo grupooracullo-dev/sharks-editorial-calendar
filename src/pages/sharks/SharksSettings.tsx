@@ -8,6 +8,7 @@ import AvatarUploader from '@/components/ui/AvatarUploader';
 import Badge from '@/components/ui/Badge';
 import Switch from '@/components/ui/Switch';
 import { USER_ROLES } from '@/lib/constants';
+import { getNotifPrefs, setNotifPrefs, type NotifPrefs } from '@/lib/notificationPrefs';
 import { toast } from 'sonner';
 import {
   Settings as SettingsIcon,
@@ -20,24 +21,6 @@ import {
   Save,
   Check,
 } from 'lucide-react';
-
-// ---------- preferencias locais ----------
-interface NotifPrefs {
-  chat: boolean;
-  overdue: boolean;
-  sync: boolean;
-}
-const PREFS_KEY = 'sharks-notif-prefs';
-const DEFAULT_PREFS: NotifPrefs = { chat: true, overdue: true, sync: true };
-
-function loadPrefs(): NotifPrefs {
-  try {
-    const raw = localStorage.getItem(PREFS_KEY);
-    return raw ? { ...DEFAULT_PREFS, ...JSON.parse(raw) } : DEFAULT_PREFS;
-  } catch {
-    return DEFAULT_PREFS;
-  }
-}
 
 export default function SharksSettings() {
   const { user, signOut, refreshProfile } = useAuth();
@@ -53,17 +36,17 @@ export default function SharksSettings() {
   const [savingPassword, setSavingPassword] = useState(false);
 
   // preferencias
-  const [prefs, setPrefs] = useState<NotifPrefs>(DEFAULT_PREFS);
+  const [prefs, setPrefs] = useState<NotifPrefs>(getNotifPrefs());
 
   useEffect(() => {
     setName(user?.full_name ?? '');
     setAvatarUrl(user?.avatar_url || null);
-    setPrefs(loadPrefs());
+    setPrefs(getNotifPrefs());
   }, [user?.id, user?.full_name, user?.avatar_url]);
 
   const savePrefs = (next: NotifPrefs) => {
     setPrefs(next);
-    localStorage.setItem(PREFS_KEY, JSON.stringify(next));
+    setNotifPrefs(next);
   };
 
   const handleSaveProfile = async () => {
