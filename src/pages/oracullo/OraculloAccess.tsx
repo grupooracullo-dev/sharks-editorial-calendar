@@ -55,13 +55,15 @@ export default function OraculloAccess() {
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const emptyPerEnv = () => ({
+    sharks_company: { wsMode: 'new' as 'existing' | 'new', workspace_id: '', new_workspace_name: '' },
+    estrategos: { wsMode: 'new' as 'existing' | 'new', workspace_id: '', new_workspace_name: '' },
+  });
   const [form, setForm] = useState({
     user_id: '',
-    environment: 'sharks_company',
+    environments: ['sharks_company'] as EnvironmentType[],
     role: 'client',
-    wsMode: 'new' as 'existing' | 'new',
-    workspace_id: '',
-    new_workspace_name: '',
+    perEnv: emptyPerEnv(),
   });
 
   const load = useCallback(async () => {
@@ -105,59 +107,69 @@ export default function OraculloAccess() {
       toast.error('Selecione um usuário');
       return;
     }
-    if (form.role === 'client') {
-      if (form.wsMode === 'existing' && !form.workspace_id) {
-        toast.error('Selecione a empresa (workspace) do cliente');
-        return;
-      }
-      if (form.wsMode === 'new' && !form.new_workspace_name.trim()) {
-        toast.error('Informe o nome da nova empresa');
-        return;
+    if (form.environments.length === 0) {
+      toast.error('Selecione pelo menos um ambiente');
+      return;
+    }
+    for (const env of form.environments) {
+      if (form.role === 'client') {
+        const cfg = form.perEnv[env];
+        if (cfg.wsMode === 'existing' && !cfg.workspace_id) {
+          toast.error(`Selecione a empresa em ${ENVIRONMENT_META[env].label}`);
+          return;
+        }
+        if (cfg.wsMode === 'new' && !cfg.new_workspace_name.trim()) {
+          toast.error(`Informe o nome da nova empresa em ${ENVIRONMENT_META[env].label}`);
+          return;
+        }
       }
     }
     setSaving(true);
     try {
-      const { data, error } = await supabase.functions.invoke('admin-link-user-env', {
-        body: {
-          op: 'link',
-          user_id: form.user_id,
-          environment: form.environment,
-          env_role: form.role,
-          ...(form.role === 'client' && form.wsMode === 'existing' ? { workspace_id: form.workspace_id } : {}),
-          ...(form.role === 'client' && form.wsMode === 'new' ? { new_workspace_name: form.new_workspace_name.trim() } : {}),
-        },
-      });
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
+      const linkedEnvs: string[] = [];
+      for (const env of form.environments) {
+        const cfg = form.perEnv[env];
+        const { data, error } = await supabase.functions.invoke('admin-link-user-env', {
+          body: {
+            op: 'link',
+            user_id: form.user_id,
+            environment: env,
+            env_role: form.role,
+            ...(form.role === 'client' && cfg.wsMode === 'existing' ? { workspace_id: cfg.workspace_id } : {}),
+            ...(form.role === 'client' && cfg.wsMode === 'new' ? { new_workspace_name: cfg.new_workspace_name.trim() } : {}),
+          },
+        });
+        if (error) throw new Error(`${ENVIRONMENT_META[env].label}: ${error.message}`);
+        if (data?.error) throw new Error(`${ENVIRONMENT_META[env].label}: ${data.error}`);
 
-      // Registra no histórico (granted / role_changed)
-      const previous = rows.find(r => r.user_id === form.user_id && r.environment === form.environment);
-      const histAction: HistoryRow['action'] = previous
-        ? (previous.role === form.role ? 'granted' : 'role_changed')
-        : 'granted';
-      const wsName = form.role === 'client'
-        ? (form.wsMode === 'existing'
-            ? workspaces.find(w => w.id === form.workspace_id)?.name ?? null
-            : form.new_workspace_name.trim() || null)
-        : null;
-      await supabase.from('access_histories').insert({
-        user_id: form.user_id,
-        environment: form.environment,
-        env_role: form.role,
-        action: histAction,
-        workspace_id: form.role === 'client' && form.wsMode === 'existing' ? form.workspace_id || null : null,
-        workspace_name: wsName,
-        performed_by: meId,
-        performed_by_name: users.find(u => u.id === meId)?.full_name ?? null,
-      });
+        // Registra no histórico (granted / role_changed)
+        const previous = rows.find(r => r.user_id === form.user_id && r.environment === env);
+        const histAction: HistoryRow['action'] = previous
+          ? (previous.role === form.role ? 'granted' : 'role_changed')
+          : 'granted';
+        const wsName = form.role === 'client'
+          ? (cfg.wsMode === 'existing'
+              ? workspaces.find(w => w.id === cfg.workspace_id)?.name ?? null
+              : cfg.new_workspace_name.trim() || null)
+          : null;
+        await supabase.from('access_histories').insert({
+          user_id: form.user_id,
+          environment: env,
+          env_role: form.role,
+          action: histAction,
+          workspace_id: form.role === 'client' && cfg.wsMode === 'existing' ? cfg.workspace_id || null : null,
+          workspace_name: wsName,
+          performed_by: meId,
+          performed_by_name: users.find(u => u.id === meId)?.full_name ?? null,
+        });
+        linkedEnvs.push(ENVIRONMENT_META[env].label);
+      }
 
       toast.success(
-        data.workspace_created
-          ? `Acesso concedido e empresa "${form.new_workspace_name.trim()}" criada em ${ENVIRONMENT_META[form.environment as EnvironmentType].label}.`
-          : 'Acesso concedido e vinculado à empresa.',
+        `Acesso concedido em ${linkedEnvs.join(' + ')}${form.role === 'client' ? ' — cliente vinculado às empresas.' : '.'}`,
       );
       setModal(false);
-      setForm(f => ({ ...f, workspace_id: '', new_workspace_name: '' }));
+      setForm(f => ({ ...f, environments: ['sharks_company'], perEnv: emptyPerEnv() }));
       await load();
     } catch (e) {
       toast.error((e as Error).message);
@@ -218,8 +230,6 @@ for (const row of rows) {
     const wsIds = new Set(memberships.filter(m => m.user_id === userId).map(m => m.workspace_id));
     return workspaces.filter(w => wsIds.has(w.id)).map(w => w.name);
   };
-
-  const envWorkspaces = workspaces.filter(w => w.environment === form.environment);
 
   return (
     <div className="space-y-6">
@@ -364,16 +374,23 @@ for (const row of rows) {
             required
           />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Ambiente</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Ambiente <span className="text-gray-400 font-normal">(1 ou ambos)</span>
+            </label>
             <div className="grid grid-cols-2 gap-3">
               {(['sharks_company', 'estrategos'] as EnvironmentType[]).map(env => {
                 const meta = ENVIRONMENT_META[env];
-                const active = form.environment === env;
+                const active = form.environments.includes(env);
                 return (
                   <button
                     key={env}
                     type="button"
-                    onClick={() => setForm(f => ({ ...f, environment: env, workspace_id: '', new_workspace_name: '' }))}
+                    onClick={() => setForm(f => ({
+                      ...f,
+                      environments: f.environments.includes(env)
+                        ? f.environments.filter(e => e !== env)
+                        : [...f.environments, env],
+                    }))}
                     className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
                       active
                         ? 'border-primary-500 bg-primary-50 shadow-sm'
@@ -381,7 +398,7 @@ for (const row of rows) {
                     }`}
                   >
                     <span className="text-2xl leading-none">{meta.emoji}</span>
-                    <div>
+                    <div className="min-w-0">
                       <p className={`text-sm font-semibold ${active ? 'text-primary-700' : 'text-gray-900'}`}>{meta.label}</p>
                       <p className="text-[11px] text-gray-400 mt-0.5">
                         {env === 'sharks_company' ? 'Marketing editorial' : 'Gestão de projetos'}
@@ -391,6 +408,9 @@ for (const row of rows) {
                 );
               })}
             </div>
+            {form.environments.length === 0 && (
+              <p className="text-xs text-red-500 mt-1.5">Selecione pelo menos um ambiente</p>
+            )}
           </div>
 
           <div>
@@ -415,56 +435,60 @@ for (const row of rows) {
               })}
             </div>
           </div>
-          {form.role === 'client' && (
-            <div className="border border-gray-200 rounded-lg p-3 space-y-2">
-              <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
-                <Building2 className="w-4 h-4 text-gray-400" />
-                Empresa do cliente em {ENVIRONMENT_META[form.environment as EnvironmentType].label}
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setForm(f => ({ ...f, wsMode: 'existing' }))}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                    form.wsMode === 'existing'
-                      ? 'border-primary-400 bg-primary-50 text-primary-700'
-                      : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                  }`}
-                >
-                  Empresa existente
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setForm(f => ({ ...f, wsMode: 'new' }))}
-                  className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                    form.wsMode === 'new'
-                      ? 'border-primary-400 bg-primary-50 text-primary-700'
-                      : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                  }`}
-                >
-                  <Plus className="w-3 h-3" /> Criar nova empresa
-                </button>
+          {form.role === 'client' && form.environments.map(env => {
+            const cfg = form.perEnv[env];
+            const envWs = workspaces.filter(w => w.environment === env);
+            return (
+              <div key={env} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-gray-400" />
+                  Empresa do cliente em {ENVIRONMENT_META[env].emoji} {ENVIRONMENT_META[env].label}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, perEnv: { ...f.perEnv, [env]: { ...cfg, wsMode: 'existing' } } }))}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                      cfg.wsMode === 'existing'
+                        ? 'border-primary-400 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                    }`}
+                  >
+                    Empresa existente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, perEnv: { ...f.perEnv, [env]: { ...cfg, wsMode: 'new' } } }))}
+                    className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                      cfg.wsMode === 'new'
+                        ? 'border-primary-400 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                    }`}
+                  >
+                    <Plus className="w-3 h-3" /> Criar nova empresa
+                  </button>
+                </div>
+                {cfg.wsMode === 'existing' ? (
+                  <Select
+                    value={cfg.workspace_id}
+                    onChange={e => setForm(f => ({ ...f, perEnv: { ...f.perEnv, [env]: { ...cfg, workspace_id: e.target.value } } }))}
+                    placeholder="Selecione a empresa..."
+                    options={envWs.map(w => ({ value: w.id, label: w.name }))}
+                  />
+                ) : (
+                  <Input
+                    value={cfg.new_workspace_name}
+                    onChange={e => setForm(f => ({ ...f, perEnv: { ...f.perEnv, [env]: { ...cfg, new_workspace_name: e.target.value } } }))}
+                    placeholder="Nome da empresa (ex: PB & RN Foods)"
+                  />
+                )}
               </div>
-              {form.wsMode === 'existing' ? (
-                <Select
-                  value={form.workspace_id}
-                  onChange={e => setForm(f => ({ ...f, workspace_id: e.target.value }))}
-                  placeholder="Selecione a empresa..."
-                  options={envWorkspaces.map(w => ({ value: w.id, label: w.name }))}
-                />
-              ) : (
-                <Input
-                  value={form.new_workspace_name}
-                  onChange={e => setForm(f => ({ ...f, new_workspace_name: e.target.value }))}
-                  placeholder="Nome da empresa (ex: PB & RN Foods)"
-                />
-              )}
-            </div>
-          )}
+            );
+          })}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => setModal(false)}>Cancelar</Button>
-            <Button onClick={handleGrant} loading={saving}>Vincular</Button>
+            <Button onClick={handleGrant} loading={saving} disabled={form.environments.length === 0}>Vincular</Button>
           </div>
         </div>
       </Modal>
