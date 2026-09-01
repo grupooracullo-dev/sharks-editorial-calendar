@@ -35,31 +35,6 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
   const [deleting, setDeleting] = useState(false);
   const [activeSection, setActiveSection] = useState('basic');
 
-  // Programação (nova ação apenas): repetir na semana/mês inteiro
-  const [repeatMode, setRepeatMode] = useState<'day' | 'week' | 'month'>('day');
-  const [skipWeekends, setSkipWeekends] = useState(false);
-
-  /** Datas alvo conforme o modo de programação */
-  const repeatDates = (): string[] => {
-    if (!formData.action_date) return [];
-    if (repeatMode === 'day') return [formData.action_date];
-    const base = parseISO(formData.action_date + 'T00:00:00');
-    if (repeatMode === 'week') {
-      const start = startOfWeek(base, { weekStartsOn: 1 });
-      return Array.from({ length: 7 }, (_, i) => formatCalendarDate(addDays(start, i)));
-    }
-    // mês: dia 1 ao último dia do mês da data escolhida
-    const y = base.getFullYear();
-    const m = base.getMonth();
-    const last = new Date(y, m + 1, 0).getDate();
-    const all = Array.from({ length: last }, (_, i) => formatCalendarDate(new Date(y, m, i + 1)));
-    return skipWeekends
-      ? all.filter(d => { const day = parseISO(d + 'T00:00:00').getDay(); return day !== 0 && day !== 6; })
-      : all;
-  };
-  const repeatCount = isEditing ? 1 : Math.max(1, repeatDates().length);
-  const isBulk = !isEditing && repeatMode !== 'day';
-
   const workspaceId = action?.workspace_id || currentWorkspace?.id || workspaces[0]?.id || '';
   const { pillars } = useEditorial(workspaceId);
   const campaigns = useActiveCampaigns(workspaceId);
@@ -91,6 +66,32 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
     responsible_ids: [] as string[],
     internal_deadline: '' as string,
   });
+
+  // Programação (nova ação apenas): repetir na semana/mês inteiro
+  // — precisa vir DEPOIS de formData (usa formData.action_date)
+  const [repeatMode, setRepeatMode] = useState<'day' | 'week' | 'month'>('day');
+  const [skipWeekends, setSkipWeekends] = useState(false);
+
+  /** Datas alvo conforme o modo de programação */
+  const repeatDates = (): string[] => {
+    if (!formData.action_date) return [];
+    if (repeatMode === 'day') return [formData.action_date];
+    const base = parseISO(formData.action_date + 'T00:00:00');
+    if (repeatMode === 'week') {
+      const start = startOfWeek(base, { weekStartsOn: 1 });
+      return Array.from({ length: 7 }, (_, i) => formatCalendarDate(addDays(start, i)));
+    }
+    // mês: dia 1 ao último dia do mês da data escolhida
+    const y = base.getFullYear();
+    const m = base.getMonth();
+    const last = new Date(y, m + 1, 0).getDate();
+    const all = Array.from({ length: last }, (_, i) => formatCalendarDate(new Date(y, m, i + 1)));
+    return skipWeekends
+      ? all.filter(d => { const day = parseISO(d + 'T00:00:00').getDay(); return day !== 0 && day !== 6; })
+      : all;
+  };
+  const repeatCount = isEditing ? 1 : Math.max(1, repeatDates().length);
+  const isBulk = !isEditing && repeatMode !== 'day';
 
   // Time de Produção para o seletor de responsáveis — admins + equipe,
   // independente do cliente selecionado (mesma lista da página Time)
