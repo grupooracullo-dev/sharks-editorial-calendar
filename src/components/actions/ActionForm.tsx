@@ -12,7 +12,7 @@ import { useEditorial } from '@/hooks/useEditorial';
 import { useActiveCampaigns } from '@/hooks/useCampaigns';
 import { bulkCreateActions } from '@/lib/actionService';
 import { supabase } from '@/lib/supabase';
-import { formatCalendarDate, addDays, startOfWeek, parseISO } from '@/lib/dateUtils';
+import { formatCalendarDate, addDays, startOfWeek, parseISO, format } from '@/lib/dateUtils';
 import { ACTION_TYPES, CONTENT_FORMATS, OBJECTIVES, FUNNEL_STAGES, ACTION_STATUSES, ACTION_TYPES_BY_ENV, FORM_SECTIONS_BY_ENV, DEFAULT_CHANNELS } from '@/lib/constants';
 import { toast } from 'sonner';
 import { CalendarDays } from 'lucide-react';
@@ -72,23 +72,27 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
   const [repeatMode, setRepeatMode] = useState<'day' | 'week' | 'month'>('day');
   const [skipWeekends, setSkipWeekends] = useState(false);
 
-  /** Datas alvo conforme o modo de programação */
+  /** Datas alvo: do dia escolhido ADIANTE até o fim da semana/mês */
   const repeatDates = (): string[] => {
     if (!formData.action_date) return [];
     if (repeatMode === 'day') return [formData.action_date];
     const base = parseISO(formData.action_date + 'T00:00:00');
+    let end: Date;
     if (repeatMode === 'week') {
-      const start = startOfWeek(base, { weekStartsOn: 1 });
-      return Array.from({ length: 7 }, (_, i) => formatCalendarDate(addDays(start, i)));
+      // domingo da semana que contém a data
+      end = addDays(startOfWeek(base, { weekStartsOn: 1 }), 6);
+    } else {
+      // último dia do mês da data escolhida
+      end = new Date(base.getFullYear(), base.getMonth() + 1, 0);
     }
-    // mês: dia 1 ao último dia do mês da data escolhida
-    const y = base.getFullYear();
-    const m = base.getMonth();
-    const last = new Date(y, m + 1, 0).getDate();
-    const all = Array.from({ length: last }, (_, i) => formatCalendarDate(new Date(y, m, i + 1)));
-    return skipWeekends
-      ? all.filter(d => { const day = parseISO(d + 'T00:00:00').getDay(); return day !== 0 && day !== 6; })
-      : all;
+    const out: string[] = [];
+    let cur = base;
+    while (cur <= end) {
+      const day = cur.getDay();
+      if (!skipWeekends || (day !== 0 && day !== 6)) out.push(formatCalendarDate(cur));
+      cur = addDays(cur, 1);
+    }
+    return out;
   };
   const repeatCount = isEditing ? 1 : Math.max(1, repeatDates().length);
   const isBulk = !isEditing && repeatMode !== 'day';
@@ -393,8 +397,14 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
                     </label>
                     <p className="text-[11px] text-gray-400 flex items-center gap-1">
                       <CalendarDays className="w-3 h-3" />
-                      Isso criará <strong className="text-gray-600">{repeatCount} ações</strong> — todas com o status
-                      selecionado na aba Produção (Rascunho ou Programado).
+                      Criará <strong className="text-gray-600">{repeatCount} ações</strong>
+                      {(() => {
+                        const dates = repeatDates();
+                        if (dates.length < 2) return null;
+                        const fmt = (d: string) => format(parseISO(d + 'T00:00:00'), 'dd/MM');
+                        return ` — de ${fmt(dates[0])} até ${fmt(dates[dates.length - 1])}`;
+                      })()}
+                      {' '}— todas com o status selecionado na aba Produção (Rascunho ou Programado).
                     </p>
                   </div>
                 )}
