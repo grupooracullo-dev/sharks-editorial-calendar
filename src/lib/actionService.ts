@@ -297,18 +297,36 @@ export async function deleteAction(id: string): Promise<{ ok: boolean; error?: s
 }
 
 export async function bulkCreateActions(rows: Partial<Action>[]): Promise<{ ok: boolean; count: number; error?: string }> {
-  const payload = rows.map(r => ({
-    ...r,
-    sync_status: r.sync_status || 'not_synced',
-    reference_urls: r.reference_urls || [],
-    created_by: authState.userId,
-  }));
+  // responsible_ids não é coluna — vai para a RPC após o insert
+  const respIds = (rows[0] as Partial<Action> & { responsible_ids?: string[] } | undefined)?.responsible_ids;
+  const payload = rows.map(r => {
+    const { responsible_ids: _strip, ...rest } = r as Partial<Action> & { responsible_ids?: string[] };
+    return {
+      ...rest,
+      sync_status: rest.sync_status || 'not_synced',
+      reference_urls: rest.reference_urls || [],
+      created_by: authState.userId,
+    };
+  });
 
   const { data, error } = await supabase.from('actions').insert(payload).select('id');
   if (error) {
     console.error('[actions] bulk create error:', error.message);
     return { ok: false, count: 0, error: error.message };
   }
+
+  // Multi-responsáveis: aplica a todos os itens criados (em paralelo)
+  if (Array.isArray(respIds) && respIds.length > 0 && data && data.length > 0) {
+    await Promise.all(
+      data.map(row =>
+        supabase.rpc('set_action_responsibles', {
+          p_action_id: (row as { id: string }).id,
+          p_user_ids: respIds,
+        }),
+      ),
+    );
+  }
+
   await reloadActions();
   notifyActionChanged(rows[0]?.workspace_id || null);
   return { ok: true, count: data?.length || 0 };

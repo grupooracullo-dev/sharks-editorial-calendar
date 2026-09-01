@@ -10,9 +10,12 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useActions } from '@/hooks/useActions';
 import { useEditorial } from '@/hooks/useEditorial';
 import { useActiveCampaigns } from '@/hooks/useCampaigns';
+import { bulkCreateActions } from '@/lib/actionService';
 import { supabase } from '@/lib/supabase';
+import { formatCalendarDate, addDays, startOfWeek, parseISO } from '@/lib/dateUtils';
 import { ACTION_TYPES, CONTENT_FORMATS, OBJECTIVES, FUNNEL_STAGES, ACTION_STATUSES, ACTION_TYPES_BY_ENV, FORM_SECTIONS_BY_ENV, DEFAULT_CHANNELS } from '@/lib/constants';
 import { toast } from 'sonner';
+import { CalendarDays } from 'lucide-react';
 
 interface ActionFormProps {
   action: Action | null;
@@ -31,6 +34,31 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [activeSection, setActiveSection] = useState('basic');
+
+  // Programação (nova ação apenas): repetir na semana/mês inteiro
+  const [repeatMode, setRepeatMode] = useState<'day' | 'week' | 'month'>('day');
+  const [skipWeekends, setSkipWeekends] = useState(false);
+
+  /** Datas alvo conforme o modo de programação */
+  const repeatDates = (): string[] => {
+    if (!formData.action_date) return [];
+    if (repeatMode === 'day') return [formData.action_date];
+    const base = parseISO(formData.action_date + 'T00:00:00');
+    if (repeatMode === 'week') {
+      const start = startOfWeek(base, { weekStartsOn: 1 });
+      return Array.from({ length: 7 }, (_, i) => formatCalendarDate(addDays(start, i)));
+    }
+    // mês: dia 1 ao último dia do mês da data escolhida
+    const y = base.getFullYear();
+    const m = base.getMonth();
+    const last = new Date(y, m + 1, 0).getDate();
+    const all = Array.from({ length: last }, (_, i) => formatCalendarDate(new Date(y, m, i + 1)));
+    return skipWeekends
+      ? all.filter(d => { const day = parseISO(d + 'T00:00:00').getDay(); return day !== 0 && day !== 6; })
+      : all;
+  };
+  const repeatCount = isEditing ? 1 : Math.max(1, repeatDates().length);
+  const isBulk = !isEditing && repeatMode !== 'day';
 
   const workspaceId = action?.workspace_id || currentWorkspace?.id || workspaces[0]?.id || '';
   const { pillars } = useEditorial(workspaceId);
@@ -97,6 +125,8 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
 
   useEffect(() => {
     if (isOpen) {
+      setRepeatMode('day');
+      setSkipWeekends(false);
       if (action) {
         setFormData({
           title: action.title ?? '',
@@ -164,6 +194,52 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
 
     setSaving(true);
     try {
+      // ─── Programação (semana/mês): cria em lote ───
+      if (isBulk) {
+        const dates = repeatDates();
+        if (dates.length === 0) {
+          toast.error('Escolha uma data válida para programar');
+          return;
+        }
+        const rows = dates.map(d => ({
+          workspace_id: formData.workspace_id,
+          environment: environment || 'sharks_company',
+          title: formData.title,
+          description: formData.description || null,
+          action_date: d,
+          action_time: formData.action_time || null,
+          action_type: formData.action_type,
+          format: (formData.format || null) as ContentFormat | null,
+          channel: formData.channel || null,
+          campaign_id: formData.campaign_id || null,
+          editorial_pillar_id: formData.editorial_pillar_id || null,
+          objective: (formData.objective || null) as Objective | null,
+          funnel_stage: (formData.funnel_stage || null) as FunnelStage | null,
+          audience: formData.audience || null,
+          product: formData.product || null,
+          theme: formData.theme || null,
+          hook: formData.hook || null,
+          main_message: formData.main_message || null,
+          copy_text: formData.copy_text || null,
+          cta: formData.cta || null,
+          internal_deadline: formData.internal_deadline || null,
+          status: (asDraft ? 'draft' : formData.status) as ActionStatus,
+          observations: formData.observations || null,
+          responsible_id: formData.responsible_ids[0] || null,
+          responsible_ids: formData.responsible_ids,
+          is_auto_generated: false,
+        }));
+        const result = await bulkCreateActions(rows);
+        if (!result.ok) {
+          toast.error(result.error || 'Erro ao criar as ações programadas');
+          return;
+        }
+        toast.success(`${result.count} ações criadas${asDraft ? ' como rascunho' : ` com status "${ACTION_STATUSES[formData.status as ActionStatus]?.label ?? formData.status}"`}!`);
+        onClose();
+        return;
+      }
+
+      // ─── Ação única ───
       const payload = {
         ...formData,
         workspace_id: formData.workspace_id,
@@ -276,6 +352,53 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
                 onChange={(e) => handleChange('action_time', e.target.value)}
               />
             </div>
+
+            {/* Programação — repetir na semana/mês (nova ação apenas) */}
+            {!isEditing && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Programar <span className="text-gray-400 font-normal">(replicar a ação)</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { id: 'day', label: 'Este dia' },
+                    { id: 'week', label: 'Semana toda' },
+                    { id: 'month', label: 'Mês todo' },
+                  ] as const).map(opt => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setRepeatMode(opt.id)}
+                      className={`px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                        repeatMode === opt.id
+                          ? 'border-primary-500 bg-primary-50 text-primary-700'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {repeatMode !== 'day' && (
+                  <div className="mt-2 space-y-1.5">
+                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={skipWeekends}
+                        onChange={(e) => setSkipWeekends(e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-400"
+                      />
+                      Pular fins de semana (só dias úteis)
+                    </label>
+                    <p className="text-[11px] text-gray-400 flex items-center gap-1">
+                      <CalendarDays className="w-3 h-3" />
+                      Isso criará <strong className="text-gray-600">{repeatCount} ações</strong> — todas com o status
+                      selecionado na aba Produção (Rascunho ou Programado).
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Select
                 label="Tipo de Ação"
@@ -509,11 +632,11 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
         {/* Actions */}
         <div className="border-t border-gray-100 pt-4 flex flex-wrap gap-2 sticky bottom-0 bg-white">
           <Button onClick={() => handleSave(false)} loading={saving} disabled={!(formData.title ?? '').trim()}>
-            Salvar ação
+            {isBulk ? `Criar ${repeatCount} ações` : 'Salvar ação'}
           </Button>
           {!isEditing && (
             <Button variant="secondary" onClick={() => handleSave(true)} disabled={!(formData.title ?? '').trim()}>
-              Salvar como rascunho
+              {isBulk ? `Rascunho (${repeatCount})` : 'Salvar como rascunho'}
             </Button>
           )}
           {isEditing && (
