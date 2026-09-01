@@ -8,8 +8,9 @@ function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 }
 
-const VALID_ROLES = ['admin_sharks', 'sharks_team'];
+const VALID_ROLES = ['admin_sharks', 'sharks_team', 'client'];
 const VALID_ENVS = ['sharks_company', 'estrategos'];
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VALID_PERMISSIONS = ['calendar', 'campaigns', 'editorial', 'templates', 'history', 'chat', 'clients', 'integrations', 'team'];
 
 const DEFAULT_PERMISSIONS = [
@@ -83,17 +84,30 @@ Deno.serve(async req => {
   }
 
   // Workspaces precisam pertencer a org do ambiente (evita cross-env)
+  const { data: org } = await admin.from('organizations').select('id').eq('environment', environment).maybeSingle();
+  const { data: envWs } = await admin
+    .from('workspaces')
+    .select('id')
+    .eq('organization_id', org?.id ?? '00000000-0000-0000-0000-000000000000');
+  const validWsIds = new Set((envWs ?? []).map((w: { id: string }) => w.id));
+
   if (Array.isArray(workspace_ids) && workspace_ids.length > 0) {
-    const { data: org } = await admin.from('organizations').select('id').eq('environment', environment).maybeSingle();
-    const { data: envWs } = await admin
-      .from('workspaces')
-      .select('id')
-      .eq('organization_id', org?.id ?? '00000000-0000-0000-0000-000000000000');
-    const validIds = new Set((envWs ?? []).map((w: { id: string }) => w.id));
-    const invalid = workspace_ids.filter((id: string) => !validIds.has(id));
+    const invalid = workspace_ids.filter((id: string) => !validWsIds.has(id));
     if (invalid.length > 0) {
       return json(400, { error: `Um ou mais clientes nao pertencem ao ambiente ${environment}` });
     }
+  }
+
+  // Cliente: workspace único obrigatório (a empresa que ele acessará)
+  let clientWorkspaceId: string | null = null;
+  if (role === 'client') {
+    if (!body?.workspace_id || !UUID_RE.test(body.workspace_id)) {
+      return json(400, { error: 'Cliente precisa de workspace_id (empresa no ambiente)' });
+    }
+    if (!validWsIds.has(body.workspace_id)) {
+      return json(400, { error: `A empresa nao pertence ao ambiente ${environment}` });
+    }
+    clientWorkspaceId = body.workspace_id;
   }
 
   // ═══ Usuário já existe? → VINCULAR ao ambiente em vez de falhar ═══
@@ -126,10 +140,12 @@ Deno.serve(async req => {
     }
 
     // Acesso ao ambiente solicitado
-    const envRoleLinked: 'admin' | 'team' =
-      environment === 'estrategos'
-        ? (body?.env_role === 'admin' ? 'admin' : 'team')
-        : (role === 'admin_sharks' ? 'admin' : 'team');
+    const envRoleLinked: 'admin' | 'team' | 'client' =
+      role === 'client'
+        ? 'client'
+        : environment === 'estrategos'
+          ? (body?.env_role === 'admin' ? 'admin' : 'team')
+          : (role === 'admin_sharks' ? 'admin' : 'team');
     const { error: envError } = await admin
       .from('user_environments')
       .upsert(
@@ -138,32 +154,42 @@ Deno.serve(async req => {
       );
     if (envError) return json(500, { error: `Ambiente: ${envError.message}` });
 
-    // Permissões: apenas se o usuário ainda não tiver nenhuma
-    const { count: permCount } = await admin
-      .from('team_member_access')
-      .select('permission', { count: 'exact', head: true })
-      .eq('user_id', existingId);
-    if (!permCount) {
-      const permsToInsert = (Array.isArray(permissions) && permissions.length > 0
-        ? permissions
-        : DEFAULT_PERMISSIONS
-      ).map((p: Record<string, unknown>) => ({
-        user_id: existingId,
-        permission: p.permission,
-        can_create: p.can_create ?? false,
-        can_read: p.can_read ?? true,
-        can_update: p.can_update ?? false,
-        can_delete: p.can_delete ?? false,
-      }));
-      if (permsToInsert.length > 0) {
-        const { error: permsError } = await admin.from('team_member_access').insert(permsToInsert);
-        if (permsError) return json(500, { error: `Permissoes: ${permsError.message}` });
+    // Permissões de time: apenas para staff e apenas se ainda não tiver nenhuma
+    if (role !== 'client') {
+      const { count: permCount } = await admin
+        .from('team_member_access')
+        .select('permission', { count: 'exact', head: true })
+        .eq('user_id', existingId);
+      if (!permCount) {
+        const permsToInsert = (Array.isArray(permissions) && permissions.length > 0
+          ? permissions
+          : DEFAULT_PERMISSIONS
+        ).map((p: Record<string, unknown>) => ({
+          user_id: existingId,
+          permission: p.permission,
+          can_create: p.can_create ?? false,
+          can_read: p.can_read ?? true,
+          can_update: p.can_update ?? false,
+          can_delete: p.can_delete ?? false,
+        }));
+        if (permsToInsert.length > 0) {
+          const { error: permsError } = await admin.from('team_member_access').insert(permsToInsert);
+          if (permsError) return json(500, { error: `Permissoes: ${permsError.message}` });
+        }
       }
     }
 
     // Clientes atribuídos (best-effort)
     let membershipsWarningLinked: string | null = null;
-    if (Array.isArray(workspace_ids) && workspace_ids.length > 0) {
+    if (role === 'client' && clientWorkspaceId) {
+      const { error: memError } = await admin
+        .from('memberships')
+        .upsert(
+          { user_id: existingId, workspace_id: clientWorkspaceId, role: 'member' as const },
+          { onConflict: 'user_id,workspace_id' },
+        );
+      if (memError) membershipsWarningLinked = `Empresa: ${memError.message}`;
+    } else if (Array.isArray(workspace_ids) && workspace_ids.length > 0) {
       const memberships = workspace_ids.map((wsId: string) => ({
         user_id: existingId,
         workspace_id: wsId,
@@ -210,10 +236,12 @@ Deno.serve(async req => {
 
   // 2.1 Acesso ao ambiente (user_environments) — sem isso o usuario
   //     nasce sem acesso a qualquer ambiente e fica travado no login.
-  const envRole: 'admin' | 'team' =
-    environment === 'estrategos'
-      ? (body?.env_role === 'admin' ? 'admin' : 'team')
-      : (role === 'admin_sharks' ? 'admin' : 'team');
+  const envRole: 'admin' | 'team' | 'client' =
+    role === 'client'
+      ? 'client'
+      : environment === 'estrategos'
+        ? (body?.env_role === 'admin' ? 'admin' : 'team')
+        : (role === 'admin_sharks' ? 'admin' : 'team');
   const { error: envError } = await admin
     .from('user_environments')
     .upsert(
@@ -226,29 +254,37 @@ Deno.serve(async req => {
     return json(500, { error: `Ambiente: ${envError.message}` });
   }
 
-  // 3. Create permissions (rollback everything on failure)
-  const permsToInsert = (Array.isArray(permissions) && permissions.length > 0
-    ? permissions
-    : DEFAULT_PERMISSIONS
-  ).map((p: Record<string, unknown>) => ({
-    user_id: authUser.user.id,
-    permission: p.permission,
-    can_create: p.can_create ?? false,
-    can_read: p.can_read ?? true,
-    can_update: p.can_update ?? false,
-    can_delete: p.can_delete ?? false,
-  }));
+  // 3. Create permissions (staff apenas — rollback everything on failure)
+  if (role !== 'client') {
+    const permsToInsert = (Array.isArray(permissions) && permissions.length > 0
+      ? permissions
+      : DEFAULT_PERMISSIONS
+    ).map((p: Record<string, unknown>) => ({
+      user_id: authUser.user.id,
+      permission: p.permission,
+      can_create: p.can_create ?? false,
+      can_read: p.can_read ?? true,
+      can_update: p.can_update ?? false,
+      can_delete: p.can_delete ?? false,
+    }));
 
-  const { error: permsError } = await admin.from('team_member_access').insert(permsToInsert);
-  if (permsError) {
-    await admin.from('users').delete().eq('id', authUser.user.id).catch(() => {});
-    await admin.auth.admin.deleteUser(authUser.user.id).catch(() => {});
-    return json(500, { error: `Permissoes: ${permsError.message}` });
+    const { error: permsError } = await admin.from('team_member_access').insert(permsToInsert);
+    if (permsError) {
+      await admin.from('users').delete().eq('id', authUser.user.id).catch(() => {});
+      await admin.auth.admin.deleteUser(authUser.user.id).catch(() => {});
+      return json(500, { error: `Permissoes: ${permsError.message}` });
+    }
   }
 
-  // 4. Client assignments (non-critical: report warning, don't rollback)
+  // 4. Vínculos (non-critical: report warning, don't rollback)
   let membershipsWarning: string | null = null;
-  if (Array.isArray(workspace_ids) && workspace_ids.length > 0) {
+  if (role === 'client' && clientWorkspaceId) {
+    const { error: memError } = await admin.from('memberships').upsert(
+      { user_id: authUser.user.id, workspace_id: clientWorkspaceId, role: 'member' as const },
+      { onConflict: 'user_id,workspace_id' },
+    );
+    if (memError) membershipsWarning = `Empresa: ${memError.message}`;
+  } else if (Array.isArray(workspace_ids) && workspace_ids.length > 0) {
     const memberships = workspace_ids.map((wsId: string) => ({
       user_id: authUser.user.id,
       workspace_id: wsId,
@@ -265,7 +301,9 @@ Deno.serve(async req => {
       name: full_name,
       roleLabel: role === 'admin_sharks'
         ? 'Administrador'
-        : environment === 'estrategos' ? 'Time Estrategos' : 'Time Sharks',
+        : role === 'client'
+          ? environment === 'estrategos' ? 'Cliente Estrategos' : 'Cliente Sharks'
+          : environment === 'estrategos' ? 'Time Estrategos' : 'Time Sharks',
       password: String(password),
     });
     const mailResult = await sendEmail({ to: String(email).trim().toLowerCase(), subject: mail.subject, html: mail.html });
