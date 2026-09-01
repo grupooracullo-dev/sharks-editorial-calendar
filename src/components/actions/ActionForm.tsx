@@ -11,7 +11,7 @@ import { useActions } from '@/hooks/useActions';
 import { useEditorial } from '@/hooks/useEditorial';
 import { useActiveCampaigns } from '@/hooks/useCampaigns';
 import { supabase } from '@/lib/supabase';
-import { ACTION_TYPES, CONTENT_FORMATS, OBJECTIVES, FUNNEL_STAGES, ACTION_STATUSES, ACTION_TYPES_BY_ENV, FORM_SECTIONS_BY_ENV } from '@/lib/constants';
+import { ACTION_TYPES, CONTENT_FORMATS, OBJECTIVES, FUNNEL_STAGES, ACTION_STATUSES, ACTION_TYPES_BY_ENV, FORM_SECTIONS_BY_ENV, DEFAULT_CHANNELS } from '@/lib/constants';
 import { toast } from 'sonner';
 
 interface ActionFormProps {
@@ -355,11 +355,19 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
                 placeholder="Selecione"
                 options={Object.entries(CONTENT_FORMATS).map(([v, l]) => ({ value: v, label: l }))}
               />
-              <Input
+              <Select
                 label="Canal"
                 value={formData.channel}
                 onChange={(e) => handleChange('channel', e.target.value)}
-                placeholder="Ex: Instagram"
+                placeholder="Selecione"
+                options={[
+                  { value: '', label: 'Sem canal' },
+                  ...DEFAULT_CHANNELS.map(c => ({ value: c.name, label: c.name })),
+                  // Preserva canal legado não listado ao editar
+                  ...(formData.channel && !DEFAULT_CHANNELS.some(c => c.name === formData.channel)
+                    ? [{ value: formData.channel, label: `${formData.channel} (atual)` }]
+                    : []),
+                ]}
               />
             </div>
             <Input
