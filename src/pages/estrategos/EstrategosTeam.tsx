@@ -184,7 +184,9 @@ export default function EstrategosTeam() {
       if (error) throw new Error(await functionErrorMessage(error));
       if (data?.error) throw new Error(data.error);
 
-      toast.success(`"${inviteForm.full_name}" entrou no time Estrategos!`);
+      toast.success(data?.linked
+        ? `"${inviteForm.full_name}" já tinha conta e foi vinculado ao ambiente Estrategos!`
+        : `"${inviteForm.full_name}" entrou no time Estrategos!`);
       setInviteOpen(false);
       resetInviteForm();
       await loadData();

@@ -176,6 +176,8 @@ export interface Action {
   editorial_pillar?: EditorialPillar;
   responsible?: User;
   workspace?: Workspace;
+  /** Todos os responsáveis (N:N) — responsible_id é o principal (1º) */
+  responsibles?: User[];
 }
 
 // Template

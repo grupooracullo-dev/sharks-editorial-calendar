@@ -60,11 +60,11 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
     cta: '',
     status: 'draft' as ActionStatus,
     observations: '',
-    responsible_id: '' as string,
+    responsible_ids: [] as string[],
     internal_deadline: '' as string,
   });
 
-  // Time de Produção para o seletor de responsável — admins + equipe,
+  // Time de Produção para o seletor de responsáveis — admins + equipe,
   // independente do cliente selecionado (mesma lista da página Time)
   const [teamMembers, setTeamMembers] = useState<Array<{ id: string; full_name: string }>>([]);
 
@@ -79,15 +79,21 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
       .then(({ data }) => {
         if (!active) return;
         const list = (data ?? []).map(u => ({ id: u.id, full_name: u.full_name }));
-        // Preserva o responsável atual (edição) mesmo se não estiver na lista
-        const currentId = action?.responsible_id;
-        if (currentId && action?.responsible && !list.some(m => m.id === currentId)) {
+        // Preserva os responsáveis atuais (edição) mesmo se não estiverem na lista
+        const current = action?.responsibles ?? [];
+        if (current.length > 0) {
+          for (const r of current) {
+            if (!list.some(m => m.id === r.id)) {
+              list.push({ id: r.id, full_name: r.full_name });
+            }
+          }
+        } else if (action?.responsible_id && action?.responsible && !list.some(m => m.id === action.responsible_id)) {
           list.push({ id: action.responsible.id, full_name: action.responsible.full_name });
         }
         setTeamMembers(list);
       });
     return () => { active = false; };
-  }, [isOpen, action?.responsible_id]);
+  }, [isOpen, action?.responsibles, action?.responsible_id]);
 
   useEffect(() => {
     if (isOpen) {
@@ -114,7 +120,9 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
           cta: action.cta || '',
           status: action.status || 'draft',
           observations: action.observations || '',
-          responsible_id: action.responsible_id || '',
+          responsible_ids: action.responsibles?.length
+            ? action.responsibles.map(r => r.id)
+            : (action.responsible_id ? [action.responsible_id] : []),
           internal_deadline: action.internal_deadline || '',
         });
       } else {
@@ -140,7 +148,7 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
           cta: '',
           status: 'draft',
           observations: '',
-          responsible_id: '',
+          responsible_ids: [] as string[],
           internal_deadline: '',
         });
       }
@@ -166,7 +174,9 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
         status: (asDraft ? 'draft' : formData.status) as ActionStatus,
         campaign_id: formData.campaign_id || null,
         editorial_pillar_id: formData.editorial_pillar_id || null,
-        responsible_id: formData.responsible_id || null,
+        // Compatibilidade: responsável principal = 1º da lista
+        responsible_id: formData.responsible_ids[0] || null,
+        responsible_ids: formData.responsible_ids,
         internal_deadline: formData.internal_deadline || null,
       };
 
@@ -426,16 +436,47 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
         {/* Production Section */}
         {activeSection === 'production' && (
           <div className="space-y-4">
-            <Select
-              label="Responsável"
-              value={formData.responsible_id}
-              onChange={(e) => handleChange('responsible_id', e.target.value)}
-              placeholder="Selecione um responsável"
-              options={[
-                { value: '', label: 'Sem responsável' },
-                ...teamMembers.map(m => ({ value: m.id, label: m.full_name })),
-              ]}
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Responsáveis <span className="text-gray-400 font-normal">(1 ou mais)</span>
+              </label>
+              {teamMembers.length === 0 ? (
+                <p className="text-xs text-gray-400 italic px-1">Nenhum membro do time disponível</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {teamMembers.map(m => {
+                    const selected = formData.responsible_ids.includes(m.id);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setFormData(f => ({
+                          ...f,
+                          responsible_ids: selected
+                            ? f.responsible_ids.filter(id => id !== m.id)
+                            : [...f.responsible_ids, m.id],
+                        }))}
+                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border text-left text-sm transition-all ${
+                          selected
+                            ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-200 text-primary-700 font-medium'
+                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${
+                          selected ? 'bg-primary-500 text-white' : 'border-2 border-gray-300'
+                        }`}>
+                          {selected && <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 fill-none stroke-current stroke-2"><path d="M2 6l3 3 5-5" /></svg>}
+                        </div>
+                        <span className="truncate">{m.full_name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {formData.responsible_ids.length === 0 && (
+                <p className="text-[11px] text-gray-400 mt-1.5">Sem responsável — a ação fica não atribuída</p>
+              )}
+            </div>
             <Input
               label="Prazo Interno"
               type="date"

@@ -96,6 +96,94 @@ Deno.serve(async req => {
     }
   }
 
+  // ═══ Usuário já existe? → VINCULAR ao ambiente em vez de falhar ═══
+  // Evita "A user with this email address has already been registered":
+  // mesmo e-mail em outro ambiente (ex: Sharks) sendo cadastrado no Estrategos.
+  const emailNorm = String(email).trim().toLowerCase();
+  let existingId: string | null = null;
+
+  const { data: profileRow } = await admin
+    .from('users')
+    .select('id')
+    .ilike('email', emailNorm)
+    .maybeSingle();
+  if (profileRow) existingId = profileRow.id as string;
+
+  if (!existingId) {
+    // Auth user existe mas sem perfil (ex: Google OAuth pendente de aprovação)
+    const { data: authId, error: findErr } = await admin.rpc('admin_find_auth_user_by_email', { p_email: emailNorm });
+    if (!findErr && authId) existingId = authId as string;
+  }
+
+  if (existingId) {
+    // Garante perfil (auth-only → cria o registro público)
+    const { data: hasProfile } = await admin.from('users').select('id').eq('id', existingId).maybeSingle();
+    if (!hasProfile) {
+      const { error: profErr } = await admin.from('users').insert({
+        id: existingId, email: emailNorm, full_name, role,
+      });
+      if (profErr) return json(500, { error: `Perfil: ${profErr.message}` });
+    }
+
+    // Acesso ao ambiente solicitado
+    const envRoleLinked: 'admin' | 'team' =
+      environment === 'estrategos'
+        ? (body?.env_role === 'admin' ? 'admin' : 'team')
+        : (role === 'admin_sharks' ? 'admin' : 'team');
+    const { error: envError } = await admin
+      .from('user_environments')
+      .upsert(
+        { user_id: existingId, environment, role: envRoleLinked, granted_by: userData.user.id },
+        { onConflict: 'user_id,environment' },
+      );
+    if (envError) return json(500, { error: `Ambiente: ${envError.message}` });
+
+    // Permissões: apenas se o usuário ainda não tiver nenhuma
+    const { count: permCount } = await admin
+      .from('team_member_access')
+      .select('permission', { count: 'exact', head: true })
+      .eq('user_id', existingId);
+    if (!permCount) {
+      const permsToInsert = (Array.isArray(permissions) && permissions.length > 0
+        ? permissions
+        : DEFAULT_PERMISSIONS
+      ).map((p: Record<string, unknown>) => ({
+        user_id: existingId,
+        permission: p.permission,
+        can_create: p.can_create ?? false,
+        can_read: p.can_read ?? true,
+        can_update: p.can_update ?? false,
+        can_delete: p.can_delete ?? false,
+      }));
+      if (permsToInsert.length > 0) {
+        const { error: permsError } = await admin.from('team_member_access').insert(permsToInsert);
+        if (permsError) return json(500, { error: `Permissoes: ${permsError.message}` });
+      }
+    }
+
+    // Clientes atribuídos (best-effort)
+    let membershipsWarningLinked: string | null = null;
+    if (Array.isArray(workspace_ids) && workspace_ids.length > 0) {
+      const memberships = workspace_ids.map((wsId: string) => ({
+        user_id: existingId,
+        workspace_id: wsId,
+        role: 'manager' as const,
+      }));
+      const { error: memError } = await admin
+        .from('memberships')
+        .upsert(memberships, { onConflict: 'user_id,workspace_id' });
+      if (memError) membershipsWarningLinked = `Clientes: ${memError.message}`;
+    }
+
+    return json(200, {
+      ok: true,
+      linked: true,
+      user_id: existingId,
+      email_sent: false,
+      warning: membershipsWarningLinked,
+    });
+  }
+
   // 1. Create auth user
   const { data: authUser, error: authError } = await admin.auth.admin.createUser({
     email: String(email).trim().toLowerCase(),

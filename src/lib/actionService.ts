@@ -45,7 +45,7 @@ function applyLocalFilters(filters?: ActionFilters): Action[] {
     result = result.filter(a => a.action_type === filters.actionType);
   }
   if (filters?.responsibleId) {
-    result = result.filter(a => a.responsible_id === filters.responsibleId);
+    result = result.filter(a => a.responsible_id === filters.responsibleId || a.responsibles?.some(r => r.id === filters.responsibleId));
   }
   if (filters?.channel) {
     result = result.filter(a => a.channel === filters.channel);
@@ -74,7 +74,7 @@ export function subscribeToActions(listener: () => void): () => void {
   };
 }
 
-const SELECT_WITH_JOINS = '*, campaign:campaigns(*), editorial_pillar:editorial_pillars(*), workspace:workspaces(name), responsible:users!actions_responsible_id_fkey(id, full_name, avatar_url)';
+const SELECT_WITH_JOINS = '*, campaign:campaigns(*), editorial_pillar:editorial_pillars(*), workspace:workspaces(name), responsible:users!actions_responsible_id_fkey(id, full_name, avatar_url), responsibles:action_responsibles(users(id, full_name, avatar_url))';
 
 export async function loadActions(workspaceId?: string | null, environment?: string | null): Promise<void> {
   currentScope = workspaceId ?? null;
@@ -162,6 +162,24 @@ export interface ActionResult {
   error?: string;
 }
 
+/** Grava os responsáveis (N:N) via RPC e re-carrega a linha com os joins. */
+async function syncResponsibles(actionId: string, userIds: string[]): Promise<Action | null> {
+  const { error } = await supabase.rpc('set_action_responsibles', {
+    p_action_id: actionId,
+    p_user_ids: userIds,
+  });
+  if (error) {
+    console.error('[actions] set_action_responsibles error:', error.message);
+    return null;
+  }
+  const { data } = await supabase
+    .from('actions')
+    .select(SELECT_WITH_JOINS)
+    .eq('id', actionId)
+    .single();
+  return (data as unknown as Action) || null;
+}
+
 export async function createAction(data: Partial<Action>): Promise<ActionResult> {
   const payload = {
     workspace_id: data.workspace_id || '',
@@ -204,18 +222,31 @@ export async function createAction(data: Partial<Action>): Promise<ActionResult>
     return { ok: false, error: error?.message || 'Erro ao criar ação' };
   }
 
-  actionsStore.push(inserted as unknown as Action);
+  // Múltiplos responsáveis (N:N) — RPC após o insert
+  const respIds = (data as Partial<Action> & { responsible_ids?: string[] }).responsible_ids;
+  let finalAction = inserted as unknown as Action;
+  if (Array.isArray(respIds)) {
+    const refreshed = await syncResponsibles(finalAction.id, respIds);
+    if (refreshed) finalAction = refreshed;
+  }
+
+  const idx = actionsStore.findIndex(a => a.id === finalAction.id);
+  if (idx !== -1) actionsStore[idx] = finalAction;
+  else actionsStore.push(finalAction);
   notifyListeners();
-  notifyActionChanged(inserted.workspace_id);
-  return { ok: true, data: inserted as unknown as Action };
+  notifyActionChanged(finalAction.workspace_id);
+  return { ok: true, data: finalAction };
 }
 
 export async function updateAction(id: string, data: Partial<Action>): Promise<ActionResult> {
   const oldAction = getActionById(id);
 
+  // responsible_ids não é coluna — vai para a RPC após o update
+  const { responsible_ids: respIdsRaw, ...updatePayload } = data as Partial<Action> & { responsible_ids?: string[] };
+
   const { data: updated, error } = await supabase
     .from('actions')
-    .update(data)
+    .update(updatePayload)
     .eq('id', id)
     .select(SELECT_WITH_JOINS)
     .single();
@@ -227,6 +258,13 @@ export async function updateAction(id: string, data: Partial<Action>): Promise<A
 
   // Mark as needing sync locally if date changed and was previously synced
   const result = updated as unknown as Action;
+
+  // Múltiplos responsáveis (N:N) — RPC após o update
+  if (Array.isArray(respIdsRaw)) {
+    const refreshed = await syncResponsibles(id, respIdsRaw);
+    if (refreshed) Object.assign(result, refreshed);
+  }
+
   if (
     data.action_date &&
     oldAction?.sync_status === 'synced' &&

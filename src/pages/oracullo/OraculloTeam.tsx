@@ -254,7 +254,9 @@ export default function OraculloTeam() {
       }
 
       const envLabels = envs.map(e => ENVIRONMENT_META[e].short).join(' + ');
-      toast.success(`"${inviteForm.full_name}" criado e vinculado a ${envLabels}!`);
+      toast.success(data?.linked
+        ? `"${inviteForm.full_name}" já tinha conta e foi vinculado a ${envLabels}!`
+        : `"${inviteForm.full_name}" criado e vinculado a ${envLabels}!`);
       setInviteOpen(false);
       resetInviteForm();
       await loadData();
