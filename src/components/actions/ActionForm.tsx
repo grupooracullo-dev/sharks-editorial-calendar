@@ -39,7 +39,6 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
   const { pillars } = useEditorial(workspaceId);
   const campaigns = useActiveCampaigns(workspaceId);
   const { create, update, remove } = useActions({});
-
   // Form state
   const [formData, setFormData] = useState({
     title: '',
@@ -67,18 +66,19 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
     internal_deadline: '' as string,
   });
 
-  // Programação (nova ação apenas): repetir na semana/mês inteiro
+  // Estender ação (pop-up pós-salvar): replicar na semana/mês
   // — precisa vir DEPOIS de formData (usa formData.action_date)
-  const [repeatMode, setRepeatMode] = useState<'day' | 'week' | 'month'>('day');
+  const [extendOpen, setExtendOpen] = useState(false);
+  const [extending, setExtending] = useState(false);
+  const [extendStatus, setExtendStatus] = useState<ActionStatus>('draft');
   const [skipWeekends, setSkipWeekends] = useState(false);
 
-  /** Datas alvo: do dia escolhido ADIANTE até o fim da semana/mês */
-  const repeatDates = (): string[] => {
+  /** Datas: do dia escolhido ADIANTE até o fim da semana/mês */
+  const datesFor = (mode: 'week' | 'month'): string[] => {
     if (!formData.action_date) return [];
-    if (repeatMode === 'day') return [formData.action_date];
     const base = parseISO(formData.action_date + 'T00:00:00');
     let end: Date;
-    if (repeatMode === 'week') {
+    if (mode === 'week') {
       // domingo da semana que contém a data
       end = addDays(startOfWeek(base, { weekStartsOn: 1 }), 6);
     } else {
@@ -94,8 +94,68 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
     }
     return out;
   };
-  const repeatCount = isEditing ? 1 : Math.max(1, repeatDates().length);
-  const isBulk = !isEditing && repeatMode !== 'day';
+
+  /** Preview do pop-up: contagem e intervalo SEM o dia-base (já salvo) */
+  const extendPreview = (mode: 'week' | 'month') => {
+    const dates = datesFor(mode).filter(d => d !== formData.action_date);
+    const fmt = (d: string) => format(parseISO(d + 'T00:00:00'), 'dd/MM');
+    return {
+      count: dates.length,
+      range: dates.length > 0 ? `${fmt(dates[0])} → ${fmt(dates[dates.length - 1])}` : '',
+    };
+  };
+
+  /** Cria as ações da extensão (mesmo status da ação salva) */
+  const handleExtend = async (mode: 'week' | 'month') => {
+    if (extending) return;
+    const dates = datesFor(mode).filter(d => d !== formData.action_date);
+    if (dates.length === 0) {
+      setExtendOpen(false);
+      onClose();
+      return;
+    }
+    setExtending(true);
+    try {
+      const rows = dates.map(d => ({
+        workspace_id: formData.workspace_id,
+        environment: environment || 'sharks_company',
+        title: formData.title,
+        description: formData.description || null,
+        action_date: d,
+        action_time: formData.action_time || null,
+        action_type: formData.action_type,
+        format: (formData.format || null) as ContentFormat | null,
+        channel: formData.channel || null,
+        campaign_id: formData.campaign_id || null,
+        editorial_pillar_id: formData.editorial_pillar_id || null,
+        objective: (formData.objective || null) as Objective | null,
+        funnel_stage: (formData.funnel_stage || null) as FunnelStage | null,
+        audience: formData.audience || null,
+        product: formData.product || null,
+        theme: formData.theme || null,
+        hook: formData.hook || null,
+        main_message: formData.main_message || null,
+        copy_text: formData.copy_text || null,
+        cta: formData.cta || null,
+        internal_deadline: formData.internal_deadline || null,
+        status: extendStatus,
+        observations: formData.observations || null,
+        responsible_id: formData.responsible_ids[0] || null,
+        responsible_ids: formData.responsible_ids,
+        is_auto_generated: false,
+      }));
+      const result = await bulkCreateActions(rows);
+      if (!result.ok) {
+        toast.error(result.error || 'Erro ao estender a ação');
+        return;
+      }
+      toast.success(`+${result.count} ações criadas (${mode === 'week' ? 'semana' : 'mês'})!`);
+      setExtendOpen(false);
+      onClose();
+    } finally {
+      setExtending(false);
+    }
+  };
 
   // Time de Produção para o seletor de responsáveis — admins + equipe,
   // independente do cliente selecionado (mesma lista da página Time)
@@ -130,7 +190,6 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
 
   useEffect(() => {
     if (isOpen) {
-      setRepeatMode('day');
       setSkipWeekends(false);
       if (action) {
         setFormData({
@@ -199,52 +258,7 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
 
     setSaving(true);
     try {
-      // ─── Programação (semana/mês): cria em lote ───
-      if (isBulk) {
-        const dates = repeatDates();
-        if (dates.length === 0) {
-          toast.error('Escolha uma data válida para programar');
-          return;
-        }
-        const rows = dates.map(d => ({
-          workspace_id: formData.workspace_id,
-          environment: environment || 'sharks_company',
-          title: formData.title,
-          description: formData.description || null,
-          action_date: d,
-          action_time: formData.action_time || null,
-          action_type: formData.action_type,
-          format: (formData.format || null) as ContentFormat | null,
-          channel: formData.channel || null,
-          campaign_id: formData.campaign_id || null,
-          editorial_pillar_id: formData.editorial_pillar_id || null,
-          objective: (formData.objective || null) as Objective | null,
-          funnel_stage: (formData.funnel_stage || null) as FunnelStage | null,
-          audience: formData.audience || null,
-          product: formData.product || null,
-          theme: formData.theme || null,
-          hook: formData.hook || null,
-          main_message: formData.main_message || null,
-          copy_text: formData.copy_text || null,
-          cta: formData.cta || null,
-          internal_deadline: formData.internal_deadline || null,
-          status: (asDraft ? 'draft' : formData.status) as ActionStatus,
-          observations: formData.observations || null,
-          responsible_id: formData.responsible_ids[0] || null,
-          responsible_ids: formData.responsible_ids,
-          is_auto_generated: false,
-        }));
-        const result = await bulkCreateActions(rows);
-        if (!result.ok) {
-          toast.error(result.error || 'Erro ao criar as ações programadas');
-          return;
-        }
-        toast.success(`${result.count} ações criadas${asDraft ? ' como rascunho' : ` com status "${ACTION_STATUSES[formData.status as ActionStatus]?.label ?? formData.status}"`}!`);
-        onClose();
-        return;
-      }
-
-      // ─── Ação única ───
+      // ─── Ação única (o pop-up de extensão aparece depois) ───
       const payload = {
         ...formData,
         workspace_id: formData.workspace_id,
@@ -269,7 +283,14 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
         toast.error(result.error || 'Erro ao salvar ação');
         return;
       }
-      onClose();
+
+      if (result.ok && result.data) {
+        toast.success(isEditing ? 'Ação atualizada!' : 'Ação salva!');
+      }
+
+      // Pop-up pós-salvar: deseja estender? (não fechamos o form ainda)
+      setExtendStatus(asDraft ? 'draft' : (formData.status as ActionStatus));
+      setExtendOpen(true);
     } finally {
       setSaving(false);
     }
@@ -357,59 +378,6 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
                 onChange={(e) => handleChange('action_time', e.target.value)}
               />
             </div>
-
-            {/* Programação — repetir na semana/mês (nova ação apenas) */}
-            {!isEditing && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Programar <span className="text-gray-400 font-normal">(replicar a ação)</span>
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {([
-                    { id: 'day', label: 'Este dia' },
-                    { id: 'week', label: 'Semana toda' },
-                    { id: 'month', label: 'Mês todo' },
-                  ] as const).map(opt => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setRepeatMode(opt.id)}
-                      className={`px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
-                        repeatMode === opt.id
-                          ? 'border-primary-500 bg-primary-50 text-primary-700'
-                          : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                {repeatMode !== 'day' && (
-                  <div className="mt-2 space-y-1.5">
-                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={skipWeekends}
-                        onChange={(e) => setSkipWeekends(e.target.checked)}
-                        className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-400"
-                      />
-                      Pular fins de semana (só dias úteis)
-                    </label>
-                    <p className="text-[11px] text-gray-400 flex items-center gap-1">
-                      <CalendarDays className="w-3 h-3" />
-                      Criará <strong className="text-gray-600">{repeatCount} ações</strong>
-                      {(() => {
-                        const dates = repeatDates();
-                        if (dates.length < 2) return null;
-                        const fmt = (d: string) => format(parseISO(d + 'T00:00:00'), 'dd/MM');
-                        return ` — de ${fmt(dates[0])} até ${fmt(dates[dates.length - 1])}`;
-                      })()}
-                      {' '}— todas com o status selecionado na aba Produção (Rascunho ou Programado).
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Select
                 label="Tipo de Ação"
@@ -643,11 +611,11 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
         {/* Actions */}
         <div className="border-t border-gray-100 pt-4 flex flex-wrap gap-2 sticky bottom-0 bg-white">
           <Button onClick={() => handleSave(false)} loading={saving} disabled={!(formData.title ?? '').trim()}>
-            {isBulk ? `Criar ${repeatCount} ações` : 'Salvar ação'}
+            Salvar ação
           </Button>
           {!isEditing && (
             <Button variant="secondary" onClick={() => handleSave(true)} disabled={!(formData.title ?? '').trim()}>
-              {isBulk ? `Rascunho (${repeatCount})` : 'Salvar como rascunho'}
+              Salvar como rascunho
             </Button>
           )}
           {isEditing && (
@@ -700,6 +668,63 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
           >
             Excluir
           </Button>
+        </div>
+      </Modal>
+      {/* Pop-up pós-salvar: Deseja estender a ação? */}
+      <Modal
+        isOpen={extendOpen}
+        onClose={() => { setExtendOpen(false); onClose(); }}
+        title="Deseja estender esta ação?"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Ação <strong className="text-gray-900">{formData.title || 'salva'}</strong> com status{' '}
+            <strong className="text-gray-900">{ACTION_STATUSES[extendStatus]?.label ?? extendStatus}</strong>.
+            Deseja replicá-la a partir do dia escolhido?
+          </p>
+
+          <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={skipWeekends}
+              onChange={(e) => setSkipWeekends(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-400"
+            />
+            Pular fins de semana (só dias úteis)
+          </label>
+
+          <div className="grid grid-cols-2 gap-2">
+            {(['week', 'month'] as const).map(mode => {
+              const p = extendPreview(mode);
+              const isWeek = mode === 'week';
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => handleExtend(mode)}
+                  disabled={p.count === 0 || extending}
+                  className={`flex flex-col items-center gap-1 p-4 rounded-xl border-2 transition-all ${
+                    p.count > 0
+                      ? 'border-primary-300 bg-primary-50 hover:border-primary-500 hover:shadow-sm'
+                      : 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                  } ${extending ? 'opacity-60 cursor-wait' : ''}`}
+                >
+                  <CalendarDays className="w-5 h-5 text-primary-600" />
+                  <span className="text-sm font-semibold text-gray-900">{isWeek ? 'Semana' : 'Mês'}</span>
+                  <span className="text-[11px] text-gray-500 text-center">
+                    {p.count > 0 ? `+${p.count} ações · ${p.range}` : 'nada a estender'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button variant="ghost" onClick={() => { setExtendOpen(false); onClose(); }} disabled={extending}>
+              Não, finalizar
+            </Button>
+          </div>
         </div>
       </Modal>
     </Drawer>
