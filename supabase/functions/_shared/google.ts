@@ -300,12 +300,14 @@ export function buildEventBody(
   row: Record<string, any>,
   integ: IntegrationRow,
   env: EnvType = 'sharks_company',
+  wsName?: string,
 ): Record<string, unknown> {
   const unified = integ.sync_mode !== 'split';
   const prefix = envPrefix(env, unified);
 
   if (source === 'campaign') {
     const lines: string[] = [];
+    if (wsName) lines.push(`Cliente: ${wsName}`);
     if (row.objective) lines.push(`Objetivo: ${row.objective}`);
     if (row.audience) lines.push(`Publico: ${row.audience}`);
     if (row.product) lines.push(`Produto: ${row.product}`);
@@ -331,6 +333,7 @@ export function buildEventBody(
 
   if (source === 'estrategos_meeting' || source === 'estrategos_implementation') {
     const lines: string[] = [];
+    if (wsName) lines.push(`Cliente: ${wsName}`);
     if (source === 'estrategos_implementation' && row.system_name) {
       lines.push(`Sistema: ${row.system_name}`);
     }
@@ -366,6 +369,7 @@ export function buildEventBody(
   const campaign = action.campaign as { name?: string; objective?: string } | null;
 
   const lines: string[] = [];
+  if (wsName) lines.push(`Cliente: ${wsName}`);
   if (action.channel) lines.push(`Canal: ${action.channel}`);
   const tipo = pretty(action.format) || pretty(action.action_type);
   if (tipo) lines.push(`Tipo/Formato: ${tipo}`);
@@ -441,11 +445,12 @@ async function createIdempotentEvent(
   row: Record<string, any>,
   integ: IntegrationRow,
   env: EnvType,
+  wsName?: string,
 ): Promise<{ id: string; reused: boolean }> {
   const existing = await findEventBySrcKey(token, calId, srcKey);
   if (existing) return { id: existing.id, reused: true };
 
-  const body = buildEventBody(src, row, integ, env);
+  const body = buildEventBody(src, row, integ, env, wsName);
   body.extendedProperties = { private: { srcKey } };
   const res = await gFetch(
     `${CAL_API}/calendars/${encodeURIComponent(calId)}/events`,
@@ -471,10 +476,11 @@ export async function processWorkspace(
     // pessoais globais), filtradas por ambiente do workspace.
     const { data: wsRow } = await admin
       .from('workspaces')
-      .select('organization_id, organizations(environment)')
+      .select('name, organization_id, organizations(environment)')
       .eq('id', workspaceId)
       .maybeSingle();
     const env = ((wsRow as { organizations?: { environment?: EnvType } } | null)?.organizations?.environment ?? 'sharks_company') as EnvType;
+    const wsName = ((wsRow as { name?: string } | null)?.name) ?? undefined;
 
     const [{ data: wsRows }, { data: personalRows }] = await Promise.all([
       admin
@@ -749,14 +755,14 @@ export async function processWorkspace(
               let createdNow = false;
 
               if (eventId) {
-                const bodyJson = JSON.stringify(buildEventBody(src, row, integ, env));
+                const bodyJson = JSON.stringify(buildEventBody(src, row, integ, env, wsName));
                 const res = await gFetch(
                   `${CAL_API}/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`,
                   { method: 'PATCH', body: bodyJson },
                   token,
                 );
                 if (res.status === 404 || res.status === 410) {
-                  const created = await createIdempotentEvent(token, calId, srcKey, src, row, integ, env);
+                  const created = await createIdempotentEvent(token, calId, srcKey, src, row, integ, env, wsName);
                   evId = created.id;
                   createdNow = !created.reused;
                 } else if (!res.ok) {
@@ -765,7 +771,7 @@ export async function processWorkspace(
                   evId = eventId;
                 }
               } else {
-                const created = await createIdempotentEvent(token, calId, srcKey, src, row, integ, env);
+                const created = await createIdempotentEvent(token, calId, srcKey, src, row, integ, env, wsName);
                 evId = created.id;
                 createdNow = !created.reused;
               }
@@ -901,8 +907,13 @@ export async function resyncWorkspace(
   await admin.from('campaigns').update({ sync_status: 'not_synced' }).eq('workspace_id', wsId).neq('sync_status', 'not_synced');
 
   // 4. re-enfileira tudo que deve existir no Google
+  //    (rascunhos ficam de fora — mesma semântica do trigger de enqueue)
   let enqueued = 0;
-  const { data: acts } = await admin.from('actions').select('id').eq('workspace_id', wsId).neq('status', 'cancelled');
+  const { data: acts } = await admin
+    .from('actions')
+    .select('id')
+    .eq('workspace_id', wsId)
+    .in('status', ['briefing', 'in_production', 'sharks_review', 'scheduled', 'published', 'completed']);
   if (acts?.length) {
     await admin.from('calendar_sync_queue').insert(
       acts.map(a => ({ workspace_id: wsId, action_id: a.id, source: 'sharks_action' as const, source_id: a.id, operation: 'create' as const })),
