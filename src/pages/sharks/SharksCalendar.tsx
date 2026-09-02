@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, type CSSProperties, type ReactNode } from 'react';
 import { Action, CalendarViewType, EnvironmentType } from '@/types';
 import { cn, formatWeekdayShort } from '@/lib/utils';
 import { getCalendarDays, isSameMonth, isSameDay, formatCalendarDate, format, ptBR, addDays, startOfWeek } from '@/lib/dateUtils';
@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useIntegration } from '@/hooks/useIntegration';
 import { isConnected, processQueue } from '@/lib/googleSync';
-import CalendarEvent from '@/components/calendar/CalendarEvent';
+import CalendarEvent, { type CalendarEventProps } from '@/components/calendar/CalendarEvent';
 import CalendarFilters from '@/components/calendar/CalendarFilters';
 import WeekGeneratorModal from '@/components/calendar/WeekGeneratorModal';
 import ActionDrawer from '@/components/actions/ActionDrawer';
@@ -21,8 +21,85 @@ import { useChannels } from '@/hooks/useChannels';
 import { useActiveCampaigns } from '@/hooks/useCampaigns';
 import { ACTION_STATUSES, ACTION_STATUS_DOT_CLASSES } from '@/lib/constants';
 import { ChevronLeft, ChevronRight, Calendar, Plus, Wand2, RefreshCw } from 'lucide-react';
-import { DndContext, DragOverlay, closestCenter, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
+import { DndContext, DragOverlay, closestCenter, DragStartEvent, DragEndEvent, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { toast } from 'sonner';
+
+/* ─── Drag & Drop helpers (dnd-kit) ─── */
+
+interface DroppableCellProps {
+  id: string;
+  className?: string;
+  style?: CSSProperties;
+  onClick?: () => void;
+  children?: ReactNode;
+}
+
+/** Célula de dia que aceita ações arrastadas (feedback visual ao passar) */
+function DroppableCell({ id, className, style, onClick, children }: DroppableCellProps) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      id={id}
+      style={style}
+      onClick={onClick}
+      className={cn(className, isOver && 'ring-2 ring-inset ring-primary-400 ring-offset-0')}
+    >
+      {children}
+    </div>
+  );
+}
+
+interface DraggableEventProps extends CalendarEventProps {
+  disabled?: boolean;
+}
+
+/** Evento arrastável — clique continua funcionando (sensor exige 6px de movimento) */
+function DraggableEvent({ disabled, action, ...eventProps }: DraggableEventProps) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: action.id,
+    disabled,
+    data: { action },
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={isDragging ? 'opacity-40' : ''}
+      style={{ touchAction: 'manipulation' }}
+    >
+      <CalendarEvent action={action} {...eventProps} />
+    </div>
+  );
+}
+
+/** Pill compacta do mês (elemento custom, não CalendarEvent) */
+function DraggablePill({ action, disabled, onClick, className, children }: {
+  action: Action;
+  disabled?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: action.id,
+    disabled,
+    data: { action },
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      onClick={onClick}
+      style={{ touchAction: 'manipulation' }}
+      className={cn('flex items-center gap-1 px-1 py-0.5 rounded cursor-pointer hover:bg-gray-100 transition-colors', className, isDragging && 'opacity-40')}
+    >
+      {children}
+    </div>
+  );
+}
 
 interface SharksCalendarProps {
   initialView?: CalendarViewType;
@@ -46,6 +123,12 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
   const { integration } = useIntegration(currentWorkspace?.id);
   const [syncing, setSyncing] = useState(false);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
+
+  // Drag & drop: Pointer com 6px (clique preservado) + Touch com 250ms de hold (mobile)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+  );
 
   const filterObj = useMemo(() => ({
     workspaceId: currentWorkspace?.id,
@@ -157,7 +240,9 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
 
     update(actionId, { action_date: newDate }).then(result => {
       if (result.ok) {
-        toast.success('Data atualizada');
+        toast.success('Data atualizada — enviando ao Google Calendar...');
+        // Drena a fila imediatamente: evento movido no GCal em segundos
+        processQueue(currentWorkspace?.id ?? null).catch(() => {});
       } else {
         toast.error(result.error || 'Erro ao mover ação');
       }
@@ -192,7 +277,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
 
   return (
     <div className="flex flex-col gap-4 h-[calc(100dvh-12.5rem)] lg:h-[calc(100dvh-6.5rem)]">
-      <DndContext collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         {/* Header */}
         <div className="flex flex-col gap-3 shrink-0">
           {/* Linha 1: título + Hoje + Filtros */}
@@ -288,7 +373,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
                 const dayStrategic = strategicDates.filter(s => s.date === dateStr);
 
                 return (
-                  <div
+                  <DroppableCell
                     key={i}
                     id={dateStr}
                     onClick={() => { if (dayActions.length === 0) handleCreateAtDate(dateStr); }}
@@ -369,14 +454,15 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
                           <div className="space-y-0.5">
                             {/* Pills compactas (estado colapsado) */}
                             {!isExpanded && dayActions.slice(0, maxVisible).map(action => (
-                              <div
+                              <DraggablePill
                                 key={action.id}
+                                action={action}
+                                disabled={action.status === 'cancelled'}
                                 onClick={(e) => { e.stopPropagation(); handleActionClick(action); }}
-                                className="flex items-center gap-1 px-1 py-0.5 rounded cursor-pointer hover:bg-gray-100 transition-colors"
                               >
                                 <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', ACTION_STATUS_DOT_CLASSES[action.status] || 'bg-gray-400')} />
                                 <span className="text-[10px] font-medium truncate">{action.title}</span>
-                              </div>
+                              </DraggablePill>
                             ))}
                             {/* Botão "Ver todas" */}
                             {!isExpanded && hiddenCount > 0 && (
@@ -391,14 +477,15 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
                             {isExpanded && (
                               <div className="space-y-0.5 border-t border-gray-100 pt-1">
                                 {dayActions.map(action => (
-                                  <div
+                                  <DraggablePill
                                     key={action.id}
+                                    action={action}
+                                    disabled={action.status === 'cancelled'}
                                     onClick={(e) => { e.stopPropagation(); handleActionClick(action); }}
-                                    className="flex items-center gap-1 px-1 py-0.5 rounded cursor-pointer hover:bg-gray-100 transition-colors"
                                   >
                                     <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', ACTION_STATUS_DOT_CLASSES[action.status] || 'bg-gray-400')} />
                                     <span className="text-[10px] font-medium truncate">{action.title}</span>
-                                  </div>
+                                  </DraggablePill>
                                 ))}
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setExpandedDay(null); }}
@@ -411,7 +498,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
                           </div>
                         );
                       })()}
-                  </div>
+                  </DroppableCell>
                 );
               })}
             </div>
@@ -467,7 +554,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
                     const dayStrategic = strategicDates.filter(s => s.date === dateStr);
 
                     return (
-                      <div
+                      <DroppableCell
                         key={i}
                         id={dateStr}
                         className="flex-1 min-w-0 min-h-0 border-r last:border-r-0 p-1.5 sm:p-2 space-y-1 sm:space-y-2 overflow-y-auto"
@@ -499,9 +586,10 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
                           </div>
                         )}
                         {dayActions.map(action => (
-                          <CalendarEvent
+                          <DraggableEvent
                             key={action.id}
                             action={action}
+                            disabled={action.status === 'cancelled'}
                             onClick={() => handleActionClick(action)}
                             onQuickStatus={handleQuickStatus}
                             compact={isMobile}
@@ -519,7 +607,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
                             + Nova ação
                           </Button>
                         )}
-                      </div>
+                      </DroppableCell>
                     );
                   })}
                 </div>
