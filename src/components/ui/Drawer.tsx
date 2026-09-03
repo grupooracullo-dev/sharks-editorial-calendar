@@ -47,7 +47,7 @@ export default function Drawer({ isOpen, onClose, title, children, width = 'md' 
   };
 
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-[70]">
       <div
         className="absolute inset-0 bg-black/30 transition-opacity"
         onClick={onClose}

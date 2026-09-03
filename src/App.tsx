@@ -231,7 +231,7 @@ export default function App() {
             <NotificationProvider>
               <DataSync />
               <AppRoutes />
-              <Toaster position="bottom-right" richColors closeButton />
+              <Toaster position="bottom-right" richColors closeButton offset="calc(3.5rem + env(safe-area-inset-bottom))" />
             </NotificationProvider>
           </WorkspaceProvider>
         </AuthProvider>

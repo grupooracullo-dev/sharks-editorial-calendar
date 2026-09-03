@@ -203,7 +203,7 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
       <div
         onClick={onClose}
         className={cn(
-          'lg:hidden fixed inset-0 bg-black/40 backdrop-blur-[2px] z-40 transition-opacity duration-300',
+          'lg:hidden fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[60] transition-opacity duration-300',
           open ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
       />
@@ -211,7 +211,7 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
       {/* Sidebar: drawer professional no mobile, fixa no desktop */}
       <aside
         className={cn(
-          'fixed left-0 top-0 h-full bg-white border-r border-gray-200 z-50 flex flex-col transition-all duration-300 ease-out',
+          'fixed left-0 top-0 h-full bg-white border-r border-gray-200 z-[70] flex flex-col transition-all duration-300 ease-out',
           // Mobile: drawer com cantos arredondados, sombra e safe area
           'w-[288px] max-w-[85vw] rounded-r-2xl shadow-2xl pb-[env(safe-area-inset-bottom)]',
           // Desktop: barra fixa padrao (sem sombra/cantos)
