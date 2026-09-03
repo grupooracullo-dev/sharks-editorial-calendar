@@ -27,14 +27,16 @@ export default function ClientChat() {
 
   return (
     <div className="space-y-4">
-      <div>
+      {/* Cabeçalho da página apenas no desktop — no mobile o painel já tem título */}
+      <div className="hidden sm:block">
         <h1 className="text-2xl font-bold text-gray-900">Chat</h1>
         <p className="text-sm text-gray-500 mt-0.5">
           Fale diretamente com a equipe Sharks
         </p>
       </div>
 
-      <div className="h-[calc(100vh-316px)] min-h-[350px]">
+      {/* Mobile: ocupa até o BottomNav (topo ~60 + padding 16 + nav 56 + safe area) */}
+      <div className="h-[calc(100dvh-8.25rem-env(safe-area-inset-bottom))] min-h-[380px] sm:h-[calc(100dvh-316px)]">
         <ChatPanel
           messages={messages}
           currentUser={user!}

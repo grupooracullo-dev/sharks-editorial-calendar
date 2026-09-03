@@ -84,6 +84,14 @@ export default function ChatPanel({ messages, currentUser, onSendMessage, title,
     requestAnimationFrame(() => taRef.current?.focus());
   };
 
+  // Mobile: um botão que alterna o tipo (Mensagem -> Dúvida -> Sugestão)
+  const cycleType = () => {
+    const order: MessageType[] = ['message', 'doubt', 'suggestion'];
+    const idx = order.indexOf(messageType);
+    setMessageType(order[(idx + 1) % order.length]);
+  };
+  const currentType = TYPE_CONFIG[messageType];
+
   const rendered = useMemo(() => {
     const items: ReactNode[] = [];
     let prev: ChatMessageData | null = null;
@@ -139,8 +147,22 @@ export default function ChatPanel({ messages, currentUser, onSendMessage, title,
 
       <div className="px-4 py-3 bg-white border-t border-gray-100">
         <div className="flex gap-2 items-end">
-          {/* Botões de tipo — compactos, ícone + label sutil */}
-          <div className="flex gap-1 shrink-0 pb-0.5">
+          {/* Tipo — mobile: botão único que alterna; desktop: 3 ícones */}
+          <button
+            type="button"
+            onClick={cycleType}
+            title={`Tipo: ${currentType.label} (toque para alternar)`}
+            className={cn(
+              'sm:hidden h-9 w-9 flex items-center justify-center rounded-lg transition-all shrink-0',
+              messageType !== 'message'
+                ? 'bg-primary-50 text-primary-600 shadow-sm'
+                : 'text-gray-400 hover:text-gray-500 hover:bg-gray-50'
+            )}
+            aria-label={`Tipo: ${currentType.label}`}
+          >
+            <currentType.icon className="w-4 h-4" />
+          </button>
+          <div className="hidden sm:flex gap-1 shrink-0 pb-0.5">
             {(['message', 'doubt', 'suggestion'] as MessageType[]).map(type => {
               const cfg = TYPE_CONFIG[type];
               return (

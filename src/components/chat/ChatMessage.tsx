@@ -29,11 +29,11 @@ export default function ChatMessage({ content, sender, message_type, created_at,
   const showMeta = showHeader || message_type !== 'message';
 
   return (
-    <div className={cn('flex gap-2.5', isOwn && 'flex-row-reverse', isGrouped ? 'mt-0.5' : 'mt-3')}>
-      <div className="w-8 shrink-0">
+    <div className={cn('flex gap-2 sm:gap-2.5', isOwn && 'flex-row-reverse', isGrouped ? 'mt-0.5' : 'mt-3')}>
+      <div className="w-7 sm:w-8 shrink-0">
         {showHeader && <Avatar name={sender.full_name} src={sender.avatar_url} size="sm" />}
       </div>
-      <div className={cn('max-w-[75%] flex flex-col min-w-0', isOwn && 'items-end')}>
+      <div className={cn('max-w-[85%] sm:max-w-[75%] flex flex-col min-w-0', isOwn && 'items-end')}>
         {showMeta && (
           <div className={cn('flex items-center gap-2 mb-1', isOwn && 'flex-row-reverse')}>
             {showHeader && (
