@@ -94,7 +94,7 @@ export default function ChatPanel({ messages, currentUser, onSendMessage, title,
       if (newDay) {
         items.push(<ChatDateSeparator key={`sep-${msg.id}`} label={dateLabel(msg.created_at)} />);
       }
-      const isGrouped = !newDay && prev !== null && prev.sender.id === msg.sender.id;
+      const isGrouped = !newDay && prev !== null && prev.sender?.id === msg.sender?.id;
       items.push(
         <ChatMessage
           key={msg.id}
@@ -102,7 +102,7 @@ export default function ChatPanel({ messages, currentUser, onSendMessage, title,
           sender={msg.sender}
           message_type={msg.message_type}
           created_at={msg.created_at}
-          isOwn={msg.sender.id === currentUser.id}
+          isOwn={msg.sender?.id === currentUser?.id}
           status={msg.status}
           isGrouped={isGrouped}
         />

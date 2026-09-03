@@ -15,7 +15,7 @@ export default function ClientChat() {
 
   useEffect(() => {
     if (!threadId || !currentWorkspace?.id || loading) return;
-    const hasUnreadIncoming = messages.some(m => m.sender.id !== user?.id && m.status !== 'read');
+    const hasUnreadIncoming = messages.some(m => m.sender?.id !== user?.id && m.status !== 'read');
     if (hasUnreadIncoming) markRead(threadId, currentWorkspace.id);
   }, [threadId, currentWorkspace?.id, messages, loading, markRead, user?.id]);
 

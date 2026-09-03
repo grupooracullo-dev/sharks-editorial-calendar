@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 
 export interface ChatMessageData {
   id: string;
+  sender_id?: string;
   content: string;
   sender: User;
   message_type: MessageType;
@@ -57,12 +58,18 @@ export function useChat(workspaceId?: string | null, currentUser?: User | null) 
       const fetchMessages = async () => {
         const { data } = await supabase
           .from('chat_messages')
-          .select('id, content, message_type, created_at, status, sender:users(*)')
+          .select('id, sender_id, content, message_type, created_at, status, sender:users(id, full_name, avatar_url)')
           .eq('thread_id', tid)
           .order('created_at');
 
         if (active && data) {
-          setMessages(data as unknown as ChatMessageData[]);
+          // O embed sender vem null para clientes (RLS users_select permite
+          // só o próprio perfil) — normaliza para nunca quebrar a UI.
+          const normalized = (data as unknown as Array<Record<string, any>>).map(m => ({
+            ...m,
+            sender: m.sender ?? { id: m.sender_id ?? '', full_name: 'Equipe', avatar_url: null },
+          }));
+          setMessages(normalized as unknown as ChatMessageData[]);
         }
         if (active) setLoading(false);
       };
