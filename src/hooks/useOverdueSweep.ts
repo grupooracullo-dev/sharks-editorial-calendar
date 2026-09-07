@@ -1,3 +1,4 @@
+import { localDate } from '@/lib/localDate';
 import { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -40,7 +41,7 @@ export function useOverdueSweep(enabled: boolean): void {
       if (cancelled) return;
 
       const seen = loadSeen();
-      const today = new Date().toISOString().split('T')[0];
+      const today = localDate();
       const mine = getOverdueActions().filter(a => a.responsible_id === user.id);
       const fresh = mine.filter(a => seen[a.id] !== today);
 

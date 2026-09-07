@@ -1,3 +1,5 @@
+import { normalizeAction } from './actionNormalization';
+import { localDate } from './localDate';
 import { Action, ActionFilters } from '@/types';
 import { supabase, authState } from '@/lib/supabase';
 import { notifyActionChanged } from '@/lib/googleSync';
@@ -99,7 +101,7 @@ export async function loadActions(workspaceId?: string | null, environment?: str
     return;
   }
 
-  actionsStore = (data as unknown as Action[]) || [];
+  actionsStore = (data ?? []).map(normalizeAction);
   loadStatus = 'success';
   notifyListeners();
 
@@ -160,27 +162,33 @@ export interface ActionResult {
   ok: boolean;
   data?: Action;
   error?: string;
+  warning?: string;
 }
 
 /** Grava os responsáveis (N:N) via RPC e re-carrega a linha com os joins. */
 async function syncResponsibles(actionId: string, userIds: string[]): Promise<Action | null> {
-  const { error } = await supabase.rpc('set_action_responsibles', {
-    p_action_id: actionId,
-    p_user_ids: userIds,
-  });
-  if (error) {
-    console.error('[actions] set_action_responsibles error:', error.message);
+  try {
+    const { error } = await supabase.rpc('set_action_responsibles', {
+      p_action_id: actionId,
+      p_user_ids: userIds,
+    });
+    if (error) {
+      console.error('[actions] set_action_responsibles error:', error.message);
+      return null;
+    }
+    const { data } = await supabase
+      .from('actions')
+      .select(SELECT_WITH_JOINS)
+      .eq('id', actionId)
+      .single();
+    return data ? normalizeAction(data) : null;
+  } catch (error) {
+    console.error('[actions] responsible assignment failed:', error);
     return null;
   }
-  const { data } = await supabase
-    .from('actions')
-    .select(SELECT_WITH_JOINS)
-    .eq('id', actionId)
-    .single();
-  return (data as unknown as Action) || null;
 }
 
-export async function createAction(data: Partial<Action>): Promise<ActionResult> {
+export async function createAction(data: Partial<Action> & { responsible_ids?: string[] }): Promise<ActionResult> {
   const payload = {
     workspace_id: data.workspace_id || '',
     environment: data.environment || 'sharks_company',
@@ -224,10 +232,12 @@ export async function createAction(data: Partial<Action>): Promise<ActionResult>
 
   // Múltiplos responsáveis (N:N) — RPC após o insert
   const respIds = (data as Partial<Action> & { responsible_ids?: string[] }).responsible_ids;
-  let finalAction = inserted as unknown as Action;
+  let finalAction = normalizeAction(inserted);
+  let warning: string | undefined;
   if (Array.isArray(respIds)) {
     const refreshed = await syncResponsibles(finalAction.id, respIds);
     if (refreshed) finalAction = refreshed;
+    else warning = "Ação criada, mas os responsáveis não foram confirmados. Reabra a ação para conferir a atribuição.";
   }
 
   const idx = actionsStore.findIndex(a => a.id === finalAction.id);
@@ -235,10 +245,10 @@ export async function createAction(data: Partial<Action>): Promise<ActionResult>
   else actionsStore.push(finalAction);
   notifyListeners();
   notifyActionChanged(finalAction.workspace_id);
-  return { ok: true, data: finalAction };
+  return { ok: true, data: finalAction, warning };
 }
 
-export async function updateAction(id: string, data: Partial<Action>): Promise<ActionResult> {
+export async function updateAction(id: string, data: Partial<Action> & { responsible_ids?: string[] }): Promise<ActionResult> {
   const oldAction = getActionById(id);
 
   // responsible_ids não é coluna — vai para a RPC após o update
@@ -257,12 +267,14 @@ export async function updateAction(id: string, data: Partial<Action>): Promise<A
   }
 
   // Mark as needing sync locally if date changed and was previously synced
-  const result = updated as unknown as Action;
+  const result = normalizeAction(updated);
+  let warning: string | undefined;
 
   // Múltiplos responsáveis (N:N) — RPC após o update
   if (Array.isArray(respIdsRaw)) {
     const refreshed = await syncResponsibles(id, respIdsRaw);
     if (refreshed) Object.assign(result, refreshed);
+    else warning = "Ação atualizada, mas os responsáveis não foram confirmados. Reabra a ação para conferir a atribuição.";
   }
 
   if (
@@ -279,7 +291,7 @@ export async function updateAction(id: string, data: Partial<Action>): Promise<A
   }
   notifyListeners();
   notifyActionChanged(result.workspace_id);
-  return { ok: true, data: result };
+  return { ok: true, data: result, warning };
 }
 
 export async function deleteAction(id: string): Promise<{ ok: boolean; error?: string }> {
@@ -296,13 +308,14 @@ export async function deleteAction(id: string): Promise<{ ok: boolean; error?: s
   return { ok: true };
 }
 
-export async function bulkCreateActions(rows: Partial<Action>[]): Promise<{ ok: boolean; count: number; error?: string }> {
+export async function bulkCreateActions(rows: Partial<Action>[]): Promise<{ ok: boolean; count: number; warning?: string; error?: string }> {
   // responsible_ids não é coluna — vai para a RPC após o insert
-  const respIds = (rows[0] as Partial<Action> & { responsible_ids?: string[] } | undefined)?.responsible_ids;
+
   const payload = rows.map(r => {
     const { responsible_ids: _strip, ...rest } = r as Partial<Action> & { responsible_ids?: string[] };
     return {
       ...rest,
+      id: rest.id || crypto.randomUUID(),
       sync_status: rest.sync_status || 'not_synced',
       reference_urls: rest.reference_urls || [],
       created_by: authState.userId,
@@ -315,21 +328,21 @@ export async function bulkCreateActions(rows: Partial<Action>[]): Promise<{ ok: 
     return { ok: false, count: 0, error: error.message };
   }
 
-  // Multi-responsáveis: aplica a todos os itens criados (em paralelo)
-  if (Array.isArray(respIds) && respIds.length > 0 && data && data.length > 0) {
-    await Promise.all(
-      data.map(row =>
-        supabase.rpc('set_action_responsibles', {
-          p_action_id: (row as { id: string }).id,
-          p_user_ids: respIds,
-        }),
-      ),
-    );
+  let warning: string | undefined;
+  const assignments = await Promise.allSettled((data ?? []).map(row => {
+    const index = payload.findIndex(item => item.id === row.id);
+    const ids = (rows[index] as Partial<Action> & { responsible_ids?: string[] }).responsible_ids;
+    return Array.isArray(ids)
+      ? supabase.rpc('set_action_responsibles', { p_action_id: row.id, p_user_ids: ids })
+      : Promise.resolve({ error: null });
+  }));
+  if (assignments.some(r => r.status === 'rejected' || r.value.error)) {
+    warning = 'Ações criadas, mas houve falha ao atribuir responsáveis. Confira as ações antes de repetir a operação.';
   }
 
   await reloadActions();
   notifyActionChanged(rows[0]?.workspace_id || null);
-  return { ok: true, count: data?.length || 0 };
+  return { ok: true, count: data?.length || 0, warning };
 }
 
 export function getActionsByDate(date: string, workspaceId?: string): Action[] {
@@ -340,7 +353,7 @@ export function getActionsByDate(date: string, workspaceId?: string): Action[] {
 }
 
 export function getTodayActions(workspaceId?: string): Action[] {
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDate();
   return getActionsByDate(today, workspaceId).sort((a, b) =>
     (a.action_time || '').localeCompare(b.action_time || '')
   );
@@ -356,7 +369,7 @@ export function getWeekActions(startDate: string, endDate: string, workspaceId?:
 }
 
 export function getOverdueActions(workspaceId?: string): Action[] {
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDate();
   return actionsStore.filter(a => {
     if (workspaceId && a.workspace_id !== workspaceId) return false;
     if (['published', 'completed', 'cancelled'].includes(a.status)) return false;

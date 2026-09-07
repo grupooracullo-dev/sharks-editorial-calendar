@@ -181,7 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
   const isSharks = isOracullo || hasAccess('sharks_company', ['admin', 'team']);
   const isAdmin = isOracullo || hasAccess('sharks_company', ['admin']);
-  const isClient = !isSharks && !isOracullo && environments.some(e => e.role === 'client');
+  const isClient = !isOracullo && environments.some(e => e.role === 'client');
 
   return (
     <AuthContext.Provider
