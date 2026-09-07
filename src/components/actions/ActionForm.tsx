@@ -1,3 +1,4 @@
+import { localDate } from '@/lib/localDate';
 import { useState, useEffect } from 'react';
 import { Action, ContentFormat, Objective, ActionType, ActionStatus, FunnelStage, EnvironmentType } from '@/types';
 import Drawer from '@/components/ui/Drawer';
@@ -44,7 +45,7 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
     title: '',
     description: '',
     workspace_id: workspaceId,
-    action_date: new Date().toISOString().split('T')[0],
+    action_date: localDate(),
     action_time: '09:00',
     action_type: 'content' as ActionType,
     format: '' as string,
@@ -149,7 +150,8 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
         toast.error(result.error || 'Erro ao estender a ação');
         return;
       }
-      toast.success(`+${result.count} ações criadas (${mode === 'week' ? 'semana' : 'mês'})!`);
+      if (result.warning) toast.warning(result.warning);
+      else toast.success(`+${result.count} ações criadas (${mode === 'week' ? 'semana' : 'mês'})!`);
       setExtendOpen(false);
       onClose();
     } finally {
@@ -196,7 +198,7 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
           title: action.title ?? '',
           description: action.description || '',
           workspace_id: action.workspace_id ?? workspaceId,
-          action_date: action.action_date || defaultDate || new Date().toISOString().split('T')[0],
+          action_date: action.action_date || defaultDate || localDate(),
           action_time: action.action_time?.slice(0, 5) || '09:00',
           action_type: action.action_type || (environment === 'estrategos' ? 'meeting' : 'content') as ActionType,
           format: action.format || '',
@@ -224,7 +226,7 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
           title: '',
           description: '',
           workspace_id: workspaceId,
-          action_date: defaultDate || new Date().toISOString().split('T')[0],
+          action_date: defaultDate || localDate(),
           action_time: '09:00',
           action_type: environment === 'estrategos' ? 'meeting' : 'content',
           format: '',
@@ -285,6 +287,11 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
       }
 
       if (result.ok && result.data) {
+        if (result.warning) {
+          toast.warning(result.warning);
+          onClose();
+          return;
+        }
         toast.success(isEditing ? 'Ação atualizada!' : 'Ação salva!');
       }
 
@@ -304,13 +311,15 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
       const result = await create({
         ...payload,
         title: `${action.title} (cópia)`,
+        responsible_ids: action.responsibles?.map(r => r.id) ?? (action.responsible_id ? [action.responsible_id] : []),
         status: 'draft' as ActionStatus,
       });
       if (!result.ok) {
         toast.error(result.error || 'Erro ao duplicar');
         return;
       }
-      toast.success('Ação duplicada como rascunho');
+      if (result.warning) toast.warning(result.warning);
+      else toast.success('Ação duplicada como rascunho');
       onClose();
     } finally {
       setSaving(false);

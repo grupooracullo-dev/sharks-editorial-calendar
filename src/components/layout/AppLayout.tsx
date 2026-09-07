@@ -49,7 +49,7 @@ export function SharksLayout({ children }: { children: ReactNode }) {
   useOverdueSweep(isSharks);
 
   if (loading) return null;
-  if (!isSharks) return <Navigate to="/client" replace />;
+  if (!isSharks) return <Navigate to="/select-environment" replace />;
 
   return <AppLayout>{children}</AppLayout>;
 }
@@ -59,7 +59,7 @@ export function ClientLayout({ children }: { children: ReactNode }) {
   const { isClient, loading } = useAuth();
 
   if (loading) return null;
-  if (!isClient) return <Navigate to="/sharks" replace />;
+  if (!isClient) return <Navigate to="/select-environment" replace />;
 
   return <AppLayout>{children}</AppLayout>;
 }
@@ -71,7 +71,7 @@ export function EstrategosLayout({ children }: { children: ReactNode }) {
   useOverdueSweep(isEstrategos);
 
   if (loading) return null;
-  if (!isEstrategos) return <Navigate to="/sharks" replace />;
+  if (!isEstrategos) return <Navigate to="/select-environment" replace />;
 
   return <AppLayout>{children}</AppLayout>;
 }
@@ -81,7 +81,7 @@ export function OraculloLayout({ children }: { children: ReactNode }) {
   const { isOracullo, loading } = useAuth();
 
   if (loading) return null;
-  if (!isOracullo) return <Navigate to="/sharks" replace />;
+  if (!isOracullo) return <Navigate to="/select-environment" replace />;
 
   return <AppLayout>{children}</AppLayout>;
 }

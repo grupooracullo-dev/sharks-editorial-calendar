@@ -116,7 +116,7 @@ function useHomePath(): string {
   const { isOracullo, isSharks, hasAccess, environments, user } = useAuth();
   if (!user) return '/login';
   if (isOracullo) return '/oracullo';
-  if (environments.length === 0) return '/auth-gate';
+  if (environments.length === 0) return '/select-environment';
   if (environments.length > 1) return '/select-environment';
   if (hasAccess('estrategos', ['admin', 'team'])) return '/estrategos';
   if (isSharks) return '/sharks';

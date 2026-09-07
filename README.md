@@ -4,7 +4,7 @@ Sistema de planejamento editorial multi-cliente para Sharks Company.
 
 ## Stack
 
-- **Frontend:** React 19 + TypeScript + Vite 6 + Tailwind CSS 4
+- **Frontend:** React 19 + TypeScript + Vite 8 + Tailwind CSS 4
 - **Backend:** Supabase (PostgreSQL, Auth, Realtime, Edge Functions)
 - **Routing:** React Router 7
 - **DnD:** @dnd-kit
@@ -109,3 +109,20 @@ O build gera `dist/` com assets estaticos. Sem SSR. Hospedagem ideal:
 - Netlify
 - Cloudflare Pages
 - Qualquer static host com rewrites SPA
+
+## Verificação das correções
+
+Use Node.js 22.21 ou superior. `npm test` verifica hierarquia de exclusão,
+normalização de responsáveis e datas locais. `npm run build` verifica os tipos
+e gera o frontend. `npm run typecheck` verifica apenas o TypeScript do frontend.
+As dependências declaradas foram alinhadas às versões do lockfile existente.
+
+A função `admin-delete-user` deve ser publicada no Supabase para que a proteção
+entre ambientes entre em vigor no servidor. Administradores de ambiente só
+podem excluir contas subordinadas vinculadas exclusivamente ao seu ambiente;
+contas compartilhadas exigem administração global e guardiões são protegidos.
+Nenhum usuário real precisa ser excluído para executar os testes locais.
+
+A gravação da ação e dos responsáveis continua em operações separadas. Quando
+apenas a atribuição falha, a interface informa que a ação foi salva e orienta
+reabrir a ação, evitando uma confirmação de sucesso completo.

@@ -1,3 +1,4 @@
+import { localDate } from '@/lib/localDate';
 import { useMemo, useState } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useActions } from '@/hooks/useActions';
@@ -34,7 +35,7 @@ export default function SharksHistory() {
         if (filters.endDate && a.action_date > filters.endDate) return false;
         if (filters.search && !a.title.toLowerCase().includes(filters.search.toLowerCase())) return false;
         // Only show past or published actions in history
-        const isPastOrDone = ['published', 'completed', 'cancelled'].includes(a.status) || a.action_date <= new Date().toISOString().split('T')[0];
+        const isPastOrDone = ['published', 'completed', 'cancelled'].includes(a.status) || a.action_date <= localDate();
         return isPastOrDone;
       })
       .sort((a, b) => b.action_date.localeCompare(a.action_date));
@@ -82,7 +83,7 @@ export default function SharksHistory() {
                 setFilters(p => ({
                   ...p,
                   startDate: `${e.target.value}-01`,
-                  endDate: new Date(new Date(`${e.target.value}-01`).getFullYear(), new Date(`${e.target.value}-01`).getMonth() + 1, 0).toISOString().split('T')[0],
+                  endDate: localDate(new Date(Number(e.target.value.split('-')[0]), Number(e.target.value.split('-')[1]), 0)),
                 }));
               }
             }}
