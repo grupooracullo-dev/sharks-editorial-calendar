@@ -95,3 +95,14 @@ test('denied environment routes lead to an unguarded selector', async () => {
   assert.doesNotMatch(layout, /<Navigate to="\/(sharks|client)"/);
   assert.equal((layout.match(/to="\/select-environment"/g) ?? []).length, 4);
 });
+
+test('client routes take precedence over Sharks membership in both menus and controls', async () => {
+  const sidebar = await readFile(new URL('../src/components/layout/AppSidebar.tsx', import.meta.url), 'utf8');
+  const bottom = await readFile(new URL('../src/components/layout/BottomNav.tsx', import.meta.url), 'utf8');
+  const header = await readFile(new URL('../src/components/layout/TopHeader.tsx', import.meta.url), 'utf8');
+  const layout = await readFile(new URL('../src/components/layout/AppLayout.tsx', import.meta.url), 'utf8');
+  assert.match(sidebar, /env === 'client' \? clientNavItems\s*: isSharks/);
+  assert.match(bottom, /pathname.startsWith\('\/client'\) \? clientNavItems\s*: isSharks/);
+  assert.equal((header.match(/isSharks && !location.pathname.startsWith\('\/client'\)/g) ?? []).length, 2);
+  assert.match(layout, /if \(!isClient\) return <Navigate to="\/select-environment"/);
+});

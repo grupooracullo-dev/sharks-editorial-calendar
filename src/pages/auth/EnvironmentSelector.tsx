@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { ENVIRONMENT_META, type EnvironmentType } from '@/types';
@@ -38,7 +39,7 @@ export default function EnvironmentSelector() {
         {targets.length === 0 && (
           <div className="text-center space-y-4">
             <p>Seu usuário ainda não tem acesso a um ambiente. Solicite a liberação ao administrador.</p>
-            <button onClick={() => void signOut()} className="text-primary-600 underline">Sair da conta</button>
+            <Button variant="ghost" onClick={() => void signOut()} className="text-primary-600 underline">Sair da conta</Button>
           </div>
         )}
         <div className={cn('grid gap-4', targets.length > 2 ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
