@@ -295,6 +295,9 @@ function nearestGoogleColor(hex: string | null | undefined): string | undefined 
   return best;
 }
 
+// Lembrete padrao: popup 30 minutos antes da acao/campanha/reuniao
+const REMINDERS_30 = { useDefault: false, overrides: [{ method: 'popup', minutes: 30 }] };
+
 export function buildEventBody(
   source: QueueSource,
   row: Record<string, any>,
@@ -325,6 +328,7 @@ export function buildEventBody(
       start: { date: startDay },
       end: { date: endDay },
       transparency: 'transparent',
+      reminders: REMINDERS_30,
     };
     const colorId = nearestGoogleColor(row.color);
     if (colorId) body.colorId = colorId;
@@ -360,7 +364,7 @@ export function buildEventBody(
       start = { date };
       end = { date: nextDay };
     }
-    return { summary: `${prefix}${row.title ?? row.name ?? ''}`, description: lines.join('\n'), start, end };
+    return { summary: `${prefix}${row.title ?? row.name ?? ''}`, description: lines.join('\n'), start, end, reminders: REMINDERS_30 };
   }
 
   // sharks_action (formato historico validado)
@@ -402,7 +406,7 @@ export function buildEventBody(
     end = { date: nextDay };
   }
 
-  return { summary: `${prefix}${action.title}`, description: lines.join('\n'), start, end };
+  return { summary: `${prefix}${action.title}`, description: lines.join('\n'), start, end, reminders: REMINDERS_30 };
 }
 
 // ---------- Queue processing ----------
