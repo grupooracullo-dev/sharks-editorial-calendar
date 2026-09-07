@@ -89,7 +89,7 @@ export default function TopHeader({ onOpenMobileNav }: { onOpenMobileNav?: () =>
           )}
 
           {/* Workspace Selector (Sharks only) */}
-          {isSharks && (
+          {isSharks && !location.pathname.startsWith('/client') && (
             <div ref={wsRef} className="relative">
             <button
               onClick={() => setWsDropdownOpen(!wsDropdownOpen)}
@@ -152,7 +152,7 @@ export default function TopHeader({ onOpenMobileNav }: { onOpenMobileNav?: () =>
         </div>
 
         {/* Search (Sharks only) */}
-        {isSharks && (
+        {isSharks && !location.pathname.startsWith('/client') && (
           <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md">
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />

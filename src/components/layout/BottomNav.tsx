@@ -42,6 +42,7 @@ export default function BottomNav() {
   const navItems =
     location.pathname.startsWith('/estrategos') ? estrategosNavItems
     : location.pathname.startsWith('/oracullo') ? oraculloNavItems
+    : location.pathname.startsWith('/client') ? clientNavItems
     : isSharks ? sharksNavItems
     : clientNavItems;
 
