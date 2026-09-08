@@ -4,11 +4,12 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Button from '@/components/ui/Button';
 import LogoUploader from '@/components/ui/LogoUploader';
+import SearchSelect from '@/components/ui/SearchSelect';
 import FormatFrequencyStepper, { defaultFormatFrequency } from '@/components/editorial/FormatFrequencyStepper';
 import { SEGMENTS } from '@/lib/constants';
 import { BR_STATES, detectDatesForClient, manualCityBirthday, type StrategicDateDraft } from '@/data/brDates';
 import { CITIES_BY_STATE } from '@/data/brCities';
-import { createFullClient } from '@/lib/clientFactory';
+import { createFullClients } from '@/lib/clientFactory';
 import { ENVIRONMENT_META, type EnvironmentType, type FormatFrequency, type Workspace } from '@/types';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -25,12 +26,12 @@ export interface ClientWizardProps {
 }
 
 export default function ClientWizard({ open, onClose, environment, onCreated }: ClientWizardProps) {
-  const steps = environment ? baseSteps : ['Ambiente', ...baseSteps];
+  const steps = environment ? baseSteps : ['Ambientes', ...baseSteps];
   /** Índice do passo que exige nome (Empresa) — desloca quando há seletor de ambiente. */
   const nameStepIndex = environment ? 0 : 1;
   const datesStepIndex = environment ? 4 : 5;
 
-  const [env, setEnv] = useState<EnvironmentType>(environment ?? 'sharks_company');
+  const [selectedEnvs, setEnvs] = useState<EnvironmentType[]>(environment ? [environment] : ['sharks_company']);
   const [step, setStep] = useState(0);
   const [creating, setCreating] = useState(false);
   const [formData, setFormData] = useState({
@@ -49,7 +50,7 @@ export default function ClientWizard({ open, onClose, environment, onCreated }: 
   const [cityDetected, setCityDetected] = useState(false);
 
   const reset = () => {
-    setEnv(environment ?? 'sharks_company');
+    setEnvs(environment ? [environment] : ['sharks_company']);
     setStep(0);
     setFormData({
       name: '',
@@ -119,11 +120,10 @@ export default function ClientWizard({ open, onClose, environment, onCreated }: 
   );
 
   const handleCreate = async () => {
-    if (!formData.name.trim() || creating) return;
+    if (!formData.name.trim() || creating || selectedEnvs.length === 0) return;
     setCreating(true);
     try {
-      const ws = await createFullClient({
-        environment: env,
+      const created = await createFullClients(selectedEnvs, {
         name: formData.name,
         segment: formData.segment,
         city: formData.city,
@@ -134,8 +134,13 @@ export default function ClientWizard({ open, onClose, environment, onCreated }: 
         google_calendar_id: formData.google_calendar_id,
         selectedDates: selectedDrafts,
       });
-      toast.success(`Cliente "${ws.name}" criado com sucesso!`);
-      onCreated?.(ws);
+      const labelsResolved = selectedEnvs.map(e => ENVIRONMENT_META[e].short).join(' + ');
+      toast.success(
+        selectedEnvs.length > 1
+          ? `Cliente "${formData.name}" criado em ${labelsResolved}!`
+          : `Cliente "${formData.name}" criado com sucesso!`,
+      );
+      onCreated?.(created[0]);
       onClose();
     } catch (err) {
       console.error(err);
@@ -173,35 +178,56 @@ export default function ClientWizard({ open, onClose, environment, onCreated }: 
 
       <p className="text-sm font-medium text-gray-900 mb-4">{steps[step]}</p>
 
-      {/* Passo 0 (multi-ambiente): seleção de ambiente */}
+      {/* Passo 0 (multi-ambiente): seleção de 1 ou ambos os ambientes */}
       {!environment && step === 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {envs.map(e => {
-            const meta = ENVIRONMENT_META[e];
-            const selected = env === e;
-            return (
-              <button
-                key={e}
-                type="button"
-                onClick={() => setEnv(e)}
-                className={cn(
-                  'flex items-center gap-3 p-4 rounded-xl border-2 text-left transition-colors',
-                  selected ? 'border-primary-500 bg-primary-50' : 'border-gray-200 bg-white hover:border-gray-300'
-                )}
-              >
-                <span className={cn(
-                  'w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center shrink-0',
-                  selected && 'text-primary-600'
-                )}>
-                  <Building2 className={cn('w-5 h-5', selected ? 'text-primary-600' : 'text-gray-400')} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-gray-900">{meta.label}</span>
-                  <span className="block text-xs text-gray-500">{meta.emoji} {meta.short}</span>
-                </span>
-              </button>
-            );
-          })}
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {envs.map(e => {
+              const meta = ENVIRONMENT_META[e];
+              const selected = selectedEnvs.includes(e);
+              return (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => setEnvs(prev => (prev.includes(e) ? prev.filter(x => x !== e) : [...prev, e]))}
+                  className={cn(
+                    'flex items-center gap-3 p-4 rounded-xl border-2 text-left transition-colors',
+                    selected ? 'border-primary-500 bg-primary-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'w-5 h-5 rounded flex items-center justify-center shrink-0 border-2',
+                      selected ? 'bg-primary-500 border-primary-500 text-white' : 'border-gray-300'
+                    )}
+                  >
+                    {selected && <CheckSquare className="w-3.5 h-3.5" />}
+                  </div>
+                  <span
+                    className={cn(
+                      'w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center shrink-0',
+                      selected && 'text-primary-600'
+                    )}
+                  >
+                    <Building2 className={cn('w-5 h-5', selected ? 'text-primary-600' : 'text-gray-400')} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-gray-900">{meta.label}</span>
+                    <span className="block text-xs text-gray-500">{meta.emoji} {meta.short}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {selectedEnvs.length === 0 ? (
+            <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">Selecione pelo menos um ambiente.</p>
+          ) : (
+            <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+              {envs.length === 2
+                ? 'O cliente será criado nos DOIS ambientes (um workspace em cada).'
+                : `O cliente será criado apenas no ambiente ${ENVIRONMENT_META[selectedEnvs[0]].short}.`}
+            </p>
+          )}
         </div>
       )}
 
@@ -246,27 +272,23 @@ export default function ClientWizard({ open, onClose, environment, onCreated }: 
             options={[{ value: 'Brasil', label: 'Brasil' }]}
           />
 
-          <Select
+          <SearchSelect
             label="Estado"
             value={formData.state}
-            onChange={(e) => setFormData(p => ({ ...p, state: e.target.value, city: '' }))}
-            placeholder="Selecione o estado"
+            onChange={(v) => setFormData(p => ({ ...p, state: v, city: '' }))}
+            placeholder="Digite para buscar o estado..."
+            emptyMessage="Estado não encontrado"
             options={BR_STATES.map(s => ({ value: s.value, label: `${s.label} (${s.value})` }))}
           />
 
           {formData.state && (
             <div className="space-y-1.5">
-              <Select
+              <SearchSelect
                 label="Cidade"
                 value={CITIES_BY_STATE[formData.state]?.includes(formData.city) ? formData.city : '__outro__'}
-                onChange={(e) => {
-                  if (e.target.value === '__outro__') {
-                    setFormData(p => ({ ...p, city: '' }));
-                  } else {
-                    setFormData(p => ({ ...p, city: e.target.value }));
-                  }
-                }}
-                placeholder="Selecione a cidade"
+                onChange={(v) => setFormData(p => ({ ...p, city: v === '__outro__' ? '' : v }))}
+                placeholder="Digite para buscar a cidade..."
+                emptyMessage="Cidade não encontrada na base"
                 options={[
                   ...(CITIES_BY_STATE[formData.state] ?? []).map(c => ({ value: c, label: c })),
                   { value: '__outro__', label: 'Outra cidade...' },
@@ -416,7 +438,7 @@ export default function ClientWizard({ open, onClose, environment, onCreated }: 
         {step < steps.length - 1 ? (
           <Button
             onClick={() => setStep(s => s + 1)}
-            disabled={step === nameStepIndex && !formData.name.trim()}
+            disabled={(step === nameStepIndex && !formData.name.trim()) || (!environment && step === 0 && selectedEnvs.length === 0)}
           >
             Continuar
           </Button>
