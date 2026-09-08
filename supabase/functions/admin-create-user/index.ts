@@ -38,7 +38,7 @@ Deno.serve(async req => {
   const { data: userData } = await admin.auth.getUser(token);
   if (!userData?.user) return json(401, { error: 'Token invalido' });
 
-  const { data: caller } = await admin.from('users').select('role, is_guardian').eq('id', userData.user.id).maybeSingle();
+  const { data: caller } = await admin.from('users').select('role, is_guardian, full_name').eq('id', userData.user.id).maybeSingle();
   const guardian = !!caller?.is_guardian || caller?.role === 'oracullo_admin';
 
   const body = await req.json().catch(() => null);
@@ -201,6 +201,17 @@ Deno.serve(async req => {
       if (memError) membershipsWarningLinked = `Clientes: ${memError.message}`;
     }
 
+    // Auditoria
+    await admin.from('access_histories').insert({
+      user_id: existingId,
+      environment,
+      env_role: envRoleLinked,
+      action: 'granted',
+      workspace_id: role === 'client' ? clientWorkspaceId : null,
+      performed_by: userData.user.id,
+      performed_by_name: caller?.full_name ?? null,
+    });
+
     return json(200, {
       ok: true,
       linked: true,
@@ -294,7 +305,18 @@ Deno.serve(async req => {
     if (memError) membershipsWarning = `Clientes: ${memError.message}`;
   }
 
-  // 5. E-mail de boas-vindas (best-effort — nunca bloqueia a criacao)
+  // 5. Auditoria
+  await admin.from('access_histories').insert({
+    user_id: authUser.user.id,
+    environment,
+    env_role: envRole,
+    action: 'granted',
+    workspace_id: role === 'client' ? clientWorkspaceId : null,
+    performed_by: userData.user.id,
+    performed_by_name: caller?.full_name ?? null,
+  });
+
+  // 6. E-mail de boas-vindas (best-effort — nunca bloqueia a criacao)
   let emailSent = false;
   try {
     const mail = welcomeEmail({

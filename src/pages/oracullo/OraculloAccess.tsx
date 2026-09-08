@@ -141,27 +141,6 @@ export default function OraculloAccess() {
         });
         if (error) throw new Error(`${ENVIRONMENT_META[env].label}: ${error.message}`);
         if (data?.error) throw new Error(`${ENVIRONMENT_META[env].label}: ${data.error}`);
-
-        // Registra no histórico (granted / role_changed)
-        const previous = rows.find(r => r.user_id === form.user_id && r.environment === env);
-        const histAction: HistoryRow['action'] = previous
-          ? (previous.role === form.role ? 'granted' : 'role_changed')
-          : 'granted';
-        const wsName = form.role === 'client'
-          ? (cfg.wsMode === 'existing'
-              ? workspaces.find(w => w.id === cfg.workspace_id)?.name ?? null
-              : cfg.new_workspace_name.trim() || null)
-          : null;
-        await supabase.from('access_histories').insert({
-          user_id: form.user_id,
-          environment: env,
-          env_role: form.role,
-          action: histAction,
-          workspace_id: form.role === 'client' && cfg.wsMode === 'existing' ? cfg.workspace_id || null : null,
-          workspace_name: wsName,
-          performed_by: meId,
-          performed_by_name: users.find(u => u.id === meId)?.full_name ?? null,
-        });
         linkedEnvs.push(ENVIRONMENT_META[env].label);
       }
 
@@ -189,21 +168,6 @@ export default function OraculloAccess() {
       });
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(data.error);
-
-      // Registra no histórico (revoked) com as empresas daquele ambiente
-      const envCompanies = workspaces
-        .filter(w => w.environment === row.environment)
-        .filter(w => memberships.some(m => m.user_id === row.user_id && m.workspace_id === w.id))
-        .map(w => w.name);
-      await supabase.from('access_histories').insert({
-        user_id: row.user_id,
-        environment: row.environment,
-        env_role: row.role,
-        action: 'revoked',
-        workspace_name: envCompanies.length > 0 ? envCompanies.join(' · ') : null,
-        performed_by: meId,
-        performed_by_name: users.find(u => u.id === meId)?.full_name ?? null,
-      });
 
       toast.success(
         `Acesso revogado${data.removed_memberships > 0 ? ` (${data.removed_memberships} vínculo(s) removido(s))` : ''}.`,

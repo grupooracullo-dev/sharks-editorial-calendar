@@ -90,6 +90,15 @@ Deno.serve(async req => {
 
   try {
     if (op === 'unlink') {
+      // Papel antigo para auditoria (antes da remocao)
+      const { data: oldRoleRow } = await admin
+        .from('user_environments')
+        .select('role')
+        .eq('user_id', targetUserId)
+        .eq('environment', env)
+        .maybeSingle();
+      const oldRole = (oldRoleRow as { role?: string } | null)?.role ?? null;
+
       // 1. memberships em workspaces da org do ambiente
       const { data: orgWorkspaces } = await admin
         .from('workspaces')
@@ -117,6 +126,17 @@ Deno.serve(async req => {
         .eq('environment', env);
       if (envErr) throw new Error(`user_environments: ${envErr.message}`);
 
+      // 3. Auditoria
+      const { data: perf } = await admin.from('users').select('full_name').eq('id', userData.user.id).maybeSingle();
+      await admin.from('access_histories').insert({
+        user_id: targetUserId,
+        environment: env,
+        env_role: oldRole,
+        action: 'revoked',
+        performed_by: userData.user.id,
+        performed_by_name: (perf as { full_name?: string } | null)?.full_name ?? null,
+      });
+
       return json(200, {
         ok: true,
         op: 'unlink',
@@ -138,6 +158,15 @@ Deno.serve(async req => {
     if (envRole === 'client' && !workspaceId && !newWorkspaceName) {
       return json(400, { error: 'Cliente precisa de workspace: informe workspace_id ou new_workspace_name' });
     }
+
+    // Papel anterior (para auditoria: granted vs role_changed)
+    const { data: prevRoleRow } = await admin
+      .from('user_environments')
+      .select('role')
+      .eq('user_id', targetUserId)
+      .eq('environment', env)
+      .maybeSingle();
+    const prevRole = (prevRoleRow as { role?: string } | null)?.role ?? null;
 
     let finalWsId = workspaceId;
 
@@ -191,6 +220,24 @@ Deno.serve(async req => {
       if (memErr) throw new Error(`membership: ${memErr.message}`);
       membershipCreated = true;
     }
+
+    // Auditoria: concessao ou alteracao de papel
+    let wsName: string | null = null;
+    if (finalWsId) {
+      const { data: wsRow } = await admin.from('workspaces').select('name').eq('id', finalWsId).maybeSingle();
+      wsName = (wsRow as { name?: string } | null)?.name ?? null;
+    }
+    const { data: perf } = await admin.from('users').select('full_name').eq('id', userData.user.id).maybeSingle();
+    await admin.from('access_histories').insert({
+      user_id: targetUserId,
+      environment: env,
+      env_role: envRole,
+      action: prevRole === null ? 'granted' : (prevRole === envRole ? 'granted' : 'role_changed'),
+      workspace_id: finalWsId,
+      workspace_name: wsName,
+      performed_by: userData.user.id,
+      performed_by_name: (perf as { full_name?: string } | null)?.full_name ?? null,
+    });
 
     return json(200, {
       ok: true,

@@ -248,6 +248,7 @@ Deno.serve(async req => {
     user_id: userId,
     environment: env,
     role: role === 'sharks_team' ? 'team' as const : 'client' as const,
+    granted_by: userData.user.id,
   }));
 
   const { error: envErr } = await admin
@@ -255,6 +256,20 @@ Deno.serve(async req => {
     .upsert(envRows, { onConflict: 'user_id,environment' });
 
   if (envErr) console.warn('[approve] user_environments warning:', envErr.message);
+
+  // 7.1 Auditoria por ambiente concedido
+  {
+    const { data: perf } = await admin.from('users').select('full_name').eq('id', userData.user.id).maybeSingle();
+    const historyRows = environments.map(env => ({
+      user_id: userId,
+      environment: env,
+      env_role: role === 'sharks_team' ? 'team' as const : 'client' as const,
+      action: 'granted' as const,
+      performed_by: userData.user.id,
+      performed_by_name: (perf as { full_name?: string } | null)?.full_name ?? null,
+    }));
+    await admin.from('access_histories').insert(historyRows).catch(() => {});
+  }
 
   // 8. Team permissions
   if (role === 'sharks_team') {
