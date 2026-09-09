@@ -152,12 +152,12 @@ export const DAYS_OF_WEEK = [
 
 // Default Editorial Pillars
 export const DEFAULT_PILLARS = [
-  { name: 'Marca & Essência', percentage: 15 },
+  { name: 'Marca & Essência', percentage: 20 },
   { name: 'Autoridade & Educação', percentage: 25 },
   { name: 'Produto & Solução', percentage: 20 },
   { name: 'Prova & Confiança', percentage: 15 },
   { name: 'Relacionamento & Comunidade', percentage: 10 },
-  { name: 'Oferta & Conversão', percentage: 15 },
+  { name: 'Oferta & Conversão', percentage: 10 },
 ];
 
 // Date Relevance
