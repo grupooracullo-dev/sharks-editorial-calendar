@@ -7,12 +7,12 @@ export interface MarketingPillar {
 
 // 6 pilares do plano de marketing da Sharks Company
 export const MARKETING_PLAN_PILLARS: MarketingPillar[] = [
-  { name: 'Essência da Marca', description: 'Propósito, valores, missão e identidade da marca', color: '#0066FF', percentage: 18 },
-  { name: 'Geomarketing', description: 'Conteúdo com recorte regional e presença local', color: '#059669', percentage: 16 },
-  { name: 'Público Alvo e Persona', description: 'Conteúdo direcionado a personas e segmentos específicos', color: '#7C3AED', percentage: 17 },
-  { name: 'Posicionamento', description: 'Como a marca se diferencia na mente do consumidor', color: '#D97706', percentage: 17 },
-  { name: 'Branding', description: 'Construção e reforço contínuo da marca e percepção', color: '#EC4899', percentage: 16 },
-  { name: 'Objetivo de Marketing', description: 'Conteúdo alinhado a metas e objetivos comerciais', color: '#EF4444', percentage: 16 },
+  { name: 'Marca & Essência', description: 'Conteúdo sobre a marca, valores e cultura', color: '#0066FF', percentage: 20 },
+  { name: 'Autoridade & Educação', description: 'Conteúdo educativo e de autoridade', color: '#7C3AED', percentage: 25 },
+  { name: 'Produto & Solução', description: 'Apresentação de produtos e serviços', color: '#059669', percentage: 20 },
+  { name: 'Prova & Confiança', description: 'Depoimentos, cases e prova social', color: '#D97706', percentage: 15 },
+  { name: 'Relacionamento & Comunidade', description: 'Engajamento e comunidade', color: '#EC4899', percentage: 10 },
+  { name: 'Oferta & Conversão', description: 'Ofertas e conversão de vendas', color: '#EF4444', percentage: 10 },
 ];
 
 export function marketingPillarsMissing(existing: { name: string }[]): MarketingPillar[] {

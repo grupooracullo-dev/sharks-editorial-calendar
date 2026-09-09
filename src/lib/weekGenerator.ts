@@ -183,12 +183,12 @@ const GREETING_TEMPLATES: Record<TimeSlot, string[]> = {
 };
 
 const PILLAR_THEMES: Record<string, string[]> = {
-  'Essência da Marca': ['valores', 'propósito', 'identidade', 'cultura', 'missão'],
-  'Geomarketing': ['região', 'local', 'presença', 'comunidade', 'território'],
-  'Público Alvo e Persona': ['persona', 'público', 'segmento', 'perfil', 'audiência'],
-  'Posicionamento': ['diferencial', 'posição', 'valor', 'percepção', 'mindshare'],
-  'Branding': ['marca', 'reconhecimento', 'imagem', 'consistência', 'visual'],
-  'Objetivo de Marketing': ['meta', 'resultado', 'conversão', 'crescimento', 'performance'],
+  'Marca & Essência': ['valores', 'propósito', 'identidade', 'cultura', 'missão'],
+  'Autoridade & Educação': ['educação', 'autoridade', 'ensino', 'conhecimento', 'dicas'],
+  'Produto & Solução': ['produto', 'solução', 'serviço', 'demonstração', 'novidade'],
+  'Prova & Confiança': ['depoimento', 'case', 'prova social', 'avaliação', 'resultado'],
+  'Relacionamento & Comunidade': ['comunidade', 'engajamento', 'bastidores', 'interação', 'cliente'],
+  'Oferta & Conversão': ['oferta', 'promoção', 'conversão', 'vendas', 'lançamento'],
 };
 
 function generateContextualTitle(
