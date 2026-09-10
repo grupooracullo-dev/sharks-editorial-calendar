@@ -45,10 +45,13 @@ export function useOverdueSweep(enabled: boolean): void {
       const fresh = mine.filter(a => seen[a.id] !== today);
 
       for (const a of fresh) {
+        // dedupe_key no banco: 1 notificação por ação por dia, à prova de
+        // dispositivo/sessão (o localStorage vira apenas atalho local)
         addNotification(
           'Ação atrasada',
           `${a.title} — a data passou (${formatDate(a.action_date)}) e ainda não foi concluída.`,
           'action_overdue',
+          `action_overdue:${a.id}:${today}`,
         );
         seen[a.id] = today;
       }

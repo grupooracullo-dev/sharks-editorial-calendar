@@ -4,20 +4,21 @@ import { supabase } from '@/lib/supabase';
 import { registerRealtimeReset } from '@/lib/realtimeCleanup';
 import { isTypeSuppressed, subscribeNotifPrefs } from '@/lib/notificationPrefs';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 // ==========================================
 // NOTIFICATIONS — DB-backed + realtime
 // - Carrega as notificações do usuário (RLS = só as suas)
 // - Canal realtime entrega INSERT/UPDATE/DELETE na hora
-// - markAsRead / markAllAsRead / clearAll persistem
+// - markAsRead / markAllAsRead / clearAll persistem (com erro visível)
 // - Preferências (chat/atrasadas/sync) filtram os tipos opcionais
-// - addNotification grava no banco (sweep de atrasadas etc.)
+// - addNotification grava no banco com dedupe opcional (dedupe_key)
 // ==========================================
 
 interface NotificationContextType {
   notifications: Notification[];
   unreadCount: number;
-  addNotification: (title: string, message: string, type: NotificationType) => void;
+  addNotification: (title: string, message: string, type: NotificationType, dedupeKey?: string) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearAll: () => void;
@@ -33,6 +34,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [, setPrefsVersion] = useState(0);
   const uid = user?.id ?? null;
 
+  // Recarrega do banco (fonte da verdade) — usado após falhas também
+  const refetch = useCallback(async () => {
+    if (!uid) return;
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(PAGE_SIZE);
+    if (data) setNotifications(data as unknown as Notification[]);
+  }, [uid]);
+
   // Carrega ao autenticar (e recarrega no login de outro usuário)
   useEffect(() => {
     if (!uid) {
@@ -40,18 +52,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       return;
     }
     let active = true;
-    supabase
-      .from('notifications')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(PAGE_SIZE)
-      .then(({ data }) => {
-        if (active && data) setNotifications(data as unknown as Notification[]);
-      });
+    refetch().then(() => { if (active) { /* ok */ } });
     return () => {
       active = false;
     };
-  }, [uid]);
+  }, [uid, refetch]);
 
   // Realtime: INSERT/UPDATE/DELETE nas próprias notificações
   useEffect(() => {
@@ -96,20 +101,22 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const unreadCount = visible.filter(n => !n.is_read).length;
 
   const addNotification = useCallback(
-    (title: string, message: string, type: NotificationType) => {
+    (title: string, message: string, type: NotificationType, dedupeKey?: string) => {
       const insert = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        const row = { user_id: user.id, title, message, type, is_read: false };
+        const row = { user_id: user.id, title, message, type, is_read: false, ...(dedupeKey ? { dedupe_key: dedupeKey } : {}) };
+        // Com dedupe_key: duplicata é ignorada silenciosamente (índice único)
         const { data, error } = await supabase
           .from('notifications')
-          .insert(row)
+          .upsert(row, dedupeKey ? { onConflict: 'user_id,dedupe_key', ignoreDuplicates: true } : {})
           .select('*')
-          .single();
+          .maybeSingle();
         if (!error && data) {
           const saved = data as unknown as Notification;
           setNotifications(prev => (prev.some(n => n.id === saved.id) ? prev : [saved, ...prev]));
         }
+        if (error) console.error('[notifications] insert:', error.message);
       };
       insert();
     },
@@ -117,32 +124,51 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   );
 
   const markAsRead = useCallback(
-    (id: string) => {
+    async (id: string) => {
       setNotifications(prev => prev.map(n => (n.id === id ? { ...n, is_read: true } : n)));
       if (uid) {
-        supabase.from('notifications').update({ is_read: true }).eq('id', id).eq('user_id', uid);
+        const { error } = await supabase
+          .from('notifications')
+          .update({ is_read: true })
+          .eq('id', id)
+          .eq('user_id', uid);
+        if (error) {
+          console.error('[notifications] markAsRead:', error.message);
+          toast.error('Não foi possível marcar a notificação como lida');
+          await refetch();
+        }
       }
     },
-    [uid]
+    [uid, refetch]
   );
 
-  const markAllAsRead = useCallback(() => {
+  const markAllAsRead = useCallback(async () => {
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     if (uid) {
-      supabase
+      const { error } = await supabase
         .from('notifications')
         .update({ is_read: true })
         .eq('user_id', uid)
         .eq('is_read', false);
+      if (error) {
+        console.error('[notifications] markAllAsRead:', error.message);
+        toast.error('Não foi possível marcar todas como lidas');
+        await refetch();
+      }
     }
-  }, [uid]);
+  }, [uid, refetch]);
 
-  const clearAll = useCallback(() => {
+  const clearAll = useCallback(async () => {
     setNotifications([]);
     if (uid) {
-      supabase.from('notifications').delete().eq('user_id', uid);
+      const { error } = await supabase.from('notifications').delete().eq('user_id', uid);
+      if (error) {
+        console.error('[notifications] clearAll:', error.message);
+        toast.error('Não foi possível limpar as notificações');
+        await refetch();
+      }
     }
-  }, [uid]);
+  }, [uid, refetch]);
 
   return (
     <NotificationContext.Provider
