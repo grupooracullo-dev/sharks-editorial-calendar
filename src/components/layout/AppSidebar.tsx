@@ -151,6 +151,7 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
   const baseItems =
     env === 'estrategos' ? estrategosNavItems.filter(i => !i.adminOnly || isEstrategosAdmin)
     : env === 'oracullo' ? oraculloNavItems
+    : env === 'client' ? clientNavItems
     : isSharks ? sharksNavItems.filter(i => !i.adminOnly || isAdmin)
     : clientNavItems;
 
@@ -280,7 +281,7 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
               {env === 'estrategos' || !isSharks ? currentWorkspace.name : `Workspace: ${currentWorkspace.name}`}
             </p>
           )}
-          {!collapsed && !currentWorkspace && (isSharks || env === 'estrategos') && (
+          {!collapsed && !currentWorkspace && ((isSharks && env !== 'client') || env === 'estrategos') && (
             <p className="mt-2 text-xs text-gray-500">Todos os clientes</p>
           )}
         </div>

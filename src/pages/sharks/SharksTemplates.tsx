@@ -102,7 +102,8 @@ export default function SharksTemplates() {
         return;
       }
 
-      toast.success(`Modelo "${template.name}" aplicado! ${result.count} ações criadas como rascunho.`);
+      if (result.warning) toast.warning(result.warning);
+      else toast.success(`Modelo "${template.name}" aplicado! ${result.count} ações criadas como rascunho.`);
       setPreviewTemplate(null);
     } finally {
       setApplying(false);

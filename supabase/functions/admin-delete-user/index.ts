@@ -1,4 +1,5 @@
 import { serviceClient, corsHeaders } from '../_shared/google.ts';
+import { canDeleteUser } from '../_shared/deleteAuthorization.ts';
 
 // Per-request CORS (updated at handler start)
 let CORS: Record<string, string> = {};
@@ -23,8 +24,7 @@ Deno.serve(async req => {
   if (!userData?.user) return json(401, { error: 'Token invalido' });
 
   const { data: caller } = await admin.from('users').select('role, is_guardian').eq('id', userData.user.id).maybeSingle();
-  const isStaff = !!caller?.is_guardian || caller?.role === 'oracullo_admin' || caller?.role === 'admin_sharks';
-  if (!isStaff) {
+  if (!caller) {
     return json(403, { error: 'Apenas administradores podem remover usuarios' });
   }
 
@@ -36,6 +36,18 @@ Deno.serve(async req => {
   // Prevent self-deletion
   if (user_id === userData.user.id) {
     return json(400, { error: 'Voce nao pode remover seu proprio usuario' });
+  }
+
+  const [targetResult, callerAccess, targetAccess] = await Promise.all([
+    admin.from('users').select('role, is_guardian').eq('id', user_id).maybeSingle(),
+    admin.from('user_environments').select('environment, role').eq('user_id', userData.user.id),
+    admin.from('user_environments').select('environment, role').eq('user_id', user_id),
+  ]);
+  if (targetResult.error || callerAccess.error || targetAccess.error) {
+    return json(500, { error: 'Nao foi possivel verificar as permissoes de exclusao' });
+  }
+  if (!targetResult.data || !canDeleteUser(caller, targetResult.data, callerAccess.data ?? [], targetAccess.data ?? [])) {
+    return json(403, { error: 'Sem permissao para excluir esta conta. Contas compartilhadas exigem administracao global; guardioes sao protegidos.' });
   }
 
   // Delete auth user (FK cascades to users, team_member_access, memberships)
