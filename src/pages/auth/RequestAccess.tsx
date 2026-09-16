@@ -52,18 +52,12 @@ export default function RequestAccess({ authUser = null, onSubmitted }: RequestA
   );
 
   useEffect(() => {
-    // Carrega workspaces ativos (RLS) + mapa de ambientes (RPC)
+    // Empresas ativas via RPC seguro (funciona para visitantes não logados)
     (async () => {
-      const [wsRes, envRes] = await Promise.all([
-        supabase.from('workspaces').select('id, name').eq('is_active', true).order('name'),
-        supabase.rpc('ws_env_map'),
-      ]);
-      const envMap = new Map<string, string>(
-        ((envRes.data ?? []) as Array<{ id: string; environment: string }>).map(r => [r.id, r.environment]),
-      );
-      const rows = ((wsRes.data ?? []) as Workspace[]).map(w => ({
+      const { data } = await supabase.rpc('public_workspaces_list');
+      const rows = ((data ?? []) as Workspace[]).map(w => ({
         ...w,
-        environment: envMap.get(w.id) ?? 'sharks_company',
+        environment: undefined,
       }));
       setAllWorkspaces(rows);
       setLoading(false);
