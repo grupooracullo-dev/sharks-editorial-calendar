@@ -127,9 +127,11 @@ export default function SharksTeam() {
         return {
           ...u,
           permissions: (permsRes.data as unknown as Permission[]) || [],
-          workspaces: ((memRes.data as unknown as { workspace: Workspace | null }[]) || [])
-            .map(m => m.workspace)
-            .filter((ws): ws is Workspace => !!ws),
+        // Vínculos do membro — somente workspaces do ambiente Sharks
+        // (assignments cross-env quebravam o admin-update-user com 400)
+        workspaces: ((memRes.data as unknown as { workspace: Workspace | null }[]) || [])
+          .map(m => m.workspace)
+          .filter((ws): ws is Workspace => !!ws && sharksIds.has(ws.id)),
         };
       })
     );
