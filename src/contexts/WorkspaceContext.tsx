@@ -79,6 +79,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     await loadWorkspaces();
   };
 
+  // Realtime: novo cliente, edição, ativação ou mudança de ambiente
+  // atualizam o seletor na hora (sem precisar de F5)
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel('workspaces-context')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'workspaces' },
+        () => { loadWorkspaces(); },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, loadWorkspaces]);
+
   const workspacesByEnv = (env: EnvironmentType) => workspaces.filter(w => w.environment === env);
 
   return (
