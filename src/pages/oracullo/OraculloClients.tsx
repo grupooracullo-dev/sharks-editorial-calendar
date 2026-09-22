@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Card from '@/components/ui/Card';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
@@ -8,11 +8,13 @@ import WorkspaceLogo from '@/components/ui/WorkspaceLogo';
 import Badge from '@/components/ui/Badge';
 import ClientWizard from '@/components/clients/ClientWizard';
 import ClientEditModal, { type ClientEditTarget } from '@/components/clients/ClientEditModal';
-import { fetchAllClients, deactivateClient, updateClient, type ClientWithOrg } from '@/lib/clientFactory';
-import { ENVIRONMENT_META, type EnvironmentType } from '@/types';
+import { fetchAllClients, deactivateClient, createFullClients, updateClient, type ClientWithOrg } from '@/lib/clientFactory';
+import { ENVIRONMENT_META, type EnvironmentType, type FormatFrequency } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { defaultFormatFrequency } from '@/components/editorial/FormatFrequencyStepper';
 import { toast } from 'sonner';
-import { Plus, Building2, MapPin, Loader2, Pencil, Trash2, ArrowRightLeft, UserPlus, ShieldCheck } from 'lucide-react';
+import { Plus, Building2, MapPin, Loader2, Pencil, Trash2, ArrowRightLeft, UserPlus, ShieldCheck, Layers, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/utils';
 
 const ENVS: EnvironmentType[] = ['sharks_company', 'estrategos'];
@@ -30,6 +32,7 @@ interface ClientGroup {
   segment: string | null;
   city: string | null;
   state: string | null;
+  country: string;
   since: string;
   envs: EnvironmentType[];
   wss: ClientWithOrg[];
@@ -65,10 +68,10 @@ export default function OraculloClients() {
   const [deleteConfirm, setDeleteConfirm] = useState<ClientGroup | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Mover ambiente (empresa single-env)
-  const [moveTarget, setMoveTarget] = useState<ClientGroup | null>(null);
-  const [moveTo, setMoveTo] = useState<EnvironmentType>('estrategos');
-  const [moving, setMoving] = useState(false);
+  // Ambientes do cliente (seleção na edição)
+  const [envsTarget, setEnvsTarget] = useState<ClientGroup | null>(null);
+  const [pendingEnvs, setPendingEnvs] = useState<EnvironmentType[]>([]);
+  const [applyingEnvs, setApplyingEnvs] = useState(false);
 
   // Criar acesso do cliente
   const [accessTarget, setAccessTarget] = useState<ClientGroup | null>(null);
@@ -99,7 +102,20 @@ export default function OraculloClients() {
         const key = normKey(c.name);
         let g = groupMap.get(key);
         if (!g) {
-          g = { key, name: c.name, logo: c.logo_url, segment: c.segment, city: c.city, state: c.state, since: c.created_at, envs: [], wss: [], primary: c, clientUser: wsUser.get(c.id) ?? null };
+          g = {
+            key,
+            name: c.name,
+            logo: c.logo_url,
+            segment: c.segment,
+            city: c.city,
+            state: c.state,
+            country: c.country ?? 'Brasil',
+            since: c.created_at,
+            envs: [],
+            wss: [],
+            primary: c,
+            clientUser: null,
+          };
           groupMap.set(key, g);
         }
         g.wss.push(c);
@@ -107,7 +123,8 @@ export default function OraculloClients() {
         if (!g.envs.includes(env)) g.envs.push(env);
         if (!g.logo && c.logo_url) g.logo = c.logo_url;
         if (c.created_at < g.since) g.since = c.created_at;
-        if (!g.clientUser && wsUser.has(c.id)) g.clientUser = wsUser.get(c.id) ?? null;
+        const cu = wsUser.get(c.id);
+        if (cu && !g.clientUser) g.clientUser = cu;
       }
       setGroups([...groupMap.values()].sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
@@ -127,10 +144,6 @@ export default function OraculloClients() {
     return () => { supabase.removeChannel(channel); };
   }, [load]);
 
-  const groupEnvs = (g: ClientGroup): EnvironmentType[] => g.envs;
-
-  const envCount = (env: EnvironmentType) => groups.filter(g => g.envs.includes(env)).length;
-
   const handleDelete = async () => {
     if (!deleteConfirm || deleting) return;
     setDeleting(true);
@@ -146,31 +159,95 @@ export default function OraculloClients() {
     }
   };
 
-  const openMove = (g: ClientGroup) => {
-    setMoveTarget(g);
-    const envsDoGrupo = g.envs;
-    setMoveTo(ENVS.find(e => !envsDoGrupo.includes(e)) ?? 'estrategos');
+  /* ─── Ambientes do cliente (seleção na edição) ─── */
+  const openEnvs = (g: ClientGroup) => {
+    setEnvsTarget(g);
+    setPendingEnvs([...g.envs]);
   };
 
-  const handleMove = async () => {
-    if (!moveTarget || moving) return;
-    setMoving(true);
+  const toggleEnv = (env: EnvironmentType) => {
+    setPendingEnvs(prev => (prev.includes(env) ? prev.filter(e => e !== env) : [...prev, env]));
+  };
+
+  const applyEnvChanges = async () => {
+    if (!envsTarget || applyingEnvs) return;
+    const g = envsTarget;
+    const toAdd = pendingEnvs.filter(e => !g.envs.includes(e));
+    const toRemove = g.envs.filter(e => !pendingEnvs.includes(e));
+    if (toAdd.length === 0 && toRemove.length === 0) {
+      setEnvsTarget(null);
+      return;
+    }
+    setApplyingEnvs(true);
     try {
-      const { data, error } = await supabase.functions.invoke('admin-move-client-env', {
-        body: { workspace_id: moveTarget.primary.id, target_environment: moveTo },
-      });
-      if (error) throw new Error(await functionErrorMessage(error));
-      if (data?.error) throw new Error(data.error);
-      toast.success(`"${moveTarget.name}" movido para ${ENVIRONMENT_META[moveTo as EnvironmentType].label} — ${data?.counts?.actions ?? 0} ações, ${data?.counts?.campaigns ?? 0} campanhas preservadas.`);
-      setMoveTarget(null);
+      // ─── INCLUIR ambiente ───
+      for (const env of toAdd) {
+        const { data: org } = await supabase
+          .from('organizations')
+          .select('id')
+          .eq('environment', env)
+          .maybeSingle();
+        if (!org) throw new Error(`Organização ${env} não encontrada`);
+
+        // 1. Reativa workspace inativo da mesma empresa (dados preservados)
+        const { data: cands } = await supabase
+          .from('workspaces')
+          .select('id, name, is_active')
+          .eq('organization_id', org.id);
+        const match = (cands ?? []).find(w => normKey(w.name ?? '') === normKey(g.name));
+        if (match) {
+          if (!match.is_active) {
+            const { error } = await supabase.from('workspaces').update({ is_active: true }).eq('id', match.id);
+            if (error) throw new Error(error.message);
+          }
+          continue;
+        }
+
+        // 2. Cria o espelho (workspace + pilares + perfil + datas do cadastro principal)
+        const { data: prof } = await supabase
+          .from('editorial_profiles')
+          .select('format_frequency')
+          .eq('workspace_id', g.primary.id)
+          .maybeSingle();
+        const { data: dates } = await supabase
+          .from('strategic_dates')
+          .select('title, date, locality, category, relevance, description, is_recurring')
+          .eq('workspace_id', g.primary.id);
+        await createFullClients([env], {
+          name: g.name,
+          segment: g.segment,
+          city: g.city,
+          state: g.state,
+          country: g.country || 'Brasil',
+          logo_url: g.logo,
+          format_frequency: ((prof as { format_frequency?: FormatFrequency } | null)?.format_frequency ?? defaultFormatFrequency()) as FormatFrequency,
+          selectedDates: (dates ?? []) as unknown as import('@/data/brDates').StrategicDateDraft[],
+        });
+      }
+
+      // ─── DESATIVAR ambiente (mantém dados, reversível) ───
+      for (const env of toRemove) {
+        for (const w of g.wss.filter(w => (w.organization?.environment ?? 'sharks_company') === env)) {
+          await deactivateClient(w.id);
+        }
+      }
+
+      const addedLabels = toAdd.map(e => ENVIRONMENT_META[e].short);
+      const removedLabels = toRemove.map(e => ENVIRONMENT_META[e].short);
+      const parts: string[] = [];
+      if (toAdd.length > 0) parts.push(`incluído em ${addedLabels.join(' + ')}`);
+      if (toRemove.length > 0) parts.push(`removido de ${removedLabels.join(' + ')}`);
+      toast.success(`"${g.name}": ${parts.join('; ')}.`);
+      setEnvsTarget(null);
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Erro ao mover cliente');
+      toast.error(err instanceof Error ? err.message : 'Erro ao atualizar ambientes');
     } finally {
-      setMoving(false);
+      setApplyingEnvs(false);
     }
   };
 
+  /* ─── Criar acesso do cliente ─── */
   const openCreateAccess = (g: ClientGroup) => {
     setAccessTarget(g);
     setAccessForm({ full_name: g.name, email: '', password: '' });
@@ -184,7 +261,6 @@ export default function OraculloClients() {
     }
     setCreatingAccess(true);
     try {
-      // Vincula o usuário a TODOS os workspaces da empresa (1º cria, demais vinculam)
       let linked = false;
       let emailSent = false;
       for (const w of accessTarget.wss) {
@@ -205,9 +281,7 @@ export default function OraculloClients() {
         if (data?.email_sent) emailSent = true;
       }
       toast.success(
-        linked
-          ? `Acesso do cliente "${accessTarget.name}" criado nos ambientes da empresa!${emailSent ? ' E-mail de boas-vindas enviado.' : ''}`
-          : 'Acesso criado.',
+        `Acesso do cliente "${accessTarget.name}" criado nos ambientes da empresa!${emailSent ? ' E-mail de boas-vindas enviado.' : ''}`,
       );
       setAccessTarget(null);
       await load();
@@ -217,6 +291,8 @@ export default function OraculloClients() {
       setCreatingAccess(false);
     }
   };
+
+  const envCount = (env: EnvironmentType) => groups.filter(g => g.envs.includes(env)).length;
 
   return (
     <div className="space-y-6">
@@ -259,78 +335,73 @@ export default function OraculloClients() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {groups.map(g => {
-            const envsDoGrupo = g.envs;
-            return (
-              <Card key={g.key} className="relative group">
-                <div className="flex items-start gap-3">
-                  <WorkspaceLogo name={g.name} logoUrl={g.logo} size="lg" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-gray-900 truncate">{g.name}</h3>
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {g.envs.map(env => (
-                        <Badge key={env} variant={env === 'sharks_company' ? 'info' : 'success'} size="sm">
-                          {ENVIRONMENT_META[env].emoji} {ENVIRONMENT_META[env].short}
-                        </Badge>
-                      ))}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">{g.segment ?? 'Gestão'}</p>
-                    <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
-                      <MapPin className="w-3 h-3" />
-                      {g.city || 'Sem cidade'}, {g.state || '--'}
-                    </p>
+          {groups.map(g => (
+            <Card key={g.key} className="relative group">
+              <div className="flex items-start gap-3">
+                <WorkspaceLogo name={g.name} logoUrl={g.logo} size="lg" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-gray-900 truncate">{g.name}</h3>
                   </div>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {g.envs.map(env => (
+                      <Badge key={env} variant={env === 'sharks_company' ? 'info' : 'success'} size="sm">
+                        {ENVIRONMENT_META[env].emoji} {ENVIRONMENT_META[env].short}
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">{g.segment ?? 'Gestão'}</p>
+                  <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
+                    <MapPin className="w-3 h-3" />
+                    {g.city || 'Sem cidade'}, {g.state || '--'}
+                  </p>
                 </div>
+              </div>
 
-                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-                  <span className="text-[11px] text-gray-400">Desde {formatDate(g.since)}</span>
-                  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
-                    {!g.clientUser && (
-                      <button
-                        onClick={() => openCreateAccess(g)}
-                        className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-colors"
-                        title="Criar acesso do cliente (usuário + vínculo às empresas)"
-                      >
-                        <UserPlus className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                    {g.envs.length < ENVS.length && (
-                      <button
-                        onClick={() => openMove(g)}
-                        className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-primary-600 hover:border-primary-200 hover:bg-primary-50 transition-colors"
-                        title="Mover para o outro ambiente"
-                      >
-                        <ArrowRightLeft className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+              <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                <span className="text-[11px] text-gray-400">Desde {formatDate(g.since)}</span>
+                <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
+                  {!g.clientUser && (
                     <button
-                      onClick={() => setEditing({
-                        id: g.primary.id,
-                        name: g.name,
-                        segment: g.segment,
-                        city: g.city,
-                        state: g.state,
-                        logo_url: g.logo,
-                      })}
-                      className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-primary-600 hover:border-primary-200 hover:bg-primary-50 transition-colors"
-                      title="Editar"
+                      onClick={() => openCreateAccess(g)}
+                      className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-colors"
+                      title="Criar acesso do cliente (usuário + vínculo às empresas)"
                     >
-                      <Pencil className="w-3.5 h-3.5" />
+                      <UserPlus className="w-3.5 h-3.5" />
                     </button>
-                    <button
-                      onClick={() => setDeleteConfirm(g)}
-                      className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
-                      title="Excluir"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  )}
+                  <button
+                    onClick={() => openEnvs(g)}
+                    className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-primary-600 hover:border-primary-200 hover:bg-primary-50 transition-colors"
+                    title="Selecionar ambientes"
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setEditing({
+                      id: g.primary.id,
+                      name: g.name,
+                      segment: g.segment,
+                      city: g.city,
+                      state: g.state,
+                      logo_url: g.logo,
+                    })}
+                    className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-primary-600 hover:border-primary-200 hover:bg-primary-50 transition-colors"
+                    title="Editar"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirm(g)}
+                    className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-              </Card>
-            );
-          })}
+              </div>
+            </Card>
+          ))}
         </div>
       )}
 
@@ -366,60 +437,59 @@ export default function OraculloClients() {
         </div>
       </Modal>
 
-      {/* Mover ambiente */}
-      <Modal isOpen={!!moveTarget} onClose={() => setMoveTarget(null)} title="Mover cliente de ambiente" size="sm">
-        {moveTarget && (
+      {/* Selecionar ambientes do cliente */}
+      <Modal isOpen={!!envsTarget} onClose={() => setEnvsTarget(null)} title="Ambientes do cliente" size="sm">
+        {envsTarget && (
           <div className="space-y-4">
             <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-3">
-              <WorkspaceLogo name={moveTarget.name} logoUrl={moveTarget.logo} size="md" />
+              <WorkspaceLogo name={envsTarget.name} logoUrl={envsTarget.logo} size="md" />
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">{moveTarget.name}</p>
-                <p className="text-xs text-gray-500">
-                  Atual: {moveTarget.envs.map(e => ENVIRONMENT_META[e].emoji + ' ' + ENVIRONMENT_META[e].label).join(', ')}
-                </p>
+                <p className="text-sm font-semibold text-gray-900 truncate">{envsTarget.name}</p>
+                <p className="text-xs text-gray-500">Selecione em quais ambientes esta empresa atua</p>
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Mover para</label>
-              <div className="grid grid-cols-2 gap-2">
-                {ENVS.map(env => {
-                  const meta = ENVIRONMENT_META[env];
-                  const active = moveTo === env;
-                  const isCurrent = moveTarget.envs.includes(env);
-                  return (
-                    <button
-                      key={env}
-                      type="button"
-                      disabled={isCurrent}
-                      onClick={() => setMoveTo(env)}
-                      className={`flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-all ${
-                        active && !isCurrent
-                          ? 'border-primary-500 bg-primary-50'
-                          : isCurrent
-                            ? 'border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed'
-                            : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
+            <div className="space-y-2">
+              {ENVS.map(env => {
+                const meta = ENVIRONMENT_META[env];
+                const selected = pendingEnvs.includes(env);
+                return (
+                  <button
+                    key={env}
+                    type="button"
+                    onClick={() => toggleEnv(env)}
+                    className={cn(
+                      'w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-colors',
+                      selected ? 'border-primary-500 bg-primary-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        'w-5 h-5 rounded flex items-center justify-center shrink-0 border-2',
+                        selected ? 'bg-primary-500 border-primary-500 text-white' : 'border-gray-300'
+                      )}
                     >
-                      <span className="text-xl leading-none">{meta.emoji}</span>
-                      <span className={`text-xs font-medium ${active && !isCurrent ? 'text-primary-700' : 'text-gray-700'}`}>{meta.short}</span>
-                      {isCurrent && <span className="text-[10px] text-gray-400">atual</span>}
-                    </button>
-                  );
-                })}
-              </div>
+                      {selected && <Check className="w-3.5 h-3.5" />}
+                    </div>
+                    <span className="text-xl leading-none">{meta.emoji}</span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-gray-900">{meta.label}</span>
+                      <span className="block text-[11px] text-gray-500">{meta.short}</span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             <div className="flex items-start gap-2 bg-blue-50 text-blue-700 text-xs px-3 py-2 rounded-lg">
               <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
               <p>
-                A empresa passa a pertencer ao ambiente selecionado. Ações, campanhas, datas e chat são preservados.
-                Movimentação válida apenas para guardião Oracullo.
+                Incluir cria o cadastro no ambiente (com pilares, perfil e datas da empresa).
+                Remover desativa a empresa naquele ambiente — os dados ficam preservados e a remoção é reversível.
               </p>
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setMoveTarget(null)}>Cancelar</Button>
-              <Button onClick={handleMove} loading={moving}>
-                <ArrowRightLeft className="w-4 h-4" />
-                Mover
+              <Button variant="ghost" onClick={() => setEnvsTarget(null)}>Cancelar</Button>
+              <Button onClick={applyEnvChanges} loading={applyingEnvs} disabled={pendingEnvs.length === 0}>
+                Salvar ambientes
               </Button>
             </div>
           </div>
