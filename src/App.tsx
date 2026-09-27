@@ -66,6 +66,8 @@ const SharksChat = lazyPage(() => import('@/pages/sharks/SharksChat'));
 const SharksIntegrations = lazyPage(() => import('@/pages/sharks/SharksIntegrations'));
 const SharksSettings = lazyPage(() => import('@/pages/sharks/SharksSettings'));
 const SharksTeam = lazyPage(() => import('@/pages/sharks/SharksTeam'));
+const SharksProducts = lazyPage(() => import('@/pages/sharks/SharksProducts'));
+const SharksPartners = lazyPage(() => import('@/pages/sharks/SharksPartners'));
 const SharksAccessRequests = lazyPage(() => import('@/pages/sharks/SharksAccessRequests'));
 
 const ClientDashboard = lazyPage(() => import('@/pages/client/ClientDashboard'));
@@ -189,6 +191,8 @@ function AppRoutes() {
         <Route path="/sharks/chat" element={<SharksLayout><SharksChat /></SharksLayout>} />
         <Route path="/sharks/integrations" element={<SharksLayout><SharksIntegrations /></SharksLayout>} />
         <Route path="/sharks/team" element={<SharksLayout><SharksTeam /></SharksLayout>} />
+        <Route path="/sharks/products" element={<SharksLayout><SharksProducts /></SharksLayout>} />
+        <Route path="/sharks/partners" element={<SharksLayout><SharksPartners /></SharksLayout>} />
         <Route path="/sharks/access-requests" element={<SharksLayout><SharksAccessRequests /></SharksLayout>} />
         <Route path="/sharks/settings" element={<SharksLayout><SharksSettings /></SharksLayout>} />
 

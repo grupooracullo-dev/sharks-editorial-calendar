@@ -178,6 +178,10 @@ export interface Action {
   workspace?: Workspace;
   /** Todos os responsáveis (N:N) — responsible_id é o principal (1º) */
   responsibles?: User[];
+  product_id?: string | null;
+  product_ref?: { id: string; name: string; image_url?: string | null } | null;
+  /** Parceiros vinculados (N:N) */
+  partners?: Array<{ id: string; name: string }>;
 }
 
 // Template
