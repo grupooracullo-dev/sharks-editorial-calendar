@@ -202,21 +202,15 @@ Deno.serve(async req => {
       .maybeSingle();
 
     if (existingProfile) {
-      return json(400, { error: 'Este e-mail ja possui conta completa no sistema.' });
+      // Conta já existe (ex.: aprovação anterior falhou depois de criar o
+      // usuário): RETOMA a aprovação em vez de bloquear — a função é
+      // idempotente nos passos seguintes (upserts).
+      console.warn('[approve] perfil ja existia — retomando aprovacao:', userId);
     }
 
-    const resolvedName = fullName
-      || (await admin.auth.admin.getUserById(userId)).data?.user?.user_metadata?.full_name
-      || reqRow.email;
-
-    const { error: profileErr } = await admin.from('users').insert({
-      id: userId,
-      email: reqRow.email,
-      full_name: resolvedName,
-      role,
-    });
-    if (profileErr) return json(500, { error: `Perfil: ${profileErr.message}` });
-  } else {
+    if (!existingProfile) {
+    const { error: profileErr } = await admin.from('users').insert({       id: userId,       email: reqRow.email,       full_name: resolvedName,       role,     });     if (profileErr) return json(500, { error: `Perfil: ${profileErr.message}` });
+    }
     authProvider = 'password';
     tempPassword = generateTempPassword();
 
@@ -273,6 +267,8 @@ Deno.serve(async req => {
 
   // 8. Team permissions
   if (role === 'sharks_team') {
+    // Idempotente: remove permissões anteriores antes de inserir (retomadas)
+    await admin.from('team_member_access').delete().eq('user_id', userId);
     const permsToInsert = permissions.map((p) => ({
       user_id: userId,
       permission: p.permission,

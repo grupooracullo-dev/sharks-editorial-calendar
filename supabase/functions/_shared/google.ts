@@ -371,10 +371,14 @@ export function buildEventBody(
   const action = row;
   const pillar = action.editorial_pillar as { name?: string } | null;
   const campaign = action.campaign as { name?: string; objective?: string } | null;
+    const partnerNames = ((action.action_partners ?? []) as Array<{ partner?: { name?: string } | null }>)
+      .map(ap => ap.partner?.name)
+      .filter((n): n is string => !!n);
 
   const lines: string[] = [];
   if (wsName) lines.push(`Cliente: ${wsName}`);
   if (action.channel) lines.push(`Canal: ${action.channel}`);
+    if (partnerNames.length > 0) lines.push(`Parceiro(s): ${partnerNames.join(', ')}`);
   const tipo = pretty(action.format) || pretty(action.action_type);
   if (tipo) lines.push(`Tipo/Formato: ${tipo}`);
   if (pillar?.name) lines.push(`Pilar: ${pillar.name}`);
@@ -509,7 +513,7 @@ export async function processWorkspace(
       .from('calendar_sync_queue')
       .select(
         'id, workspace_id, action_id, source, source_id, operation, attempts, google_event_id, integration_id, ' +
-        'action:actions(*, campaign:campaigns(name,objective), editorial_pillar:editorial_pillars(name))',
+        'action:actions(*, campaign:campaigns(name,objective), editorial_pillar:editorial_pillars(name), action_partners(partner:partners(name)))',
       )
       .eq('workspace_id', workspaceId)
       .eq('status', 'pending')
