@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 import { formatCalendarDate, addDays, startOfWeek, parseISO, format } from '@/lib/dateUtils';
 import { ACTION_TYPES, CONTENT_FORMATS, OBJECTIVES, FUNNEL_STAGES, ACTION_STATUSES, ACTION_TYPES_BY_ENV, FORM_SECTIONS_BY_ENV, DEFAULT_CHANNELS } from '@/lib/constants';
 import { toast } from 'sonner';
+import SearchSelect from '@/components/ui/SearchSelect';
 import { CalendarDays } from 'lucide-react';
 
 interface ActionFormProps {
@@ -56,6 +57,8 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
     funnel_stage: '' as string,
     audience: '',
     product: '',
+    product_id: '' as string | null,
+    partner_ids: [] as string[],
     theme: '',
     hook: '',
     main_message: '',
@@ -132,6 +135,8 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
         objective: (formData.objective || null) as Objective | null,
         funnel_stage: (formData.funnel_stage || null) as FunnelStage | null,
         audience: formData.audience || null,
+    product_id: formData.product_id || null,
+    partner_ids: formData.partner_ids,
         product: formData.product || null,
         theme: formData.theme || null,
         hook: formData.hook || null,
@@ -162,6 +167,24 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
   // Time de Produção para o seletor de responsáveis — admins + equipe,
   // independente do cliente selecionado (mesma lista da página Time)
   const [teamMembers, setTeamMembers] = useState<Array<{ id: string; full_name: string }>>([]);
+
+  // Catálogos do workspace: produtos e parceiros ativos
+  const [productOptions, setProductOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [partnerOptions, setPartnerOptions] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    if (!isOpen || !workspaceId) return;
+    let active = true;
+    (async () => {
+      const [pRes, ptRes] = await Promise.all([
+        supabase.from('products').select('id, name').eq('workspace_id', workspaceId).eq('status', 'active').order('name'),
+        supabase.from('partners').select('id, name').eq('workspace_id', workspaceId).eq('status', 'active').order('name'),
+      ]);
+      if (!active) return;
+      setProductOptions((pRes.data ?? []) as Array<{ id: string; name: string }>);
+      setPartnerOptions((ptRes.data ?? []) as Array<{ id: string; name: string }>);
+    })();
+    return () => { active = false; };
+  }, [isOpen, workspaceId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -216,6 +239,8 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
           cta: action.cta || '',
           status: action.status || 'draft',
           observations: action.observations || '',
+          product_id: action.product_id ?? '',
+          partner_ids: action.partners?.length ? action.partners.map(r => r.id) : (action.product_id ? [] : []),
           responsible_ids: action.responsibles?.length
             ? action.responsibles.map(r => r.id)
             : (action.responsible_id ? [action.responsible_id] : []),
@@ -244,6 +269,8 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
           cta: '',
           status: 'draft',
           observations: '',
+          product_id: '' as string | null,
+          partner_ids: [] as string[],
           responsible_ids: [] as string[],
           internal_deadline: '',
         });
@@ -440,17 +467,28 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
                 options={Object.entries(FUNNEL_STAGES).map(([v, l]) => ({ value: v, label: l }))}
               />
             </div>
+            <SearchSelect
+              label="Produto ou Serviço"
+              value={formData.product_id || ''}
+              onChange={(v) => {
+                const opt = productOptions.find(o => o.id === v);
+                setFormData(p => ({ ...p, product_id: v || null, product: opt?.name ?? '' }));
+              }}
+              placeholder="Selecione o produto..."
+              emptyMessage="Nenhum produto cadastrado — cadastre em Produtos"
+              options={[
+                { value: '', label: 'Sem produto' },
+                ...productOptions.map(p => ({ value: p.id, label: p.name })),
+                ...(formData.product && !productOptions.some(p => p.name === formData.product)
+                  ? [{ value: `__legacy__${formData.product}`, label: `${formData.product} (texto atual)` }]
+                  : []),
+              ]}
+            />
             <Input
               label="Público"
               value={formData.audience}
               onChange={(e) => handleChange('audience', e.target.value)}
               placeholder="Ex: Mulheres 25-40 anos"
-            />
-            <Input
-              label="Produto ou Serviço"
-              value={formData.product}
-              onChange={(e) => handleChange('product', e.target.value)}
-              placeholder="Ex: Kit Dia dos Pais"
             />
           </div>
         )}

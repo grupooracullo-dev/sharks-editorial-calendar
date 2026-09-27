@@ -76,7 +76,7 @@ export function subscribeToActions(listener: () => void): () => void {
   };
 }
 
-const SELECT_WITH_JOINS = 'id,workspace_id,campaign_id,editorial_pillar_id,responsible_id,title,description,action_date,action_time,action_type,format,channel,objective,funnel_stage,audience,product,theme,hook,main_message,copy_text,cta,internal_deadline,status,observations,reference_urls,sync_status,is_auto_generated,environment,created_by,created_at,updated_at, campaign:campaigns(id,workspace_id,name,objective,start_date,end_date,description,audience,product,priority,status,color,created_at,updated_at), editorial_pillar:editorial_pillars(id,workspace_id,name,description,color,percentage,sort_order,is_active,created_at), workspace:workspaces(name), responsible:users!actions_responsible_id_fkey(id, full_name, avatar_url), responsibles:action_responsibles(users(id, full_name, avatar_url))';
+const SELECT_WITH_JOINS = 'id,workspace_id,product_id,campaign_id,editorial_pillar_id,responsible_id,title,description,action_date,action_time,action_type,format,channel,objective,funnel_stage,audience,product,theme,hook,main_message,copy_text,cta,internal_deadline,status,observations,reference_urls,sync_status,is_auto_generated,environment,created_by,created_at,updated_at, campaign:campaigns(id,workspace_id,name,objective,start_date,end_date,description,audience,product,priority,status,color,created_at,updated_at), editorial_pillar:editorial_pillars(id,workspace_id,name,description,color,percentage,sort_order,is_active,created_at), workspace:workspaces(name), responsible:users!actions_responsible_id_fkey(id, full_name, avatar_url), responsibles:action_responsibles(users(id, full_name, avatar_url)), product_ref:products(id, name, image_url), action_partners(partner:partners(id, name))';
 
 export async function loadActions(workspaceId?: string | null, environment?: string | null): Promise<void> {
   currentScope = workspaceId ?? null;
@@ -206,6 +206,7 @@ export async function createAction(data: Partial<Action> & { responsible_ids?: s
     objective: data.objective || null,
     funnel_stage: data.funnel_stage || null,
     audience: data.audience || null,
+    product_id: data.product_id || null,
     product: data.product || null,
     theme: data.theme || null,
     hook: data.hook || null,
@@ -231,6 +232,16 @@ export async function createAction(data: Partial<Action> & { responsible_ids?: s
     return { ok: false, error: error?.message || 'Erro ao criar ação' };
   }
 
+  // Parceiros (N:N) — gravação direta
+  const partnerIds = (data as Partial<Action> & { partner_ids?: string[] }).partner_ids;
+  if (Array.isArray(partnerIds) && partnerIds.length > 0) {
+    await supabase.from('action_partners').insert(partnerIds.map(pid => ({ action_id: (inserted as { id: string }).id, partner_id: pid })));
+    const rf = await supabase.from('actions').select(SELECT_WITH_JOINS).eq('id', (inserted as { id: string }).id).single();
+    if (rf.data) {
+      Object.assign(inserted as object, rf.data as object);
+    }
+  }
+
   // Múltiplos responsáveis (N:N) — RPC após o insert
   const respIds = (data as Partial<Action> & { responsible_ids?: string[] }).responsible_ids;
   let finalAction = normalizeAction(inserted);
@@ -253,7 +264,7 @@ export async function updateAction(id: string, data: Partial<Action> & { respons
   const oldAction = getActionById(id);
 
   // responsible_ids não é coluna — vai para a RPC após o update
-  const { responsible_ids: respIdsRaw, ...updatePayload } = data as Partial<Action> & { responsible_ids?: string[] };
+  const { responsible_ids: respIdsRaw, partner_ids: partnerIdsRaw, ...updatePayload } = data as Partial<Action> & { responsible_ids?: string[]; partner_ids?: string[] };
 
   const { data: updated, error } = await supabase
     .from('actions')
@@ -276,6 +287,17 @@ export async function updateAction(id: string, data: Partial<Action> & { respons
     const refreshed = await syncResponsibles(id, respIdsRaw);
     if (refreshed) Object.assign(result, refreshed);
     else warning = "Ação atualizada, mas os responsáveis não foram confirmados. Reabra a ação para conferir a atribuição.";
+  }
+
+  // Parceiros (N:N) — gravação direta
+  if (Array.isArray(partnerIdsRaw)) {
+    await supabase.from('action_partners').delete().eq('action_id', id);
+    if (partnerIdsRaw.length > 0) {
+      const ins = await supabase.from('action_partners').insert(partnerIdsRaw.map(pid => ({ action_id: id, partner_id: pid })));
+      if (ins.error) console.error('[actions] partners error:', ins.error.message);
+    }
+    const rf = await supabase.from('actions').select(SELECT_WITH_JOINS).eq('id', id).single();
+    if (rf.data) Object.assign(result, rf.data as object);
   }
 
   if (
