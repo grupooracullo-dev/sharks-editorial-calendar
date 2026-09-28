@@ -47,3 +47,6 @@ supabase/.temp
 # local dev scripts (contain Supabase tokens)
 apply-*.ps1
 supabase/apply-*.ps1
+
+.vercel
+.env*
