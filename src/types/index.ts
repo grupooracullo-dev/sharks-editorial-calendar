@@ -180,6 +180,8 @@ export interface Action {
   responsibles?: User[];
   product_id?: string | null;
   product_ref?: { id: string; name: string; image_url?: string | null } | null;
+  /** Produtos vinculados (N:N) — product_id/product_ref ficam com o 1º (compat) */
+  products?: Array<{ id: string; name: string; image_url?: string | null }>;
   /** Parceiros vinculados (N:N) */
   partners?: Array<{ id: string; name: string }>;
 }

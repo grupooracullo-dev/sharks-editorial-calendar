@@ -4,7 +4,9 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import Button from '@/components/ui/Button';
-import type { Lead } from '@/hooks/useLeads';
+import ChipMultiSelect from '@/components/ui/ChipMultiSelect';
+import { useEnvProducts } from '@/hooks/useEnvProducts';
+import type { CrmEnvironment, Lead } from '@/hooks/useLeads';
 
 export interface LeadFormValues {
   name: string;
@@ -18,25 +20,30 @@ export interface LeadFormValues {
   expected_close_date: string;
   owner_id: string;
   notes: string;
+  product_ids: string[];
 }
 
 const EMPTY_FORM: LeadFormValues = {
   name: '', contact_name: '', contact_email: '', contact_phone: '',
   source: '', segment: '', value: '', monthly_value: '',
-  expected_close_date: '', owner_id: '', notes: '',
+  expected_close_date: '', owner_id: '', notes: '', product_ids: [],
 };
 
 interface LeadFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   lead: Lead | null;
+  /** Ambiente do catálogo (criação) — na edição prevalece o ambiente do lead */
+  environment: CrmEnvironment | null;
   owners: { value: string; label: string }[];
   submitting: boolean;
   onSubmit: (values: LeadFormValues) => Promise<void>;
 }
 
-export default function LeadFormModal({ isOpen, onClose, lead, owners, submitting, onSubmit }: LeadFormModalProps) {
+export default function LeadFormModal({ isOpen, onClose, lead, environment, owners, submitting, onSubmit }: LeadFormModalProps) {
   const [form, setForm] = useState<LeadFormValues>(EMPTY_FORM);
+  const catalogEnv = lead?.environment ?? environment;
+  const catalogProducts = useEnvProducts(catalogEnv);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -53,6 +60,7 @@ export default function LeadFormModal({ isOpen, onClose, lead, owners, submittin
           expected_close_date: lead.expected_close_date ?? '',
           owner_id: lead.owner_id ?? '',
           notes: lead.notes ?? '',
+          product_ids: (lead.products ?? []).map(x => x.product?.id).filter((v): v is string => !!v),
         }
       : EMPTY_FORM);
   }, [isOpen, lead]);
@@ -114,6 +122,16 @@ export default function LeadFormModal({ isOpen, onClose, lead, owners, submittin
           />
         </div>
         <Textarea label="Observações" value={form.notes} onChange={set('notes')} placeholder="Contexto do lead, próxima ação..." rows={3} />
+        {catalogEnv && (
+          <ChipMultiSelect
+            label="Produtos de interesse"
+            options={catalogProducts.map(p => ({ id: p.id, name: p.name }))}
+            values={form.product_ids}
+            onChange={(ids) => setForm(f => ({ ...f, product_ids: ids }))}
+            placeholder="Selecionar produtos do catálogo..."
+            emptyMessage="Nenhum produto cadastrado — cadastre na página Produtos"
+          />
+        )}
       </div>
 
       <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100">

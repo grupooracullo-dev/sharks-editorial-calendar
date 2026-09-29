@@ -76,7 +76,7 @@ export function subscribeToActions(listener: () => void): () => void {
   };
 }
 
-const SELECT_WITH_JOINS = 'id,workspace_id,product_id,campaign_id,editorial_pillar_id,responsible_id,title,description,action_date,action_time,action_type,format,channel,objective,funnel_stage,audience,product,theme,hook,main_message,copy_text,cta,internal_deadline,status,observations,reference_urls,sync_status,is_auto_generated,environment,created_by,created_at,updated_at, campaign:campaigns(id,workspace_id,name,objective,start_date,end_date,description,audience,product,priority,status,color,created_at,updated_at), editorial_pillar:editorial_pillars(id,workspace_id,name,description,color,percentage,sort_order,is_active,created_at), workspace:workspaces(name), responsible:users!actions_responsible_id_fkey(id, full_name, avatar_url), responsibles:action_responsibles(users(id, full_name, avatar_url)), product_ref:products(id, name, image_url), action_partners(partner:partners(id, name))';
+const SELECT_WITH_JOINS = 'id,workspace_id,product_id,campaign_id,editorial_pillar_id,responsible_id,title,description,action_date,action_time,action_type,format,channel,objective,funnel_stage,audience,product,theme,hook,main_message,copy_text,cta,internal_deadline,status,observations,reference_urls,sync_status,is_auto_generated,environment,created_by,created_at,updated_at, campaign:campaigns(id,workspace_id,name,objective,start_date,end_date,description,audience,product,priority,status,color,created_at,updated_at), editorial_pillar:editorial_pillars(id,workspace_id,name,description,color,percentage,sort_order,is_active,created_at), workspace:workspaces(name), responsible:users!actions_responsible_id_fkey(id, full_name, avatar_url), responsibles:action_responsibles(users(id, full_name, avatar_url)), product_ref:products(id, name, image_url), products:action_products(product:products(id, name, image_url)), action_partners(partner:partners(id, name))';
 
 export async function loadActions(workspaceId?: string | null, environment?: string | null): Promise<void> {
   currentScope = workspaceId ?? null;
@@ -189,7 +189,10 @@ async function syncResponsibles(actionId: string, userIds: string[]): Promise<Ac
   }
 }
 
-export async function createAction(data: Partial<Action> & { responsible_ids?: string[] }): Promise<ActionResult> {
+export async function createAction(data: Partial<Action> & { responsible_ids?: string[]; product_ids?: string[] }): Promise<ActionResult> {
+  const productIds = (data as Partial<Action> & { product_ids?: string[] }).product_ids;
+  // Compatibilidade: product_id fica com o 1º produto selecionado
+  const legacyProductId = data.product_id || (Array.isArray(productIds) ? productIds[0] ?? null : null);
   const payload = {
     workspace_id: data.workspace_id || '',
     environment: data.environment || 'sharks_company',
@@ -206,7 +209,7 @@ export async function createAction(data: Partial<Action> & { responsible_ids?: s
     objective: data.objective || null,
     funnel_stage: data.funnel_stage || null,
     audience: data.audience || null,
-    product_id: data.product_id || null,
+    product_id: legacyProductId,
     product: data.product || null,
     theme: data.theme || null,
     hook: data.hook || null,
@@ -236,6 +239,15 @@ export async function createAction(data: Partial<Action> & { responsible_ids?: s
   const partnerIds = (data as Partial<Action> & { partner_ids?: string[] }).partner_ids;
   if (Array.isArray(partnerIds) && partnerIds.length > 0) {
     await supabase.from('action_partners').insert(partnerIds.map(pid => ({ action_id: (inserted as { id: string }).id, partner_id: pid })));
+  }
+
+  // Produtos (N:N) — gravação direta
+  if (Array.isArray(productIds) && productIds.length > 0) {
+    const pr = await supabase.from('action_products').insert(productIds.map(pid => ({ action_id: (inserted as { id: string }).id, product_id: pid })));
+    if (pr.error) console.error('[actions] action_products error:', pr.error.message);
+  }
+
+  if ((Array.isArray(partnerIds) && partnerIds.length > 0) || (Array.isArray(productIds) && productIds.length > 0)) {
     const rf = await supabase.from('actions').select(SELECT_WITH_JOINS).eq('id', (inserted as { id: string }).id).single();
     if (rf.data) {
       Object.assign(inserted as object, rf.data as object);
@@ -260,11 +272,17 @@ export async function createAction(data: Partial<Action> & { responsible_ids?: s
   return { ok: true, data: finalAction, warning };
 }
 
-export async function updateAction(id: string, data: Partial<Action> & { responsible_ids?: string[] }): Promise<ActionResult> {
+export async function updateAction(id: string, data: Partial<Action> & { responsible_ids?: string[]; product_ids?: string[] }): Promise<ActionResult> {
   const oldAction = getActionById(id);
 
   // responsible_ids não é coluna — vai para a RPC após o update
-  const { responsible_ids: respIdsRaw, partner_ids: partnerIdsRaw, ...updatePayload } = data as Partial<Action> & { responsible_ids?: string[]; partner_ids?: string[] };
+  // product_ids/partner_ids não são colunas — vão para as junções após o update
+  const { responsible_ids: respIdsRaw, partner_ids: partnerIdsRaw, product_ids: productIdsRaw, ...updatePayload } = data as Partial<Action> & { responsible_ids?: string[]; partner_ids?: string[]; product_ids?: string[] };
+
+  // Compatibilidade: product_id fica com o 1º produto selecionado
+  if (Array.isArray(productIdsRaw)) {
+    (updatePayload as { product_id?: string | null }).product_id = productIdsRaw[0] ?? null;
+  }
 
   const { data: updated, error } = await supabase
     .from('actions')
@@ -296,6 +314,19 @@ export async function updateAction(id: string, data: Partial<Action> & { respons
       const ins = await supabase.from('action_partners').insert(partnerIdsRaw.map(pid => ({ action_id: id, partner_id: pid })));
       if (ins.error) console.error('[actions] partners error:', ins.error.message);
     }
+  }
+
+  // Produtos (N:N) — gravação direta
+  if (Array.isArray(productIdsRaw)) {
+    const del = await supabase.from('action_products').delete().eq('action_id', id);
+    if (del.error) console.error('[actions] action_products delete error:', del.error.message);
+    if (productIdsRaw.length > 0) {
+      const ins = await supabase.from('action_products').insert(productIdsRaw.map(pid => ({ action_id: id, product_id: pid })));
+      if (ins.error) console.error('[actions] action_products error:', ins.error.message);
+    }
+  }
+
+  if (Array.isArray(partnerIdsRaw) || Array.isArray(productIdsRaw)) {
     const rf = await supabase.from('actions').select(SELECT_WITH_JOINS).eq('id', id).single();
     if (rf.data) Object.assign(result, rf.data as object);
   }
@@ -332,10 +363,16 @@ export async function deleteAction(id: string): Promise<{ ok: boolean; error?: s
 }
 
 export async function bulkCreateActions(rows: Partial<Action>[]): Promise<{ ok: boolean; count: number; warning?: string; error?: string }> {
-  // responsible_ids não é coluna — vai para a RPC após o insert
+  // responsible_ids/product_ids/partner_ids não são colunas — vão para
+  // RPC/junções após o insert
 
   const payload = rows.map(r => {
-    const { responsible_ids: _strip, ...rest } = r as Partial<Action> & { responsible_ids?: string[] };
+    const {
+      responsible_ids: _resp,
+      product_ids: _prod,
+      partner_ids: _part,
+      ...rest
+    } = r as Partial<Action> & { responsible_ids?: string[]; product_ids?: string[]; partner_ids?: string[] };
     return {
       ...rest,
       id: rest.id || crypto.randomUUID(),
@@ -349,6 +386,23 @@ export async function bulkCreateActions(rows: Partial<Action>[]): Promise<{ ok: 
   if (error) {
     console.error('[actions] bulk create error:', error.message);
     return { ok: false, count: 0, error: error.message };
+  }
+
+  // Junções (produtos do cliente + parceiros) por linha criada
+  const productJunctions: Array<{ action_id: string; product_id: string }> = [];
+  const partnerJunctions: Array<{ action_id: string; partner_id: string }> = [];
+  for (const row of (data ?? [])) {
+    const src = rows.find((_, i) => payload[i]?.id === row.id) as (Partial<Action> & { product_ids?: string[]; partner_ids?: string[] }) | undefined;
+    for (const pid of src?.product_ids ?? []) productJunctions.push({ action_id: row.id, product_id: pid });
+    for (const pid of src?.partner_ids ?? []) partnerJunctions.push({ action_id: row.id, partner_id: pid });
+  }
+  if (productJunctions.length > 0) {
+    const pr = await supabase.from('action_products').insert(productJunctions);
+    if (pr.error) console.error('[actions] bulk action_products error:', pr.error.message);
+  }
+  if (partnerJunctions.length > 0) {
+    const pt = await supabase.from('action_partners').insert(partnerJunctions);
+    if (pt.error) console.error('[actions] bulk action_partners error:', pt.error.message);
   }
 
   let warning: string | undefined;

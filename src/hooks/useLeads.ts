@@ -27,6 +27,8 @@ export interface Lead {
   updated_at: string;
   owner: { id: string; full_name: string; avatar_url: string | null } | null;
   workspace: { id: string; name: string } | null;
+  /** Produtos de interesse (N:N com o catálogo do ambiente) */
+  products?: Array<{ product: { id: string; name: string } }> | null;
 }
 
 export interface LeadActivity {
@@ -39,10 +41,22 @@ export interface LeadActivity {
   author: { id: string; full_name: string } | null;
 }
 
-type LeadPayload = Partial<Lead> & { name: string };
+type LeadPayload = Partial<Lead> & { name: string; product_ids?: string[] };
 
 /* FKs nomeadas desambiguam os dois vínculos com users (owner_id, created_by) */
-const LEAD_SELECT = '*, owner:crm_leads_owner_id_fkey(id, full_name, avatar_url), workspace:workspaces(id, name)';
+const LEAD_SELECT = '*, owner:crm_leads_owner_id_fkey(id, full_name, avatar_url), workspace:workspaces(id, name), products:crm_lead_products(product:environment_products(id, name))';
+
+/** Substitui a junção lead ↔ produtos do catálogo do ambiente. */
+async function syncLeadProducts(leadId: string, productIds: string[]): Promise<void> {
+  const { error: delErr } = await supabase.from('crm_lead_products').delete().eq('lead_id', leadId);
+  if (delErr) throw new Error(delErr.message);
+  if (productIds.length > 0) {
+    const { error: insErr } = await supabase
+      .from('crm_lead_products')
+      .insert(productIds.map(pid => ({ lead_id: leadId, product_id: pid })));
+    if (insErr) throw new Error(insErr.message);
+  }
+}
 
 /* Mensagem legível de erro de Edge Function (context.response) */
 export async function crmFunctionErrorMessage(error: unknown): Promise<string> {
@@ -89,30 +103,58 @@ export function useLeads(environment: CrmEnvironment | null) {
 
   const createLead = async (payload: LeadPayload): Promise<Lead> => {
     const { data: auth } = await supabase.auth.getUser();
+    const { product_ids, ...insert } = payload;
     const { data, error } = await supabase
       .from('crm_leads')
       .insert({
-        ...payload,
-        owner_id: payload.owner_id ?? auth.user?.id ?? null,
+        ...insert,
+        owner_id: insert.owner_id ?? auth.user?.id ?? null,
         created_by: auth.user?.id ?? null,
       })
       .select(LEAD_SELECT)
       .single();
     if (error) throw new Error(error.message);
     const lead = data as unknown as Lead;
+
+    if (Array.isArray(product_ids)) {
+      await syncLeadProducts(lead.id, product_ids);
+      const { data: fresh, error: err2 } = await supabase
+        .from('crm_leads')
+        .select(LEAD_SELECT)
+        .eq('id', lead.id)
+        .single();
+      if (err2) throw new Error(err2.message);
+      const final = fresh as unknown as Lead;
+      setLeads(prev => [final, ...prev]);
+      return final;
+    }
+
     setLeads(prev => [lead, ...prev]);
     return lead;
   };
 
-  const updateLead = async (id: string, patch: Partial<Lead>): Promise<Lead> => {
+  const updateLead = async (id: string, patch: Partial<Lead> & { product_ids?: string[] }): Promise<Lead> => {
+    const { product_ids, ...update } = patch;
     const { data, error } = await supabase
       .from('crm_leads')
-      .update(patch)
+      .update(update)
       .eq('id', id)
       .select(LEAD_SELECT)
       .single();
     if (error) throw new Error(error.message);
-    const lead = data as unknown as Lead;
+    let lead = data as unknown as Lead;
+
+    if (Array.isArray(product_ids)) {
+      await syncLeadProducts(id, product_ids);
+      const { data: fresh, error: err2 } = await supabase
+        .from('crm_leads')
+        .select(LEAD_SELECT)
+        .eq('id', id)
+        .single();
+      if (err2) throw new Error(err2.message);
+      lead = fresh as unknown as Lead;
+    }
+
     setLeads(prev => prev.map(l => (l.id === id ? lead : l)));
     return lead;
   };

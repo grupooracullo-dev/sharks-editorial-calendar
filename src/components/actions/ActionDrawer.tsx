@@ -240,7 +240,7 @@ export default function ActionDrawer({ action, isOpen, onClose, onEdit, onDelete
         )}
 
         {/* Production */}
-        {(action.audience || action.product || action.theme || action.observations) && (
+        {(action.audience || action.product || (action.products?.length ?? 0) > 0 || action.theme || action.observations) && (
           <div className="border-t border-gray-100 pt-4">
             <h4 className="text-sm font-semibold text-gray-900 mb-3">Produção</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -250,7 +250,19 @@ export default function ActionDrawer({ action, isOpen, onClose, onEdit, onDelete
                   <p className="text-sm text-gray-900">{action.audience}</p>
                 </div>
               )}
-              {action.product && (
+              {(action.products?.length ?? 0) > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Produtos</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {action.products!.map(p => (
+                      <span key={p.id} className="text-xs font-medium text-gray-700 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">
+                        {p.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {!action.products?.length && action.product && (
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Produto</p>
                   <p className="text-sm text-gray-900">{action.product}</p>
