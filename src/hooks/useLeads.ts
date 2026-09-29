@@ -220,6 +220,65 @@ export function useLeadActivities(leadId: string | null) {
   return { activities, loading, addActivity };
 }
 
+/* ─── Última atividade de cada lead (resumo para o card do pipeline) ─── */
+export interface LeadActivitySummary {
+  type: LeadActivity['type'];
+  content: string;
+  created_at: string;
+}
+
+export function useLeadActivitySummaries(environment: CrmEnvironment | null) {
+  const [summaries, setSummaries] = useState<Map<string, LeadActivitySummary>>(new Map());
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      const { data, error } = await supabase
+        .from('crm_lead_activities')
+        .select('lead_id, type, content, created_at, lead:crm_lead_activities_lead_id_fkey(environment)')
+        .order('created_at', { ascending: false })
+        .limit(3000);
+      if (!active) return;
+      if (error) {
+        console.error('[crm] activity summaries error:', error.message);
+        return;
+      }
+      const map = new Map<string, LeadActivitySummary>();
+      for (const row of ((data ?? []) as unknown as Array<{
+        lead_id: string;
+        type: LeadActivity['type'];
+        content: string;
+        created_at: string;
+        lead: { environment: CrmEnvironment } | null;
+      }>)) {
+        if (environment && row.lead?.environment !== environment) continue;
+        // Lista ordenada por created_at desc → a primeira ocorrência é a mais recente
+        if (!map.has(row.lead_id)) {
+          map.set(row.lead_id, { type: row.type, content: row.content, created_at: row.created_at });
+        }
+      }
+      setSummaries(map);
+    };
+
+    load();
+
+    const channel = supabase
+      .channel('crm-activity-summaries')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'crm_lead_activities' },
+        () => { load(); },
+      )
+      .subscribe();
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, [environment]);
+
+  return summaries;
+}
+
 /* ─── Staff do ambiente (opções de responsável) ─── */
 export function useEnvStaff(environment: CrmEnvironment | null) {
   const [options, setOptions] = useState<{ value: string; label: string }[]>([]);

@@ -2,8 +2,8 @@ import type { DragEvent } from 'react';
 import { cn } from '@/lib/utils';
 import { Building2 } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
-import { STAGE_META, formatBRL } from '@/lib/crmStages';
-import type { Lead } from '@/hooks/useLeads';
+import { ACTIVITY_TYPE_META, formatBRL, formatRelativeTime } from '@/lib/crmStages';
+import type { Lead, LeadActivitySummary } from '@/hooks/useLeads';
 import { ENVIRONMENT_META } from '@/types';
 
 interface LeadCardProps {
@@ -11,14 +11,15 @@ interface LeadCardProps {
   draggable: boolean;
   dragging: boolean;
   showEnv?: boolean;
+  lastActivity: LeadActivitySummary | null;
   onOpen: () => void;
   onDragStart: (e: DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
 }
 
-export default function LeadCard({ lead, draggable, dragging, showEnv, onOpen, onDragStart, onDragEnd }: LeadCardProps) {
-  const stage = STAGE_META[lead.stage];
-
+export default function LeadCard({
+  lead, draggable, dragging, showEnv, lastActivity, onOpen, onDragStart, onDragEnd,
+}: LeadCardProps) {
   return (
     <div
       draggable={draggable}
@@ -27,44 +28,58 @@ export default function LeadCard({ lead, draggable, dragging, showEnv, onOpen, o
       onClick={onOpen}
       className={cn(
         'bg-white border border-gray-200 rounded-lg p-3 text-left cursor-pointer transition-all',
-        'hover:border-gray-300 hover:shadow-sm active:cursor-grabbing',
+        'hover:border-gray-300 hover:shadow-md active:cursor-grabbing',
         dragging && 'opacity-40',
       )}
     >
+      {/* Nome + ambiente */}
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-semibold text-gray-900 truncate flex-1">{lead.name}</p>
-        <span className={cn('w-2 h-2 rounded-full shrink-0 mt-1.5', stage.dotClass)} title={stage.label} />
-      </div>
-
-      {(lead.segment || lead.source) && (
-        <p className="text-xs text-gray-500 truncate mt-0.5">
-          {[lead.segment, lead.source].filter(Boolean).join(' · ')}
-        </p>
-      )}
-
-      <div className="flex items-center justify-between gap-2 mt-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          {lead.owner && (
-            <Avatar name={lead.owner.full_name} src={lead.owner.avatar_url} size="xs" />
-          )}
-          {lead.workspace && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full min-w-0">
-              <Building2 className="w-3 h-3 shrink-0" />
-              <span className="truncate">{lead.workspace.name}</span>
-            </span>
-          )}
-          {showEnv && (
-            <span className="text-[11px] text-gray-400 shrink-0">
-              {ENVIRONMENT_META[lead.environment].emoji}
-            </span>
-          )}
-        </div>
-        {lead.value != null && (
-          <span className="text-xs font-semibold text-gray-700 tabular-nums shrink-0">
-            {formatBRL(lead.value)}
+        <p className="text-sm font-semibold text-gray-900 leading-snug break-words flex-1">{lead.name}</p>
+        {showEnv && (
+          <span className="text-xs shrink-0 mt-0.5" title={ENVIRONMENT_META[lead.environment].label}>
+            {ENVIRONMENT_META[lead.environment].emoji}
           </span>
         )}
       </div>
+
+      {/* Valor em destaque (padrão pipeline) */}
+      <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+        <span className={cn('text-sm', lead.value != null ? 'font-semibold text-gray-800' : 'text-gray-400')}>
+          Valor: {lead.value != null ? formatBRL(lead.value) : '—'}
+        </span>
+        {lead.monthly_value != null && (
+          <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+            {formatBRL(lead.monthly_value)}/mês
+          </span>
+        )}
+      </div>
+
+      {/* Cliente convertido */}
+      {lead.workspace && (
+        <span className="mt-1.5 inline-flex items-center gap-1 max-w-full text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-full">
+          <Building2 className="w-3 h-3 shrink-0" />
+          <span className="truncate">{lead.workspace.name}</span>
+        </span>
+      )}
+
+      {/* Responsável + tempo relativo */}
+      <div className="flex items-center gap-1.5 mt-2 min-w-0">
+        {lead.owner ? (
+          <Avatar name={lead.owner.full_name} src={lead.owner.avatar_url} size="xs" />
+        ) : (
+          <span className="w-6 h-6 rounded-full bg-gray-100 shrink-0" />
+        )}
+        <span className="text-xs text-gray-500 truncate">
+          {lead.owner?.full_name ?? 'Sem responsável'} · {formatRelativeTime(lead.updated_at)}
+        </span>
+      </div>
+
+      {/* Última atividade */}
+      <p className="text-xs text-gray-400 mt-1.5 truncate">
+        {lastActivity
+          ? `${ACTIVITY_TYPE_META[lastActivity.type]?.label ?? lastActivity.type}: ${lastActivity.content}`
+          : 'Nenhuma atividade'}
+      </p>
     </div>
   );
 }

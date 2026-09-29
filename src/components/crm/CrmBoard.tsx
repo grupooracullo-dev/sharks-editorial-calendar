@@ -3,19 +3,24 @@ import PageHeader from '@/components/ui/PageHeader';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Card from '@/components/ui/Card';
+import Tabs from '@/components/ui/Tabs';
+import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import EmptyState from '@/components/ui/EmptyState';
 import { toast } from 'sonner';
-import { Plus, Target, Loader2 } from 'lucide-react';
+import { Plus, Target, Search, Loader2 } from 'lucide-react';
 import LeadKanban from './LeadKanban';
 import LeadFormModal, { type LeadFormValues } from './LeadFormModal';
 import LeadDrawer from './LeadDrawer';
 import ConvertLeadModal from './ConvertLeadModal';
+import ClientsTab from './ClientsTab';
 import { formatBRL, type LeadStage } from '@/lib/crmStages';
 import {
-  useLeads, useEnvStaff, type CrmEnvironment, type Lead,
+  useLeads, useEnvStaff, useLeadActivitySummaries, type CrmEnvironment, type Lead,
 } from '@/hooks/useLeads';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
+
+type CrmTab = 'pipeline' | 'clients';
 
 interface CrmBoardProps {
   environment: CrmEnvironment | null;
@@ -29,6 +34,11 @@ export default function CrmBoard({ environment, canDelete = false, showEnv = fal
   const { isMobile } = useBreakpoint();
   const { leads, loading, createLead, updateLead, deleteLead, moveStage, convertLead } = useLeads(environment);
   const owners = useEnvStaff(environment);
+  const activitySummaries = useLeadActivitySummaries(environment);
+
+  const [tab, setTab] = useState<CrmTab>('pipeline');
+  const [search, setSearch] = useState('');
+  const [ownerFilter, setOwnerFilter] = useState('');
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
@@ -39,9 +49,24 @@ export default function CrmBoard({ environment, canDelete = false, showEnv = fal
   const [deletingLead, setDeletingLead] = useState<Lead | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  /* Filtros aplicados ao board e à aba de clientes */
+  const filteredLeads = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return leads.filter(l => {
+      if (ownerFilter && l.owner_id !== ownerFilter) return false;
+      if (!term) return true;
+      return (
+        l.name.toLowerCase().includes(term) ||
+        (l.contact_name ?? '').toLowerCase().includes(term) ||
+        (l.workspace?.name ?? '').toLowerCase().includes(term) ||
+        (l.segment ?? '').toLowerCase().includes(term)
+      );
+    });
+  }, [leads, search, ownerFilter]);
+
   const stats = useMemo(() => {
-    const open = leads.filter(l => l.stage !== 'won' && l.stage !== 'lost');
-    const won = leads.filter(l => l.stage === 'won');
+    const open = filteredLeads.filter(l => l.stage !== 'won' && l.stage !== 'lost');
+    const won = filteredLeads.filter(l => l.stage === 'won');
     return {
       pipelineValue: open.reduce((acc, l) => acc + (Number(l.value) || 0), 0),
       openCount: open.length,
@@ -49,7 +74,7 @@ export default function CrmBoard({ environment, canDelete = false, showEnv = fal
       monthlyValue: won.reduce((acc, l) => acc + (Number(l.monthly_value) || 0), 0),
       wonCount: won.length,
     };
-  }, [leads]);
+  }, [filteredLeads]);
 
   /* O drawer guarda referência viva do lead (realtime pode atualizá-lo) */
   const drawerLive: Lead | null = drawerLead
@@ -160,62 +185,99 @@ export default function CrmBoard({ environment, canDelete = false, showEnv = fal
 
   return (
     <div className="flex-1 min-h-0 flex flex-col space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageHeader
-          title={title}
-          subtitle={subtitle}
-          actions={
-            <Button onClick={() => { setEditingLead(null); setFormOpen(true); }}>
-              <Plus className="w-4 h-4" />
-              Novo lead
-            </Button>
-          }
-        />
+      <PageHeader
+        title={title}
+        subtitle={subtitle}
+        actions={
+          <Button onClick={() => { setEditingLead(null); setFormOpen(true); }}>
+            <Plus className="w-4 h-4" />
+            Novo lead
+          </Button>
+        }
+      />
+
+      {/* Abas Pipeline / Clientes */}
+      <Tabs
+        tabs={[{ id: 'pipeline' as const, label: 'Pipeline' }, { id: 'clients' as const, label: 'Clientes' }]}
+        activeTab={tab}
+        onChange={setTab}
+        className="self-start"
+      />
+
+      {/* Barra de filtros */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar lead, cliente ou segmento..."
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg bg-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:border-primary-500 placeholder:text-gray-400"
+          />
+        </div>
+        <div className="w-full sm:w-56">
+          <Select
+            value={ownerFilter}
+            onChange={(e) => setOwnerFilter(e.target.value)}
+            placeholder="Todos os responsáveis"
+            options={owners}
+          />
+        </div>
       </div>
 
-      {/* Resumo */}
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
-        <span className="text-gray-500">
-          Pipeline aberto: <strong className="text-gray-900 tabular-nums">{formatBRL(stats.pipelineValue)}</strong>
-          <span className="text-gray-400"> ({stats.openCount} leads)</span>
-        </span>
-        <span className="text-gray-500">
-          Ganho: <strong className="text-emerald-600 tabular-nums">{formatBRL(stats.wonValue)}</strong>
-          <span className="text-gray-400"> ({stats.wonCount} {stats.wonCount === 1 ? 'lead' : 'leads'})</span>
-        </span>
-        <span className="text-gray-500">
-          Recorrência mensal: <strong className="text-gray-900 tabular-nums">{formatBRL(stats.monthlyValue)}</strong>
-        </span>
-      </div>
-
-      {/* Board */}
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="w-6 h-6 text-primary-500 animate-spin" />
         </div>
-      ) : leads.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
-          <Card padding="md">
-            <EmptyState
-              icon={Target}
-              title="Nenhum lead ainda"
-              description="Crie o primeiro lead para começar a acompanhar a jornada até a conversão."
-            />
-            <div className="flex justify-center pb-2 -mt-2">
-              <Button onClick={() => { setEditingLead(null); setFormOpen(true); }}>
-                <Plus className="w-4 h-4" />
-                Novo lead
-              </Button>
+      ) : tab === 'pipeline' ? (
+        <>
+          {/* Resumo do pipeline */}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+            <span className="text-gray-500">
+              Pipeline aberto: <strong className="text-gray-900 tabular-nums">{formatBRL(stats.pipelineValue)}</strong>
+              <span className="text-gray-400"> ({stats.openCount} leads)</span>
+            </span>
+            <span className="text-gray-500">
+              Ganho: <strong className="text-emerald-600 tabular-nums">{formatBRL(stats.wonValue)}</strong>
+              <span className="text-gray-400"> ({stats.wonCount})</span>
+            </span>
+            <span className="text-gray-500">
+              Recorrência mensal: <strong className="text-gray-900 tabular-nums">{formatBRL(stats.monthlyValue)}</strong>
+            </span>
+          </div>
+
+          {leads.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center">
+              <Card padding="md">
+                <EmptyState
+                  icon={Target}
+                  title="Nenhum lead ainda"
+                  description="Crie o primeiro lead para começar a acompanhar a jornada até a conversão."
+                />
+                <div className="flex justify-center pb-2 -mt-2">
+                  <Button onClick={() => { setEditingLead(null); setFormOpen(true); }}>
+                    <Plus className="w-4 h-4" />
+                    Novo lead
+                  </Button>
+                </div>
+              </Card>
             </div>
-          </Card>
-        </div>
+          ) : (
+            <LeadKanban
+              leads={filteredLeads}
+              activitySummaries={activitySummaries}
+              showEnv={showEnv}
+              isMobile={isMobile}
+              onOpenLead={(lead) => setDrawerLead(lead)}
+              onMoveStage={handleMoveStage}
+            />
+          )}
+        </>
       ) : (
-        <LeadKanban
-          leads={leads}
+        <ClientsTab
+          leads={filteredLeads}
           showEnv={showEnv}
-          isMobile={isMobile}
           onOpenLead={(lead) => setDrawerLead(lead)}
-          onMoveStage={handleMoveStage}
         />
       )}
 
