@@ -7,77 +7,21 @@ import { supabase } from '@/lib/supabase';
 import Avatar from '@/components/ui/Avatar';
 import { ENVIRONMENT_META, type EnvironmentType } from '@/types';
 import {
-  LayoutDashboard,
-  Calendar,
-  Users,
-  Megaphone,
-  BookOpen,
-  LayoutTemplate,
-  History,
-  MessageSquare,
-  Link2,
-  Settings,
+  SHARKS_NAV,
+  CLIENT_NAV,
+  ESTRATEGOS_NAV,
+  ORACULLO_NAV,
+} from '@/components/layout/navItems';
+import {
   LogOut,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
   X,
-  UserCog,
-  UserPlus,
-  Briefcase,
-  Rocket,
-  ShieldCheck,
-  CalendarDays,
-  Building2,
 } from 'lucide-react';
 import logoUrl from '/logo.png?url';
 import logoSharksUrl from '/logo-sharks.png?url';
 import logoEstrategosUrl from '/logo-estrategos.png?url';
-
-const sharksNavItems = [
-  { icon: LayoutDashboard, label: 'Visão Geral', path: '/sharks' },
-  { icon: Calendar, label: 'Calendário', path: '/sharks/calendar' },
-  { icon: Megaphone, label: 'Campanhas', path: '/sharks/campaigns' },
-  { icon: BookOpen, label: 'Linha Editorial', path: '/sharks/editorial' },
-  { icon: LayoutTemplate, label: 'Modelos', path: '/sharks/templates' },
-  { icon: MessageSquare, label: 'Chat', path: '/sharks/chat' },
-  { icon: History, label: 'Histórico', path: '/sharks/history' },
-  { icon: Users, label: 'Clientes', path: '/sharks/clients' },
-  { icon: UserCog, label: 'Time', path: '/sharks/team' },
-  { icon: UserPlus, label: 'Acessos', path: '/sharks/access-requests', adminOnly: true },
-  { icon: Link2, label: 'Integrações', path: '/sharks/integrations' },
-  { icon: Settings, label: 'Configurações', path: '/sharks/settings' },
-];
-
-const clientNavItems = [
-  { icon: LayoutDashboard, label: 'Início', path: '/client' },
-  { icon: Calendar, label: 'Meu Calendário', path: '/client/calendar' },
-  { icon: MessageSquare, label: 'Chat', path: '/client/chat' },
-  { icon: History, label: 'Histórico', path: '/client/history' },
-  { icon: Link2, label: 'Integrações', path: '/client/integrations' },
-];
-
-const estrategosNavItems = [
-  { icon: LayoutDashboard, label: 'Visão Geral', path: '/estrategos' },
-  { icon: Calendar, label: 'Calendário', path: '/estrategos/calendar' },
-  { icon: Briefcase, label: 'Projetos', path: '/estrategos/projects' },
-  { icon: CalendarDays, label: 'Reuniões', path: '/estrategos/meetings' },
-  { icon: Rocket, label: 'Implementações', path: '/estrategos/implementations' },
-  { icon: MessageSquare, label: 'Chat', path: '/estrategos/chat' },
-  { icon: Users, label: 'Clientes', path: '/estrategos/clients', adminOnly: true },
-  { icon: UserCog, label: 'Time', path: '/estrategos/team' },
-  { icon: UserPlus, label: 'Acessos', path: '/estrategos/access-requests', adminOnly: true },
-  { icon: Link2, label: 'Integrações', path: '/estrategos/integrations' },
-];
-
-const oraculloNavItems = [
-  { icon: LayoutDashboard, label: 'Visão Geral', path: '/oracullo' },
-  { icon: ShieldCheck, label: 'Acessos', path: '/oracullo/access' },
-  { icon: UserPlus, label: 'Solicitações', path: '/oracullo/access-requests' },
-  { icon: Users, label: 'Usuários', path: '/oracullo/users' },
-  { icon: UserCog, label: 'Time', path: '/oracullo/team' },
-  { icon: Building2, label: 'Clientes', path: '/oracullo/clients' },
-];
 
 type SidebarEnv = 'sharks' | 'client' | 'estrategos' | 'oracullo';
 
@@ -149,15 +93,15 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
   }, [canSeeRequestsBadge]);
 
   const baseItems =
-    env === 'estrategos' ? estrategosNavItems.filter(i => !i.adminOnly || isEstrategosAdmin)
-    : env === 'oracullo' ? oraculloNavItems
-    : env === 'client' ? clientNavItems
-    : isSharks ? sharksNavItems.filter(i => !i.adminOnly || isAdmin)
-    : clientNavItems;
+    env === 'estrategos' ? ESTRATEGOS_NAV.filter(i => !i.adminOnly || isEstrategosAdmin)
+    : env === 'oracullo' ? ORACULLO_NAV
+    : env === 'client' ? CLIENT_NAV
+    : isSharks ? SHARKS_NAV.filter(i => !i.adminOnly || isAdmin)
+    : CLIENT_NAV;
 
   // No portal do cliente dentro do contexto estrategos, reutiliza os itens do client
   const navItems = env === 'client' && location.pathname.startsWith('/client/estrategos')
-    ? clientNavItems
+    ? CLIENT_NAV
     : baseItems;
 
   const brandTitle =
@@ -166,10 +110,15 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
     : isSharks ? 'Sharks Company'
     : 'Sharks Company';
 
-  const currentEnvLabel =
-    env === 'estrategos' ? '📊 Estrategos'
-    : env === 'oracullo' ? '🛡️ Oracullo'
-    : '🦈 Sharks';
+  const currentEnvEmoji =
+    env === 'estrategos' ? '📊'
+    : env === 'oracullo' ? '🛡️'
+    : '🦈';
+
+  const currentEnvName =
+    env === 'estrategos' ? 'Estrategos'
+    : env === 'oracullo' ? 'Oracullo'
+    : 'Sharks';
 
   const envLogo: Record<string, string> = {
     sharks_company: logoSharksUrl,
@@ -251,7 +200,12 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
                 onClick={() => setEnvMenuOpen(v => !v)}
                 className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 text-sm font-medium text-gray-700 transition-colors"
               >
-                <span className="truncate">{currentEnvLabel}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white text-[11px] leading-none">
+                    {currentEnvEmoji}
+                  </span>
+                  <span className="truncate">{currentEnvName}</span>
+                </span>
                 <ChevronDown className={cn('w-4 h-4 text-gray-400 transition-transform', envMenuOpen && 'rotate-180')} />
               </button>
               {envMenuOpen && (
@@ -300,8 +254,9 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
                     className={({ isActive }) =>
                       cn(
                         'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
                         isActive
-                          ? 'bg-primary-50 text-primary-600'
+                          ? 'bg-primary-50 text-primary-600 before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:rounded-r-full before:bg-primary-600 before:content-[""]'
                           : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
                         collapsed && 'justify-center px-2'
                       )
@@ -358,7 +313,8 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
         {/* Collapse toggle */}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 bg-white border border-gray-200 rounded-full items-center justify-center text-gray-400 hover:text-gray-600 shadow-sm"
+          aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
+          className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 bg-white border border-gray-200 rounded-full items-center justify-center text-gray-400 hover:text-gray-600 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
         >
           {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
         </button>
