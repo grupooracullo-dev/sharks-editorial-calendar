@@ -50,8 +50,9 @@ function slugify(name: string): string {
 
 function generateTempPassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  const rnd = crypto.getRandomValues(new Uint32Array(12));
   let pwd = '';
-  for (let i = 0; i < 12; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 12; i++) pwd += chars[rnd[i] % chars.length];
   return pwd;
 }
 
