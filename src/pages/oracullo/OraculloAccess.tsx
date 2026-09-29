@@ -68,19 +68,28 @@ export default function OraculloAccess() {
 
   const load = useCallback(async () => {
     const [a, h, u, m, ws, envMapRes] = await Promise.all([
-      supabase.from('user_environments').select('user_id, environment, role, created_at, users(email, full_name, role)'),
+      // Sem embed de users: user_environments nao tem FK exposta para
+      // public.users (PostgREST PGRST200) — users chega na query "u" abaixo.
+      supabase.from('user_environments').select('user_id, environment, role, created_at'),
       supabase.from('access_histories').select('*').order('created_at', { ascending: false }).limit(200),
       supabase.from('users').select('*').order('full_name'),
       supabase.from('memberships').select('user_id, workspace_id'),
       supabase.from('workspaces').select('id, name').eq('is_active', true).order('name'),
       supabase.rpc('ws_env_map'),
     ]);
+    if (a.error) console.error('[oracullo-access] user_environments load error:', a.error.message);
     const envMap = new Map<string, string>(
       ((envMapRes.data ?? []) as Array<{ id: string; environment: string }>).map(r => [r.id, r.environment]),
     );
-    setRows((a.data as unknown as Row[]) ?? []);
+    const userList = (u.data as unknown as User[]) ?? [];
+    setUsers(userList);
+    setRows(
+      ((a.data as unknown as Array<Omit<Row, 'users'>>) ?? []).map(r => {
+        const found = userList.find(x => x.id === r.user_id);
+        return { ...r, users: found ? { email: found.email, full_name: found.full_name, role: found.role } : null };
+      }),
+    );
     setHistory((h.data as unknown as HistoryRow[]) ?? []);
-    setUsers((u.data as unknown as User[]) ?? []);
     setMemberships((m.data as Array<{ user_id: string; workspace_id: string }>) ?? []);
     setWorkspaces(
       ((ws.data ?? []) as Array<{ id: string; name: string }>).map(w => ({

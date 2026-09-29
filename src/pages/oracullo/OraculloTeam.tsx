@@ -116,11 +116,13 @@ export default function OraculloTeam() {
     const [ueRes, wsRes, envMapRes] = await Promise.all([
       supabase
         .from('user_environments')
-        .select('environment, role, user_id, users!inner(id, email, full_name, role, avatar_url)')
+        .select('environment, role, user_id')
         .in('role', ['admin', 'team']),
       supabase.from('workspaces').select('id, name, segment').eq('is_active', true).order('name'),
       supabase.rpc('ws_env_map'),
     ]);
+
+    if (ueRes.error) console.error('[oracullo-team] user_environments load error:', ueRes.error.message);
 
     const wsList = (wsRes.data as unknown as Workspace[]) || [];
     setAllWorkspaces(wsList);
@@ -137,20 +139,33 @@ export default function OraculloTeam() {
       user_id: string;
       environment: string;
       role: 'admin' | 'team';
-      users: { id: string; email: string; full_name: string; role: string; avatar_url: string | null };
     }>) ?? [];
+
+    // user_environments nao tem FK exposta para public.users — o embed
+    // PostgREST falhava (PGRST200); busca os usuarios em segunda chamada.
+    const userIds = [...new Set(ueRows.map(r => r.user_id))];
+    const usersRes = userIds.length > 0
+      ? await supabase.from('users').select('id, email, full_name, role, avatar_url').in('id', userIds)
+      : null;
+    if (usersRes?.error) console.error('[oracullo-team] users load error:', usersRes.error.message);
+    const usersById = new Map<string, { id: string; email: string; full_name: string; role: string; avatar_url: string | null }>(
+      ((usersRes?.data ?? []) as Array<{ id: string; email: string; full_name: string; role: string; avatar_url: string | null }>)
+        .map(u => [u.id, u]),
+    );
 
     const enrichedMap = new Map<string, MemberWithAccess>();
 
     for (const row of ueRows) {
       const uid = row.user_id;
+      const user = usersById.get(uid);
+      if (!user) continue;
       if (!enrichedMap.has(uid)) {
         enrichedMap.set(uid, {
-          id: row.users.id,
-          email: row.users.email,
-          full_name: row.users.full_name,
-          global_role: row.users.role,
-          avatar_url: row.users.avatar_url ?? undefined,
+          id: user.id,
+          email: user.email,
+          full_name: user.full_name,
+          global_role: user.role,
+          avatar_url: user.avatar_url ?? undefined,
           environments: [],
           permissions: {} as Record<EnvironmentType, Permission[]>,
           workspaces: {} as Record<EnvironmentType, Workspace[]>,
