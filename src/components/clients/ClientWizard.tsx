@@ -233,15 +233,17 @@ export default function ClientWizard({ open, onClose, environment, onCreated }: 
 
       {/* Passo Empresa */}
       {((environment && step === 0) || (!environment && step === 1)) && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <div className="flex-1 space-y-4">
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="sm:col-span-2">
               <Input
                 label="Nome da empresa"
                 value={formData.name}
                 onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
                 placeholder="Ex: PB & RN Foods"
               />
+            </div>
+            <div>
               <Select
                 label="Segmento"
                 value={formData.segment}
@@ -250,14 +252,15 @@ export default function ClientWizard({ open, onClose, environment, onCreated }: 
                 options={SEGMENTS.map(s => ({ value: s, label: s }))}
               />
             </div>
-            <div className="sm:w-56 shrink-0">
-              <p className="text-sm font-medium text-gray-700 mb-1.5">Logomarca</p>
-              <LogoUploader
-                name={formData.name || 'Cliente'}
-                logoUrl={formData.logo_url}
-                onChange={(url) => setFormData(p => ({ ...p, logo_url: url }))}
-              />
-            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4">
+            <p className="text-sm font-semibold text-gray-900 mb-3">Logomarca</p>
+            <LogoUploader
+              name={formData.name || 'Cliente'}
+              logoUrl={formData.logo_url}
+              onChange={(url) => setFormData(p => ({ ...p, logo_url: url }))}
+            />
           </div>
         </div>
       )}
