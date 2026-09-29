@@ -72,6 +72,7 @@ export default function AccessRequestsPage({ environment }: AccessRequestsPagePr
   const [rejectReason, setRejectReason] = useState('');
   const [processing, setProcessing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
   const [viewModal, setViewModal] = useState<AccessRequest | null>(null);
 
   // Approve form
@@ -219,6 +220,7 @@ export default function AccessRequestsPage({ environment }: AccessRequestsPagePr
         toast.success(`Aprovado como ${roleLabel} (${envLabel})! ${data.email} ja possui conta Google ativa.`);
       } else {
         toast.success(`Aprovado como ${roleLabel} (${envLabel})! Senha temporaria: ${data.temp_password}`);
+        setGeneratedPassword(data.temp_password ?? null);
         setShowPassword(true);
       }
       setApproveModal(null);
@@ -254,6 +256,11 @@ export default function AccessRequestsPage({ environment }: AccessRequestsPagePr
   const copyPassword = (pwd: string) => {
     navigator.clipboard.writeText(pwd);
     toast.success('Senha copiada!');
+  };
+
+  const closePasswordModal = () => {
+    setShowPassword(false);
+    setGeneratedPassword(null);
   };
 
   const wsName = (id: string | null) =>
@@ -759,7 +766,7 @@ export default function AccessRequestsPage({ environment }: AccessRequestsPagePr
       {/* Show generated password modal */}
       <Modal
         isOpen={showPassword}
-        onClose={() => setShowPassword(false)}
+        onClose={closePasswordModal}
         title="Acesso aprovado!"
         size="sm"
       >
@@ -768,11 +775,22 @@ export default function AccessRequestsPage({ environment }: AccessRequestsPagePr
             Envie esta senha ao solicitante por e-mail. O usuário deverá trocá-la no primeiro login.
           </p>
           <div className="flex items-center gap-2 bg-white border border-emerald-300 rounded-lg p-2">
-            <p className="text-base font-mono text-emerald-900 flex-1">Senha gerada (veja o toast acima)</p>
+            <p className="text-base font-mono text-emerald-900 flex-1 break-all">
+              {generatedPassword ?? '—'}
+            </p>
+            {generatedPassword && (
+              <button
+                onClick={() => copyPassword(generatedPassword)}
+                className="p-1.5 text-emerald-700 hover:bg-emerald-100 rounded shrink-0"
+                title="Copiar senha"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-4">
-          <Button onClick={() => setShowPassword(false)}>Fechar</Button>
+          <Button onClick={closePasswordModal}>Fechar</Button>
         </div>
       </Modal>
     </div>
