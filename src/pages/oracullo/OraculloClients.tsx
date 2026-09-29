@@ -307,18 +307,18 @@ export default function OraculloClients() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 md:max-w-md">
-        <div className="bg-gray-50 rounded-lg p-3 text-center">
+      <div className="grid grid-cols-3 gap-3 sm:max-w-md">
+        <div className="rounded-xl border border-gray-200 bg-white p-3 text-center">
           <p className="text-xl font-bold text-gray-900">{groups.length}</p>
-          <p className="text-[11px] text-gray-400">Empresas</p>
+          <p className="text-[11px] font-medium text-gray-500">Empresas</p>
         </div>
-        <div className="bg-blue-50 rounded-lg p-3 text-center">
-          <p className="text-xl font-bold text-blue-900">{envCount('sharks_company')}</p>
-          <p className="text-[11px] text-blue-500">Sharks Company</p>
+        <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-center">
+          <p className="text-xl font-bold text-blue-700">{envCount('sharks_company')}</p>
+          <p className="text-[11px] font-medium text-blue-600">🦈 Sharks Company</p>
         </div>
-        <div className="bg-emerald-50 rounded-lg p-3 text-center">
-          <p className="text-xl font-bold text-emerald-900">{envCount('estrategos')}</p>
-          <p className="text-[11px] text-emerald-600">Estrategos</p>
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-center">
+          <p className="text-xl font-bold text-emerald-700">{envCount('estrategos')}</p>
+          <p className="text-[11px] font-medium text-emerald-600">📊 Estratégos</p>
         </div>
       </div>
 
@@ -336,31 +336,42 @@ export default function OraculloClients() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {groups.map(g => (
-            <Card key={g.key} className="relative group">
+            <Card key={g.key} className="relative group flex flex-col">
               <div className="flex items-start gap-3">
                 <WorkspaceLogo name={g.name} logoUrl={g.logo} size="lg" />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-gray-900 truncate">{g.name}</h3>
-                  </div>
-                  <div className="mt-1 flex flex-wrap gap-1">
+                  <h3 className="font-semibold text-gray-900 truncate">{g.name}</h3>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
                     {g.envs.map(env => (
                       <Badge key={env} variant={env === 'sharks_company' ? 'info' : 'success'} size="sm">
                         {ENVIRONMENT_META[env].emoji} {ENVIRONMENT_META[env].short}
                       </Badge>
                     ))}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">{g.segment ?? 'Gestão'}</p>
-                  <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
-                    <MapPin className="w-3 h-3" />
+                  <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1 flex-wrap">
+                    <Building2 className="w-3 h-3 shrink-0 text-gray-400" />
+                    {g.segment ?? 'Gestão'}
+                    <span className="text-gray-300">·</span>
+                    <MapPin className="w-3 h-3 shrink-0 text-gray-400" />
                     {g.city || 'Sem cidade'}, {g.state || '--'}
                   </p>
                 </div>
               </div>
 
-              <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-                <span className="text-[11px] text-gray-400">Desde {formatDate(g.since)}</span>
-                <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
+              <div className="mt-auto pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 min-w-0 text-[11px] text-gray-400">
+                  <span className="truncate">Desde {formatDate(g.since) || '—'}</span>
+                  {g.clientUser && (
+                    <span
+                      title={`Acesso do cliente: ${g.clientUser.email}`}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-medium shrink-0"
+                    >
+                      <ShieldCheck className="w-3 h-3" />
+                      Acesso
+                    </span>
+                  )}
+                </span>
+                <div className="flex items-center gap-1 shrink-0 opacity-70 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                   {!g.clientUser && (
                     <button
                       onClick={() => openCreateAccess(g)}

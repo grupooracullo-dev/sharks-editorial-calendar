@@ -14,9 +14,11 @@ export function generateId(): string {
 function toValidDate(date: string | Date): Date | null {
   if (typeof date === 'string') {
     if (!date) return null;
-    const d = new Date(date + 'T00:00:00');
+    // Aceita 'YYYY-MM-DD' e também timestamps ISO completos (created_at etc.)
+    const datePart = date.slice(0, 10);
+    const d = new Date(datePart + 'T00:00:00');
     if (isNaN(d.getTime())) return null;
-    const [y, m, day] = date.split('-').map(Number);
+    const [y, m, day] = datePart.split('-').map(Number);
     if (!y || !m || !day) return null;
     if (d.getFullYear() !== y || d.getMonth() !== m - 1 || d.getDate() !== day) return null;
     return d;
