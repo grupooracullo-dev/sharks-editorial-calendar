@@ -260,7 +260,7 @@ Deno.serve(async req => {
       { onConflict: 'user_id,environment' },
     );
   if (envError) {
-    await admin.from('users').delete().eq('id', authUser.user.id).catch(() => {});
+    await admin.from('users').delete().eq('id', authUser.user.id);
     await admin.auth.admin.deleteUser(authUser.user.id).catch(() => {});
     return json(500, { error: `Ambiente: ${envError.message}` });
   }
@@ -281,7 +281,7 @@ Deno.serve(async req => {
 
     const { error: permsError } = await admin.from('team_member_access').insert(permsToInsert);
     if (permsError) {
-      await admin.from('users').delete().eq('id', authUser.user.id).catch(() => {});
+      await admin.from('users').delete().eq('id', authUser.user.id);
       await admin.auth.admin.deleteUser(authUser.user.id).catch(() => {});
       return json(500, { error: `Permissoes: ${permsError.message}` });
     }

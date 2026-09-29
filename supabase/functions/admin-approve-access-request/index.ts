@@ -62,11 +62,7 @@ function generateTempPassword(): string {
   return out.map(i => chars[i]).join('');
 }
 
-Deno.serve(async req => {
-  Object.assign(CORS, corsHeaders(req));
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
-  if (req.method !== 'POST') return json(405, { error: 'Use POST' });
-
+async function handleApprove(req: Request): Promise<Response> {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) return json(401, { error: 'Token ausente' });
 
@@ -199,8 +195,12 @@ Deno.serve(async req => {
   let authProvider: 'google' | 'password';
 
   if (existingAuthId) {
+    // Conta auth ja existe (login Google ou aprovacao anterior interrompida):
+    // RETOMA a aprovacao em vez de bloquear — os passos seguintes sao
+    // idempotentes (upserts). Nao ha senha temporaria.
     userId = existingAuthId;
     authProvider = 'google';
+    tempPassword = null;
 
     const { data: existingProfile } = await admin
       .from('users')
@@ -209,15 +209,18 @@ Deno.serve(async req => {
       .maybeSingle();
 
     if (existingProfile) {
-      // Conta já existe (ex.: aprovação anterior falhou depois de criar o
-      // usuário): RETOMA a aprovação em vez de bloquear — a função é
-      // idempotente nos passos seguintes (upserts).
       console.warn('[approve] perfil ja existia — retomando aprovacao:', userId);
+    } else {
+      const { error: profileErr } = await admin.from('users').insert({
+        id: userId,
+        email: reqRow.email,
+        full_name: fullName,
+        role,
+      });
+      if (profileErr) return json(500, { error: `Perfil: ${profileErr.message}` });
     }
-
-    if (!existingProfile) {
-    const { error: profileErr } = await admin.from('users').insert({       id: userId,       email: reqRow.email,       full_name: resolvedName,       role,     });     if (profileErr) return json(500, { error: `Perfil: ${profileErr.message}` });
-    }
+  } else {
+    // Novo usuario: cria auth + perfil + senha temporaria
     authProvider = 'password';
     tempPassword = generateTempPassword();
 
@@ -269,7 +272,8 @@ Deno.serve(async req => {
       performed_by: userData.user.id,
       performed_by_name: (perf as { full_name?: string } | null)?.full_name ?? null,
     }));
-    await admin.from('access_histories').insert(historyRows).catch(() => {});
+    const { error: histErr } = await admin.from('access_histories').insert(historyRows);
+    if (histErr) console.warn('[approve] audit warning:', histErr.message);
   }
 
   // 8. Team permissions
@@ -287,7 +291,7 @@ Deno.serve(async req => {
 
     const { error: permsError } = await admin.from('team_member_access').insert(permsToInsert);
     if (permsError) {
-      await admin.from('users').delete().eq('id', userId).catch(() => {});
+      await admin.from('users').delete().eq('id', userId);
       await admin.auth.admin.deleteUser(userId).catch(() => {});
       return json(500, { error: `Permissoes: ${permsError.message}` });
     }
@@ -429,4 +433,16 @@ Deno.serve(async req => {
     email_sent: emailSent,
     warning: membershipsWarning,
   });
+}
+
+Deno.serve(async req => {
+  Object.assign(CORS, corsHeaders(req));
+  try {
+    if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+    if (req.method !== 'POST') return json(405, { error: 'Use POST' });
+    return await handleApprove(req);
+  } catch (e) {
+    console.error('[approve] uncaught:', (e as Error)?.stack || e);
+    return json(500, { error: `Erro interno: ${(e as Error)?.message || String(e)}` });
+  }
 });
