@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useEffect, useState, useCallback } from 'react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -207,10 +208,7 @@ for (const row of rows) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Acessos por Ambiente</h1>
-          <p className="text-sm text-gray-500 mt-0.5">O Oracullo decide quem acessa Sharks Company e Estrategos</p>
-        </div>
+        <PageHeader title="Acessos por Ambiente" subtitle="O Oracullo decide quem acessa Sharks Company e Estrategos" />
         <Button onClick={() => setModal(true)}><Plus className="w-4 h-4" /> Vincular acesso</Button>
       </div>
 

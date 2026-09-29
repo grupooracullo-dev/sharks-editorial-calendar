@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useState, useEffect, useCallback } from 'react';
 import Card from '@/components/ui/Card';
 import Modal from '@/components/ui/Modal';
@@ -291,10 +292,7 @@ export default function EstrategosTeam() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Time Estrategos</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Gerencie membros, permissões e acesso aos clientes do ambiente</p>
-        </div>
+        <PageHeader title="Time Estrategos" subtitle="Gerencie membros, permissões e acesso aos clientes do ambiente" />
         {isEnvAdmin && (
           <Button onClick={openInvite}>
             <Plus className="w-4 h-4" />

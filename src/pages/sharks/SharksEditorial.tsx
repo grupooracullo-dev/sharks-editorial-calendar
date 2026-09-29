@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useState, useEffect, useCallback } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useEditorial } from '@/hooks/useEditorial';
@@ -85,10 +86,7 @@ export default function SharksEditorial() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Linha Editorial</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Perfil editorial de {currentWorkspace.name}</p>
-      </div>
+      <PageHeader title="Linha Editorial" subtitle={<>Perfil editorial de {currentWorkspace.name}</>} />
 
       {/* Profile Settings */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

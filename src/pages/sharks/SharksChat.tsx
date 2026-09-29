@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useState, useEffect } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -45,10 +46,7 @@ export default function SharksChat() {
 
   return (
     <div className="space-y-4 lg:space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Chat</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Converse com os clientes em tempo real</p>
-      </div>
+      <PageHeader title="Chat" subtitle="Converse com os clientes em tempo real" />
 
       {isMobile && (
         <div className="relative">

@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useState } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import Card from '@/components/ui/Card';
@@ -37,10 +38,7 @@ export default function SharksClients() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Gerencie os workspaces de cada cliente</p>
-        </div>
+        <PageHeader title="Clientes" subtitle="Gerencie os workspaces de cada cliente" />
         <Button onClick={() => setWizardOpen(true)}>
           <Plus className="w-4 h-4" />
           Novo cliente

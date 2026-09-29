@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
@@ -74,12 +75,7 @@ export default function OraculloDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Oracullo Calendar</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          {formatDate(today)} — Governança dos ambientes
-        </p>
-      </div>
+      <PageHeader title="Oracullo Calendar" subtitle={<>{formatDate(today)} — Governança dos ambientes</>} />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatsCard icon={Users} label="Usuários" value={users.length} />

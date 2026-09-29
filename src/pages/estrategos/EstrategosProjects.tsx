@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useEffect, useState } from 'react';
 import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -109,10 +110,7 @@ export default function EstrategosProjects() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Projetos</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Projetos de gestão empresarial</p>
-        </div>
+        <PageHeader title="Projetos" subtitle="Projetos de gestão empresarial" />
         <Button onClick={openCreate}><Plus className="w-4 h-4" /> Novo projeto</Button>
       </div>
 

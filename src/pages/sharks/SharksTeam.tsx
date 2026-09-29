@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useState, useEffect, useCallback } from 'react';
 import Card from '@/components/ui/Card';
 import Modal from '@/components/ui/Modal';
@@ -264,10 +265,7 @@ export default function SharksTeam() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Time de Produção</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Gerencie membros, permissões e acesso aos clientes</p>
-        </div>
+        <PageHeader title="Time de Produção" subtitle="Gerencie membros, permissões e acesso aos clientes" />
         {isAdmin && (
           <Button onClick={openInvite}>
             <Plus className="w-4 h-4" />

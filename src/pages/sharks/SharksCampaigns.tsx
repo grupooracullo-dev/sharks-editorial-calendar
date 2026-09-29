@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useState } from 'react';
 import { useCampaigns } from '@/hooks/useCampaigns';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -109,12 +110,7 @@ export default function SharksCampaigns() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Campanhas</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {currentWorkspace ? `Campanhas de ${currentWorkspace.name}` : 'Selecione um cliente para ver as campanhas'}
-          </p>
-        </div>
+        <PageHeader title="Campanhas" subtitle={<>{currentWorkspace ? `Campanhas de ${currentWorkspace.name}` : 'Selecione um cliente para ver as campanhas'}</>} />
         {currentWorkspace && (
           <Button onClick={openCreate}>
             <Plus className="w-4 h-4" />

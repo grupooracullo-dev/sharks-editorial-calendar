@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -95,10 +96,7 @@ export default function SharksSettings() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Configurações</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Preferências da sua conta</p>
-      </div>
+      <PageHeader title="Configurações" subtitle="Preferências da sua conta" />
 
       {/* Perfil */}
       <Card>

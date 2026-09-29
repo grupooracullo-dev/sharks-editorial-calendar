@@ -235,7 +235,20 @@ export default function App() {
             <NotificationProvider>
               <DataSync />
               <AppRoutes />
-              <Toaster position="bottom-right" richColors closeButton offset="calc(3.5rem + env(safe-area-inset-bottom))" />
+              <Toaster
+                position="bottom-right"
+                richColors
+                closeButton
+                offset="calc(3.5rem + env(safe-area-inset-bottom))"
+                toastOptions={{
+                  style: {
+                    borderRadius: '0.75rem',
+                    border: '1px solid #e5e7eb',
+                    fontSize: '14px',
+                    fontFamily: 'inherit',
+                  },
+                }}
+              />
             </NotificationProvider>
           </WorkspaceProvider>
         </AuthProvider>

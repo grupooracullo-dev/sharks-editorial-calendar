@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useEffect, useState } from 'react';
 import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -186,12 +187,7 @@ export default function ClientIntegrations() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Integrações</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          Conecte o Google Calendar de <strong>{currentWorkspace.name}</strong>
-        </p>
-      </div>
+      <PageHeader title="Integrações" subtitle={<>Conecte o Google Calendar de <strong>{currentWorkspace.name}</strong></>} />
 
       <Card>
         <CardHeader>

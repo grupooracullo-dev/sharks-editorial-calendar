@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { localDate } from '@/lib/localDate';
 import { useMemo, useState } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -43,10 +44,7 @@ export default function SharksHistory() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Histórico</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Consulte todas as ações passadas</p>
-      </div>
+      <PageHeader title="Histórico" subtitle="Consulte todas as ações passadas" />
 
       {/* Filters */}
       <Card padding="sm">

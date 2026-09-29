@@ -1,5 +1,7 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useState, useEffect, useCallback } from 'react';
 import Card from '@/components/ui/Card';
+import Tabs from '@/components/ui/Tabs';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
@@ -280,32 +282,14 @@ export default function AccessRequestsPage({ environment }: AccessRequestsPagePr
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Solicitações de Acesso</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {pendingCount > 0
+        <PageHeader title="Solicitações de Acesso" subtitle={<>{pendingCount > 0
               ? `${pendingCount} solicitação${pendingCount > 1 ? 'ões' : ''} pendente${pendingCount > 1 ? 's' : ''}`
-              : 'Nenhuma solicitação pendente'}
-          </p>
-        </div>
-        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
-          <button
-            onClick={() => setFilter('pending')}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-              filter === 'pending' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
-            }`}
-          >
-            Pendentes
-          </button>
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-              filter === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
-            }`}
-          >
-            Histórico
-          </button>
-        </div>
+              : 'Nenhuma solicitação pendente'}</>} />
+        <Tabs
+          tabs={[{ id: 'pending' as const, label: 'Pendentes' }, { id: 'all' as const, label: 'Histórico' }]}
+          activeTab={filter}
+          onChange={setFilter}
+        />
       </div>
 
       {/* Lista */}

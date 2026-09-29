@@ -10,11 +10,18 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import Card from '@/components/ui/Card';
+import Tabs from '@/components/ui/Tabs';
 import { CONTENT_FORMATS, OBJECTIVES } from '@/lib/constants';
 import { cn, formatWeekdayShort } from '@/lib/utils';
 import { formatCalendarDate, getCalendarDays, isSameMonth, isSameDay, format, ptBR, addMonths, subMonths, addDays, startOfWeek } from '@/lib/dateUtils';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
+
+const VIEW_TABS: { id: CalendarViewType; label: string }[] = [
+  { id: 'month', label: 'Mês' },
+  { id: 'week', label: 'Semana' },
+  { id: 'agenda', label: 'Agenda' },
+];
 
 export default function ClientCalendar() {
   const { currentWorkspace } = useWorkspace();
@@ -53,22 +60,13 @@ const goNext = () => {
     <div className="flex flex-col gap-4 h-[calc(100dvh-12.5rem)] lg:h-[calc(100dvh-6.5rem)]">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shrink-0">
-        <h1 className="text-2xl font-bold text-gray-900 capitalize">Meu Calendário — {monthLabel}</h1>
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight capitalize">Meu Calendário — {monthLabel}</h1>
         <div className="flex items-center gap-2">
-      <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
-          {(['month', 'week', 'agenda'] as CalendarViewType[]).map(v => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                className={cn(
-                  'px-3 py-1.5 text-sm font-medium rounded-md transition-all',
-                  view === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                )}
-              >
-                {v === 'month' ? 'Mês' : v === 'week' ? 'Semana' : 'Agenda'}
-              </button>
-            ))}
-          </div>
+        <Tabs
+          tabs={VIEW_TABS}
+          activeTab={view}
+          onChange={setView}
+        />
           <div className="flex items-center gap-1">
             <Button variant="outline" size="icon" onClick={goPrev}>
               <ChevronLeft className="w-4 h-4" />
@@ -83,7 +81,7 @@ const goNext = () => {
 
       {/* Month view (read-only) */}
       {view === 'month' && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
+        <Card padding="none" className="overflow-hidden flex-1 min-h-0 flex flex-col">
           <div className="grid grid-cols-7 border-b border-gray-200 shrink-0">
             {(isMobile ? ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'] : weekDays).map(day => (
               <div key={day} className="px-2 py-2 text-xs font-semibold text-gray-500 text-center">{day}</div>
@@ -207,12 +205,12 @@ const goNext = () => {
               ))}
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {/* Week view (read-only) */}
       {view === 'week' && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
+        <Card padding="none" className="overflow-hidden flex-1 min-h-0 flex flex-col">
           <div className="flex-1 min-h-0 overflow-auto">
             <div className={cn('min-h-full flex flex-col', isMobile && 'min-w-[720px]')}>
               <div className="sticky top-0 z-10 bg-white grid grid-cols-7 border-b border-gray-100 shrink-0">
@@ -267,7 +265,7 @@ const goNext = () => {
               </div>
             </div>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Agenda view (read-only) */}
