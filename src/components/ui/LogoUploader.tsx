@@ -36,9 +36,9 @@ export default function LogoUploader({ name, logoUrl, onChange }: LogoUploaderPr
   };
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex flex-wrap items-center gap-4">
       <WorkspaceLogo name={name} logoUrl={logoUrl} size="lg" />
-      <div className="flex flex-col sm:flex-row gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <input
           ref={inputRef}
           type="file"
