@@ -89,6 +89,7 @@ const EstrategosIntegrations = lazyPage(() => import('@/pages/estrategos/Estrate
 const EstrategosMeetings = lazyPage(() => import('@/pages/estrategos/EstrategosMeetings'));
 const EstrategosImplementations = lazyPage(() => import('@/pages/estrategos/EstrategosImplementations'));
 const EstrategosCRM = lazyPage(() => import('@/pages/estrategos/EstrategosCRM'));
+const EstrategosProducts = lazyPage(() => import('@/pages/estrategos/EstrategosProducts'));
 
 function PageFallback() {
   return (
@@ -220,6 +221,7 @@ function AppRoutes() {
         <Route path="/estrategos/access-requests" element={<EstrategosLayout><EstrategosAccessRequests /></EstrategosLayout>} />
         <Route path="/estrategos/team" element={<EstrategosLayout><EstrategosTeam /></EstrategosLayout>} />
         <Route path="/estrategos/crm" element={<EstrategosLayout><EstrategosCRM /></EstrategosLayout>} />
+        <Route path="/estrategos/products" element={<EstrategosLayout><EstrategosProducts /></EstrategosLayout>} />
 
         {/* Legal (público, exigência OAuth Google) */}
         <Route path="/privacy" element={<PrivacyPolicy />} />

@@ -17,6 +17,7 @@ import {
   CalendarDays,
   Building2,
   Target,
+  Package,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -34,6 +35,7 @@ export const SHARKS_NAV: NavItem[] = [
   { icon: Megaphone, label: 'Campanhas', path: '/sharks/campaigns' },
   { icon: BookOpen, label: 'Linha Editorial', path: '/sharks/editorial' },
   { icon: LayoutTemplate, label: 'Modelos', path: '/sharks/templates' },
+  { icon: Package, label: 'Produtos', path: '/sharks/products' },
   { icon: MessageSquare, label: 'Chat', path: '/sharks/chat' },
   { icon: History, label: 'Histórico', path: '/sharks/history' },
   { icon: Target, label: 'CRM', path: '/sharks/crm' },
@@ -58,6 +60,7 @@ export const ESTRATEGOS_NAV: NavItem[] = [
   { icon: Briefcase, label: 'Projetos', path: '/estrategos/projects' },
   { icon: CalendarDays, label: 'Reuniões', path: '/estrategos/meetings' },
   { icon: Rocket, label: 'Implementações', shortLabel: 'Impl.', path: '/estrategos/implementations' },
+  { icon: Package, label: 'Produtos', path: '/estrategos/products' },
   { icon: Target, label: 'CRM', path: '/estrategos/crm' },
   { icon: MessageSquare, label: 'Chat', path: '/estrategos/chat' },
   { icon: Users, label: 'Clientes', path: '/estrategos/clients', adminOnly: true },

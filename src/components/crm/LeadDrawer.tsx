@@ -96,6 +96,22 @@ export default function LeadDrawer({
           </div>
         )}
 
+        {/* Produtos de interesse */}
+        {(lead.products?.length ?? 0) > 0 && (
+          <div>
+            <p className="text-xs text-gray-400 mb-1.5">Produtos de interesse</p>
+            <div className="flex flex-wrap gap-1.5">
+              {lead.products!.map(x => (
+                x.product && (
+                  <span key={x.product.id} className="text-xs font-medium text-gray-700 bg-gray-100 border border-gray-200 px-2 py-1 rounded-full">
+                    {x.product.name}
+                  </span>
+                )
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Dados */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
           <InfoRow label="Contato" value={lead.contact_name} />

@@ -189,10 +189,12 @@ export default function CrmBoard({ environment, canDelete = false, showEnv = fal
         title={title}
         subtitle={subtitle}
         actions={
-          <Button onClick={() => { setEditingLead(null); setFormOpen(true); }}>
-            <Plus className="w-4 h-4" />
-            Novo lead
-          </Button>
+          environment ? (
+            <Button onClick={() => { setEditingLead(null); setFormOpen(true); }}>
+              <Plus className="w-4 h-4" />
+              Novo lead
+            </Button>
+          ) : undefined
         }
       />
 
@@ -286,6 +288,7 @@ export default function CrmBoard({ environment, canDelete = false, showEnv = fal
         isOpen={formOpen}
         onClose={() => { setFormOpen(false); setEditingLead(null); }}
         lead={editingLead}
+        environment={editingLead?.environment ?? environment}
         owners={owners}
         submitting={submitting}
         onSubmit={handleCreateOrUpdate}

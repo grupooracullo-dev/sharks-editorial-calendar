@@ -17,7 +17,7 @@ import { supabase } from '@/lib/supabase';
 import { formatCalendarDate, addDays, startOfWeek, parseISO, format } from '@/lib/dateUtils';
 import { ACTION_TYPES, CONTENT_FORMATS, OBJECTIVES, FUNNEL_STAGES, ACTION_STATUSES, ACTION_TYPES_BY_ENV, FORM_SECTIONS_BY_ENV, DEFAULT_CHANNELS } from '@/lib/constants';
 import { toast } from 'sonner';
-import SearchSelect from '@/components/ui/SearchSelect';
+import ChipMultiSelect from '@/components/ui/ChipMultiSelect';
 import { CalendarDays } from 'lucide-react';
 
 interface ActionFormProps {
@@ -59,6 +59,7 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
     audience: '',
     product: '',
     product_id: '' as string | null,
+    product_ids: [] as string[],
     partner_ids: [] as string[],
     theme: '',
     hook: '',
@@ -135,8 +136,9 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
         editorial_pillar_id: formData.editorial_pillar_id || null,
         objective: (formData.objective || null) as Objective | null,
         funnel_stage: (formData.funnel_stage || null) as FunnelStage | null,
-        audience: formData.audience || null,
+          audience: formData.audience || null,
     product_id: formData.product_id || null,
+    product_ids: formData.product_ids,
     partner_ids: formData.partner_ids,
         product: formData.product || null,
         theme: formData.theme || null,
@@ -241,6 +243,9 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
           status: action.status || 'draft',
           observations: action.observations || '',
           product_id: action.product_id ?? '',
+          product_ids: action.products?.length
+            ? action.products.map(p => p.id)
+            : (action.product_id ? [action.product_id] : []),
           partner_ids: action.partners?.length ? action.partners.map(r => r.id) : (action.product_id ? [] : []),
           responsible_ids: action.responsibles?.length
             ? action.responsibles.map(r => r.id)
@@ -271,6 +276,7 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
           status: 'draft',
           observations: '',
           product_id: '' as string | null,
+          product_ids: [] as string[],
           partner_ids: [] as string[],
           responsible_ids: [] as string[],
           internal_deadline: '',
@@ -459,22 +465,19 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
                 options={Object.entries(FUNNEL_STAGES).map(([v, l]) => ({ value: v, label: l }))}
               />
             </div>
-            <SearchSelect
-              label="Produto ou Serviço"
-              value={formData.product_id || ''}
-              onChange={(v) => {
-                const opt = productOptions.find(o => o.id === v);
-                setFormData(p => ({ ...p, product_id: v || null, product: opt?.name ?? '' }));
-              }}
-              placeholder="Selecione o produto..."
+            <ChipMultiSelect
+              label="Produtos ou Serviços"
+              options={productOptions}
+              values={formData.product_ids}
+              onChange={(ids) => setFormData(p => ({
+                ...p,
+                product_ids: ids,
+                // Compatibilidade: product text/product_id ficam com o 1º
+                product_id: ids[0] ?? null,
+                product: productOptions.find(o => o.id === ids[0])?.name ?? '',
+              }))}
+              placeholder="Selecionar produtos..."
               emptyMessage="Nenhum produto cadastrado — cadastre em Produtos"
-              options={[
-                { value: '', label: 'Sem produto' },
-                ...productOptions.map(p => ({ value: p.id, label: p.name })),
-                ...(formData.product && !productOptions.some(p => p.name === formData.product)
-                  ? [{ value: `__legacy__${formData.product}`, label: `${formData.product} (texto atual)` }]
-                  : []),
-              ]}
             />
             <Input
               label="Público"
