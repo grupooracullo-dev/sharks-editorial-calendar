@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,9 +31,7 @@ export default function EnvironmentSelector() {
     <div className="min-h-[calc(100vh-200px)] flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Bem-vindo, {user?.full_name?.split(' ')[0]}!
-          </h1>
+          <PageHeader title={<>Bem-vindo, {user?.full_name?.split(' ')[0]}!</>} />
           <p className="text-sm text-gray-500 mt-1">Selecione o ambiente que deseja acessar</p>
         </div>
 

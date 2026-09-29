@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useState } from 'react';
 import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -141,10 +142,7 @@ export default function EstrategosIntegrations() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Integrações</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Conecte o Google Calendar por cliente Estrategos</p>
-      </div>
+      <PageHeader title="Integrações" subtitle="Conecte o Google Calendar por cliente Estrategos" />
 
       {wsList.length > 1 && (
         <div className="flex gap-2 flex-wrap">

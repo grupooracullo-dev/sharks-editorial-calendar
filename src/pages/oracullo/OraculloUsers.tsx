@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useEffect, useState } from 'react';
 import Card from '@/components/ui/Card';
 import Avatar from '@/components/ui/Avatar';
@@ -47,10 +48,7 @@ export default function OraculloUsers() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Usuários</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Todos os usuários da plataforma Oracullo</p>
-      </div>
+      <PageHeader title="Usuários" subtitle="Todos os usuários da plataforma Oracullo" />
 
       <Card>
         {loading ? (

@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useMemo, useState } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useActions } from '@/hooks/useActions';
@@ -46,10 +47,7 @@ export default function ClientHistory() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Histórico</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Acompanhe tudo que já foi publicado</p>
-      </div>
+      <PageHeader title="Histórico" subtitle="Acompanhe tudo que já foi publicado" />
 
       {/* Month navigation */}
       <div className="flex flex-wrap items-center justify-between gap-2">

@@ -35,7 +35,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
       <div className="lg:ml-[240px] transition-all duration-300">
         <TopHeader onOpenMobileNav={() => setMobileNavOpen(true)} />
         <main className="p-4 pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-6">
-          {children}
+          <div className="mx-auto w-full max-w-[1400px]">
+            {children}
+          </div>
         </main>
       </div>
       <BottomNav />

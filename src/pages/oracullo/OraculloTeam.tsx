@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useState, useEffect, useCallback } from 'react';
 import Card from '@/components/ui/Card';
 import Modal from '@/components/ui/Modal';
@@ -441,10 +442,7 @@ export default function OraculloTeam() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Time</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Gerencie membros e permissões em todos os ambientes</p>
-        </div>
+        <PageHeader title="Time" subtitle="Gerencie membros e permissões em todos os ambientes" />
         {isOracullo && (
           <Button onClick={openInvite}>
             <Plus className="w-4 h-4" />

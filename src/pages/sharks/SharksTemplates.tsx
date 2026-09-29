@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useState, useEffect } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useEditorial } from '@/hooks/useEditorial';
@@ -112,10 +113,7 @@ export default function SharksTemplates() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Modelos</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Templates pré-configurados para acelerar o planejamento</p>
-      </div>
+      <PageHeader title="Modelos" subtitle="Templates pré-configurados para acelerar o planejamento" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {templates.map(t => (

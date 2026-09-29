@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/lib/supabase';
@@ -88,12 +89,7 @@ export default function SharksProducts() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Produtos</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {currentWorkspace ? `Catálogo de ${currentWorkspace.name}` : 'Selecione um cliente para ver o catálogo'}
-          </p>
-        </div>
+        <PageHeader title="Produtos" subtitle={<>{currentWorkspace ? `Catálogo de ${currentWorkspace.name}` : 'Selecione um cliente para ver o catálogo'}</>} />
         {currentWorkspace && (
           <Button onClick={openNew}>
             <Plus className="w-4 h-4" />

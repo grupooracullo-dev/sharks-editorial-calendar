@@ -1,3 +1,4 @@
+import Card from '@/components/ui/Card';
 import { useState, useEffect, useCallback, useMemo, type CSSProperties, type ReactNode } from 'react';
 import { Action, CalendarViewType, EnvironmentType } from '@/types';
 import { cn, formatWeekdayShort } from '@/lib/utils';
@@ -15,6 +16,7 @@ import WeekGeneratorModal from '@/components/calendar/WeekGeneratorModal';
 import ActionDrawer from '@/components/actions/ActionDrawer';
 import ActionForm from '@/components/actions/ActionForm';
 import Button from '@/components/ui/Button';
+import Tabs from '@/components/ui/Tabs';
 import { useEditorial } from '@/hooks/useEditorial';
 import { useStrategicDates } from '@/hooks/useStrategicDates';
 import { useChannels } from '@/hooks/useChannels';
@@ -283,7 +285,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
           {/* Linha 1: título + Hoje + Filtros */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3 min-w-0">
-              <h1 className="text-2xl font-bold text-gray-900 capitalize truncate">{monthLabel}</h1>
+              <h1 className="text-2xl font-bold text-gray-900 tracking-tight capitalize truncate">{monthLabel}</h1>
               <Button variant="ghost" size="sm" onClick={goToToday}>Hoje</Button>
             </div>
             <CalendarFilters activeFilters={filters} onFilterChange={setFilters} environment={environment} />
@@ -291,20 +293,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
 
           {/* Linha 2: controles em uma linha (views + navegação + ações) */}
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
-              {views.map(v => (
-                <button
-                  key={v.id}
-                  onClick={() => setView(v.id)}
-                  className={cn(
-                    'px-3 py-1.5 text-sm font-medium rounded-md transition-all',
-                    view === v.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                  )}
-                >
-                  {v.label}
-                </button>
-              ))}
-            </div>
+            <Tabs tabs={views} activeTab={view} onChange={setView} />
 
             <div className="flex items-center gap-1">
               <Button variant="outline" size="icon" onClick={goPrev}>
@@ -346,7 +335,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
 
         {/* Month View */}
         {view === 'month' && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
+          <Card padding="none" className="overflow-hidden flex-1 min-h-0 flex flex-col">
             <div className="grid grid-cols-7 border-b border-gray-200 shrink-0">
               {(isMobile ? ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'] : weekDays).map((day, i) => (
                 <div key={i} className="px-1 sm:px-3 py-2 text-xs font-semibold text-gray-500 text-center border-r last:border-r-0">
@@ -520,12 +509,12 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
                 )}
               </div>
             )}
-          </div>
+          </Card>
         )}
 
         {/* Week View */}
         {view === 'week' && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
+          <Card padding="none" className="overflow-hidden flex-1 min-h-0 flex flex-col">
             <div className="flex-1 min-h-0 overflow-auto">
               <div className={cn('min-h-full flex flex-col', isMobile && 'min-w-[720px]')}>
                 <div className="sticky top-0 z-10 bg-white grid grid-cols-7 border-b border-gray-200 shrink-0">
@@ -613,12 +602,12 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
                 </div>
               </div>
             </div>
-          </div>
+          </Card>
         )}
 
         {/* Day View (mobile-optimized) */}
         {view === 'day' && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
+          <Card padding="none" className="overflow-hidden flex-1 min-h-0 flex flex-col">
             <div className="px-4 py-3 border-b border-gray-200 bg-gray-50/50 shrink-0">
               <p className="text-sm font-semibold text-gray-900 capitalize">
                 {format(currentDate, 'EEEE, dd MMMM yyyy', { locale: ptBR })}
@@ -652,12 +641,12 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
                 ));
               })()}
             </div>
-          </div>
+          </Card>
         )}
 
         {/* Agenda View */}
         {view === 'agenda' && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100 flex-1 min-h-0 overflow-y-auto">
+          <Card padding="none" className="divide-y divide-gray-100 flex-1 min-h-0 overflow-y-auto">
             {calendarDays.filter(d => actions.some(a => a.action_date === formatCalendarDate(d))).length === 0 ? (
               <div className="p-8 text-center">
                 <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -690,7 +679,7 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
                 );
               })
             )}
-          </div>
+          </Card>
         )}
 
         <DragOverlay>

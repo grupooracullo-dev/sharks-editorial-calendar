@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -117,12 +118,7 @@ export default function DashboardOverview({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          {formatDate(today)} — {subtitle}
-        </p>
-      </div>
+      <PageHeader title={<>{title}</>} subtitle={<>{formatDate(today)} — {subtitle}</>} />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">

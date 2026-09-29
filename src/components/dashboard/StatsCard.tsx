@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import Card from '@/components/ui/Card';
 
 interface StatsCardProps {
   icon: LucideIcon;
@@ -15,8 +16,9 @@ interface StatsCardProps {
 
 export default function StatsCard({ icon: Icon, label, value, trend, trendUp, iconBg = 'bg-primary-50 text-primary-600', className, onClick }: StatsCardProps) {
   return (
-    <div
-      className={cn('bg-white rounded-xl border border-gray-200 shadow-sm p-4 card-hover', onClick && 'cursor-pointer', className)}
+    <Card
+      hover={!!onClick}
+      className={cn(className)}
       onClick={onClick}
     >
       <div className="flex items-start justify-between">
@@ -34,6 +36,6 @@ export default function StatsCard({ icon: Icon, label, value, trend, trendUp, ic
       </div>
       <p className="text-2xl font-bold text-gray-900 mt-3 tabular-nums">{value}</p>
       <p className="text-xs text-gray-500 mt-0.5">{label}</p>
-    </div>
+    </Card>
   );
 }

@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useEffect } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,7 +30,7 @@ export default function ClientChat() {
     <div className="space-y-4">
       {/* Cabeçalho da página apenas no desktop — no mobile o painel já tem título */}
       <div className="hidden sm:block">
-        <h1 className="text-2xl font-bold text-gray-900">Chat</h1>
+        <PageHeader title="Chat" />
         <p className="text-sm text-gray-500 mt-0.5">
           Fale diretamente com a equipe Sharks
         </p>

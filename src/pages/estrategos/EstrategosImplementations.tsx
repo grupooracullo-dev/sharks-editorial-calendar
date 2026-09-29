@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useEffect, useState } from 'react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -126,10 +127,7 @@ export default function EstrategosImplementations() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Implantações</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Implantação de sistemas — marcos sincronizados com o Google Calendar</p>
-        </div>
+        <PageHeader title="Implantações" subtitle="Implantação de sistemas — marcos sincronizados com o Google Calendar" />
         <Button onClick={openCreate}><Plus className="w-4 h-4" /> Nova implantação</Button>
       </div>
 

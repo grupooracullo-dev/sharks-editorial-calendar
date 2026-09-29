@@ -1,3 +1,4 @@
+import PageHeader from '@/components/ui/PageHeader';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -77,10 +78,7 @@ export default function ClientDashboard() {
   return (
     <div className="space-y-6">
       {/* Greeting */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Olá, {currentWorkspace.name}!</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Aqui está o resumo do seu planejamento</p>
-      </div>
+      <PageHeader title={<>Olá, {currentWorkspace.name}!</>} subtitle="Aqui está o resumo do seu planejamento" />
 
       {/* QUICK INSIGHTS — acima do calendário */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
