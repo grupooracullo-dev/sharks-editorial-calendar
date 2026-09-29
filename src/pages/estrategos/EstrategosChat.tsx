@@ -38,7 +38,7 @@ export default function EstrategosChat() {
   };
 
   return (
-    <div className="space-y-4 lg:space-y-6">
+    <div className="flex-1 min-h-0 flex flex-col space-y-4 lg:space-y-6">
       <PageHeader title="Chat" subtitle="Converse com os clientes em tempo real" />
 
       {isMobile && (
@@ -81,13 +81,13 @@ export default function EstrategosChat() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] grid-rows-[1fr] gap-4 flex-1 min-h-0">
         {!isMobile && (
-          <Card padding="none">
-            <div className="p-3 border-b border-gray-100">
+          <Card padding="none" className="h-full flex flex-col min-h-0 overflow-hidden">
+            <div className="p-3 border-b border-gray-100 shrink-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Clientes</p>
             </div>
-            <div className="max-h-[calc(100vh-260px)] overflow-y-auto">
+            <div className="flex-1 min-h-0 overflow-y-auto">
               {wsList.map(ws => (
                 <button
                   key={ws.id}
@@ -109,7 +109,7 @@ export default function EstrategosChat() {
           </Card>
         )}
 
-        <Card padding="none">
+        <Card padding="none" className="h-full min-h-0">
           {activeWsId && user ? (
             <ChatPanel
               messages={messages}
@@ -119,7 +119,7 @@ export default function EstrategosChat() {
               title={selectedWs?.name}
             />
           ) : (
-            <p className="text-sm text-gray-500 py-12 text-center">Selecione um cliente para conversar</p>
+            <p className="h-full flex items-center justify-center text-sm text-gray-500">Selecione um cliente para conversar</p>
           )}
         </Card>
       </div>
