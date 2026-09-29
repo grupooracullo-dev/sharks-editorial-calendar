@@ -26,3 +26,21 @@ export function formatBRL(value: number | string | null | undefined): string {
   if (n == null || Number.isNaN(n)) return '—';
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(n);
 }
+
+export function formatRelativeTime(date: string | Date): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const diffMs = Date.now() - d.getTime();
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return 'agora';
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h}h`;
+  const days = Math.floor(h / 24);
+  if (days === 1) return 'há 1 dia';
+  if (days < 30) return `há ${days} dias`;
+  const months = Math.floor(days / 30);
+  if (months === 1) return 'há 1 mês';
+  if (months < 12) return `há ${months} meses`;
+  const years = Math.floor(months / 12);
+  return years === 1 ? 'há 1 ano' : `há ${years} anos`;
+}

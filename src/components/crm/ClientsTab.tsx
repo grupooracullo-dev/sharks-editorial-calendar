@@ -1,0 +1,101 @@
+import { Building2 } from 'lucide-react';
+import EmptyState from '@/components/ui/EmptyState';
+import Avatar from '@/components/ui/Avatar';
+import { formatBRL, formatRelativeTime } from '@/lib/crmStages';
+import type { Lead } from '@/hooks/useLeads';
+import { ENVIRONMENT_META } from '@/types';
+
+interface ClientsTabProps {
+  leads: Lead[];
+  showEnv?: boolean;
+  onOpenLead: (lead: Lead) => void;
+}
+
+export default function ClientsTab({ leads, showEnv, onOpenLead }: ClientsTabProps) {
+  const clients = leads.filter(l => l.stage === 'won' && l.workspace_id && l.workspace);
+  const totalMonthly = clients.reduce((acc, l) => acc + (Number(l.monthly_value) || 0), 0);
+  const totalWon = clients.reduce((acc, l) => acc + (Number(l.value) || 0), 0);
+
+  if (clients.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="w-full max-w-md">
+          <EmptyState
+            icon={Building2}
+            title="Nenhum cliente convertido ainda"
+            description="Quando um lead for convertido, ele aparece aqui com a recorrência mensal."
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col gap-3">
+      {/* Resumo */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+        <span className="text-gray-500">
+          <strong className="text-gray-900">{clients.length}</strong>{' '}
+          {clients.length === 1 ? 'cliente' : 'clientes'} via CRM
+        </span>
+        <span className="text-gray-500">
+          Contratos: <strong className="text-gray-900 tabular-nums">{formatBRL(totalWon)}</strong>
+        </span>
+        <span className="text-gray-500">
+          Recorrência mensal: <strong className="text-emerald-600 tabular-nums">{formatBRL(totalMonthly)}</strong>
+        </span>
+      </div>
+
+      {/* Grid de clientes */}
+      <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 content-start p-1">
+        {clients.map(lead => (
+          <button
+            key={lead.id}
+            onClick={() => onOpenLead(lead)}
+            className="bg-white border border-gray-200 rounded-lg p-3 text-left transition-all hover:border-gray-300 hover:shadow-md"
+          >
+            <div className="flex items-start gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <Building2 className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-gray-900 truncate">{lead.workspace?.name}</p>
+                <p className="text-xs text-gray-400 truncate">
+                  lead: {lead.name}
+                  {showEnv && ` · ${ENVIRONMENT_META[lead.environment].emoji}`}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-2.5 flex items-center justify-between gap-2 min-w-0">
+              <span className="flex items-center gap-1.5 min-w-0 text-xs text-gray-500">
+                {lead.owner ? (
+                  <Avatar name={lead.owner.full_name} src={lead.owner.avatar_url} size="xs" />
+                ) : (
+                  <span className="w-6 h-6 rounded-full bg-gray-100 shrink-0" />
+                )}
+                <span className="truncate">{lead.owner?.full_name ?? 'Sem responsável'}</span>
+              </span>
+              {lead.value != null && (
+                <span className="text-sm font-semibold text-gray-800 tabular-nums shrink-0">
+                  {formatBRL(lead.value)}
+                </span>
+              )}
+            </div>
+
+            <div className="mt-1.5 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-gray-400">
+                atualizado {formatRelativeTime(lead.updated_at)}
+              </span>
+              {lead.monthly_value != null && (
+                <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full shrink-0">
+                  {formatBRL(lead.monthly_value)}/mês
+                </span>
+              )}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

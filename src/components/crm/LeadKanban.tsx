@@ -1,20 +1,25 @@
 import { useState, type DragEvent } from 'react';
 import { cn } from '@/lib/utils';
 import { LEAD_STAGES, STAGE_META, formatBRL, type LeadStage } from '@/lib/crmStages';
-import type { Lead } from '@/hooks/useLeads';
+import type { Lead, LeadActivitySummary } from '@/hooks/useLeads';
 import LeadCard from './LeadCard';
 
 interface LeadKanbanProps {
   leads: Lead[];
+  activitySummaries: Map<string, LeadActivitySummary>;
   showEnv?: boolean;
   isMobile?: boolean;
   onOpenLead: (lead: Lead) => void;
   onMoveStage: (lead: Lead, stage: LeadStage) => void;
 }
 
-export default function LeadKanban({ leads, showEnv, isMobile, onOpenLead, onMoveStage }: LeadKanbanProps) {
+export default function LeadKanban({ leads, activitySummaries, showEnv, isMobile, onOpenLead, onMoveStage }: LeadKanbanProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overStage, setOverStage] = useState<LeadStage | null>(null);
+
+  const totalPipeline = leads
+    .filter(l => l.stage !== 'won' && l.stage !== 'lost')
+    .reduce((acc, l) => acc + (Number(l.value) || 0), 0);
 
   const handleDragStart = (lead: Lead) => (e: DragEvent<HTMLDivElement>) => {
     e.dataTransfer.setData('text/plain', lead.id);
@@ -32,11 +37,12 @@ export default function LeadKanban({ leads, showEnv, isMobile, onOpenLead, onMov
   };
 
   return (
-    <div className="flex-1 min-h-0 flex gap-3 overflow-x-auto pb-1">
+    <div className="flex-1 min-h-0 flex gap-3 overflow-x-auto pb-1 xl:grid xl:grid-cols-6 xl:overflow-visible">
       {LEAD_STAGES.map(stage => {
         const meta = STAGE_META[stage];
         const columnLeads = leads.filter(l => l.stage === stage);
         const columnValue = columnLeads.reduce((acc, l) => acc + (Number(l.value) || 0), 0);
+        const pct = totalPipeline > 0 ? Math.round((columnValue / totalPipeline) * 100) : 0;
         const isOver = overStage === stage && !!draggingId;
 
         return (
@@ -52,26 +58,19 @@ export default function LeadKanban({ leads, showEnv, isMobile, onOpenLead, onMov
             }}
             onDrop={handleDrop(stage)}
             className={cn(
-              'w-[264px] shrink-0 flex flex-col rounded-xl border transition-colors',
+              'w-[272px] shrink-0 xl:w-auto flex flex-col rounded-xl border transition-colors min-h-0',
               isOver
                 ? 'border-primary-300 bg-primary-50/70 ring-2 ring-primary-200'
                 : 'border-gray-200 bg-gray-100/60',
             )}
           >
-            {/* Header da coluna */}
+            {/* Header da etapa */}
             <div className="px-3 py-2.5 border-b border-gray-200/70 shrink-0">
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 min-w-0">
-                  <span className={cn('w-2 h-2 rounded-full shrink-0', meta.dotClass)} />
-                  <span className="truncate">{meta.label}</span>
-                  <span className="text-xs font-medium text-gray-400">{columnLeads.length}</span>
-                </span>
-                {columnValue > 0 && (
-                  <span className="text-[11px] font-medium text-gray-500 tabular-nums shrink-0">
-                    {formatBRL(columnValue)}
-                  </span>
-                )}
-              </div>
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-0">
+                <span className={cn('w-2 h-2 rounded-full shrink-0', meta.dotClass)} />
+                <span className="truncate">{meta.label}</span>
+                <span className="text-gray-400">{columnLeads.length}</span>
+              </span>
             </div>
 
             {/* Cards */}
@@ -83,6 +82,7 @@ export default function LeadKanban({ leads, showEnv, isMobile, onOpenLead, onMov
                   draggable={!isMobile}
                   dragging={draggingId === lead.id}
                   showEnv={showEnv}
+                  lastActivity={activitySummaries.get(lead.id) ?? null}
                   onOpen={() => onOpenLead(lead)}
                   onDragStart={handleDragStart(lead)}
                   onDragEnd={() => { setDraggingId(null); setOverStage(null); }}
@@ -98,6 +98,18 @@ export default function LeadKanban({ leads, showEnv, isMobile, onOpenLead, onMov
                   {isOver ? 'Solte aqui' : 'Vazio'}
                 </div>
               )}
+            </div>
+
+            {/* Rodapé com totais (padrão pipeline) */}
+            <div className="px-3 py-2 border-t border-gray-200/70 bg-white/60 rounded-b-xl shrink-0">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-500">Total</span>
+                <span className="font-semibold text-gray-800 tabular-nums">{formatBRL(columnValue)}</span>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                {columnLeads.length} {columnLeads.length === 1 ? 'lead' : 'leads'}
+                {stage !== 'won' && stage !== 'lost' && columnValue > 0 && <> · {pct}% do pipeline</>}
+              </p>
             </div>
           </div>
         );
