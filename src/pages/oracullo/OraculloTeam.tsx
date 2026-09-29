@@ -105,6 +105,11 @@ export default function OraculloTeam() {
     full_name: '',
     permissions: [] as Permission[],
     workspace_ids: [] as string[],
+    environments: [] as EnvironmentType[],
+    envRoles: {
+      sharks_company: 'team',
+      estrategos: 'team',
+    } as Record<EnvironmentType, 'admin' | 'team'>,
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -300,26 +305,70 @@ export default function OraculloTeam() {
       full_name: member.full_name,
       permissions: member.permissions[activeTab]?.length > 0 ? member.permissions[activeTab] : defaultPermissions(),
       workspace_ids: member.workspaces[activeTab]?.map(w => w.id) ?? [],
+      environments: member.environments.map(e => e.environment),
+      envRoles: {
+        sharks_company: member.environments.find(e => e.environment === 'sharks_company')?.role ?? 'team',
+        estrategos: member.environments.find(e => e.environment === 'estrategos')?.role ?? 'team',
+      },
     });
     setEditOpen(true);
   };
 
   const handleUpdate = async () => {
     if (!editingMember || !editForm.full_name.trim() || submitting) return;
+    if (editForm.environments.length === 0) {
+      toast.error('Selecione pelo menos um ambiente.');
+      return;
+    }
+    const currentEnvs = editingMember.environments.map(e => e.environment);
+    const toUnlink = currentEnvs.filter(env => !editForm.environments.includes(env));
+    if (editingMember.id === currentUser?.id && toUnlink.length > 0) {
+      toast.error('Você não pode remover seus próprios ambientes.');
+      return;
+    }
+    const toLink = editForm.environments.filter(env =>
+      !currentEnvs.includes(env) ||
+      editForm.envRoles[env] !== editingMember.environments.find(e => e.environment === env)?.role
+    );
     setSubmitting(true);
     try {
+      // 1) Novos ambientes / troca de função — antes do update, pois
+      //    workspace_ids é validado contra a org do ambiente da aba ativa.
+      for (const env of toLink) {
+        const { data, error } = await supabase.functions.invoke('admin-link-user-env', {
+          body: { op: 'link', user_id: editingMember.id, environment: env, env_role: editForm.envRoles[env] },
+        });
+        if (error) throw new Error(await functionErrorMessage(error));
+        if (data?.error) throw new Error(data.error);
+      }
+
+      // 2) Nome, permissões e clientes do ambiente da aba ativa
       const { data, error } = await supabase.functions.invoke('admin-update-user', {
         body: {
           user_id: editingMember.id,
           full_name: editForm.full_name.trim(),
           environment: activeTab,
           permissions: editForm.permissions,
-          workspace_ids: editForm.workspace_ids,
+          workspace_ids: editForm.environments.includes(activeTab) ? editForm.workspace_ids : [],
         },
       });
       if (error) throw new Error(await functionErrorMessage(error));
       if (data?.error) throw new Error(data.error);
-      toast.success('Membro atualizado!');
+
+      // 3) Ambientes desmarcados — unlink remove o vínculo e as memberships
+      for (const env of toUnlink) {
+        const { data: ud, error: ue } = await supabase.functions.invoke('admin-link-user-env', {
+          body: { op: 'unlink', user_id: editingMember.id, environment: env },
+        });
+        if (ue) throw new Error(await functionErrorMessage(ue));
+        if (ud?.error) throw new Error(ud.error);
+      }
+
+      const changes = [
+        ...toLink.map(env => `+ ${ENVIRONMENT_META[env].short}`),
+        ...toUnlink.map(env => `− ${ENVIRONMENT_META[env].short}`),
+      ];
+      toast.success(changes.length > 0 ? `Membro atualizado (${changes.join(', ')})` : 'Membro atualizado!');
       setEditOpen(false);
       setEditingMember(null);
       await loadData();
@@ -850,10 +899,79 @@ export default function OraculloTeam() {
 
           {editingMember && (
             <p className="text-xs text-gray-400">
-              E-mail: {editingMember.email} (não pode ser alterado) · Ambiente:{' '}
+              E-mail: {editingMember.email} (não pode ser alterado) · Ambiente da edição:{' '}
               {ENVIRONMENT_META[activeTab].emoji} {ENVIRONMENT_META[activeTab].label}
             </p>
           )}
+
+          {/* Environments */}
+          <div>
+            <h4 className="text-sm font-semibold text-gray-900 mb-1">Ambientes de acesso</h4>
+            <p className="text-xs text-gray-400 mb-3">
+              Marque para liberar o acesso a um ambiente; desmarque para remover.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {ENV_ORDER.map(env => {
+                const meta = ENVIRONMENT_META[env];
+                const checked = editForm.environments.includes(env);
+                const existing = editingMember?.environments.find(e => e.environment === env);
+                return (
+                  <div
+                    key={env}
+                    className={`rounded-lg border p-3 transition-all ${
+                      checked ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-200' : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setEditForm(f => ({
+                        ...f,
+                        environments: checked
+                          ? f.environments.filter(e => e !== env)
+                          : [...f.environments, env],
+                      }))}
+                      className="flex items-center gap-3 w-full text-left"
+                    >
+                      <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${
+                        checked ? 'bg-primary-500 text-white' : 'border-2 border-gray-300'
+                      }`}>
+                        {checked && <Check className="w-3 h-3" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{meta.emoji} {meta.label}</p>
+                        <p className="text-[11px] text-gray-400">
+                          {checked
+                            ? existing ? 'vínculo atual' : 'novo acesso'
+                            : existing ? 'será removido' : 'sem acesso'}
+                        </p>
+                      </div>
+                    </button>
+                    {checked && (
+                      <div className="mt-3">
+                        <Select
+                          label={`Função em ${meta.short}`}
+                          value={editForm.envRoles[env]}
+                          onChange={(e) => setEditForm(f => ({
+                            ...f,
+                            envRoles: { ...f.envRoles, [env]: e.target.value as 'admin' | 'team' },
+                          }))}
+                          options={[
+                            { value: 'team', label: 'Time — acesso conforme permissões' },
+                            { value: 'admin', label: 'Admin do ambiente — acesso total' },
+                          ]}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {editForm.environments.length === 0 && (
+              <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2 mt-2">
+                Selecione pelo menos um ambiente.
+              </p>
+            )}
+          </div>
 
           {/* Permissions */}
           <div>
