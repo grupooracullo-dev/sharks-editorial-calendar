@@ -54,6 +54,7 @@ const OraculloAccess = lazyPage(() => import('@/pages/oracullo/OraculloAccess'))
 const OraculloAccessRequests = lazyPage(() => import('@/pages/oracullo/OraculloAccessRequests'));
 const OraculloUsers = lazyPage(() => import('@/pages/oracullo/OraculloUsers'));
 const OraculloTeam = lazyPage(() => import('@/pages/oracullo/OraculloTeam'));
+const OraculloCRM = lazyPage(() => import('@/pages/oracullo/OraculloCRM'));
 
 const SharksDashboard = lazyPage(() => import('@/pages/sharks/SharksDashboard'));
 const SharksCalendarPage = lazyPage(() => import('@/pages/sharks/SharksCalendar'));
@@ -69,6 +70,7 @@ const SharksTeam = lazyPage(() => import('@/pages/sharks/SharksTeam'));
 const SharksProducts = lazyPage(() => import('@/pages/sharks/SharksProducts'));
 const SharksPartners = lazyPage(() => import('@/pages/sharks/SharksPartners'));
 const SharksAccessRequests = lazyPage(() => import('@/pages/sharks/SharksAccessRequests'));
+const SharksCRM = lazyPage(() => import('@/pages/sharks/SharksCRM'));
 
 const ClientDashboard = lazyPage(() => import('@/pages/client/ClientDashboard'));
 const ClientCalendar = lazyPage(() => import('@/pages/client/ClientCalendar'));
@@ -86,6 +88,7 @@ const EstrategosTeam = lazyPage(() => import('@/pages/estrategos/EstrategosTeam'
 const EstrategosIntegrations = lazyPage(() => import('@/pages/estrategos/EstrategosIntegrations'));
 const EstrategosMeetings = lazyPage(() => import('@/pages/estrategos/EstrategosMeetings'));
 const EstrategosImplementations = lazyPage(() => import('@/pages/estrategos/EstrategosImplementations'));
+const EstrategosCRM = lazyPage(() => import('@/pages/estrategos/EstrategosCRM'));
 
 function PageFallback() {
   return (
@@ -175,6 +178,7 @@ function AppRoutes() {
         {/* Oracullo (governança multi-ambiente) */}
         <Route path="/oracullo" element={<OraculloLayout><OraculloDashboard /></OraculloLayout>} />
         <Route path="/oracullo/access" element={<OraculloLayout><OraculloAccess /></OraculloLayout>} />
+        <Route path="/oracullo/crm" element={<OraculloLayout><OraculloCRM /></OraculloLayout>} />
         <Route path="/oracullo/access-requests" element={<OraculloLayout><OraculloAccessRequests /></OraculloLayout>} />
         <Route path="/oracullo/users" element={<OraculloLayout><OraculloUsers /></OraculloLayout>} />
         <Route path="/oracullo/clients" element={<OraculloLayout><OraculloClients /></OraculloLayout>} />
@@ -188,6 +192,7 @@ function AppRoutes() {
         <Route path="/sharks/editorial" element={<SharksLayout><SharksEditorial /></SharksLayout>} />
         <Route path="/sharks/templates" element={<SharksLayout><SharksTemplates /></SharksLayout>} />
         <Route path="/sharks/history" element={<SharksLayout><SharksHistory /></SharksLayout>} />
+        <Route path="/sharks/crm" element={<SharksLayout><SharksCRM /></SharksLayout>} />
         <Route path="/sharks/chat" element={<SharksLayout><SharksChat /></SharksLayout>} />
         <Route path="/sharks/integrations" element={<SharksLayout><SharksIntegrations /></SharksLayout>} />
         <Route path="/sharks/team" element={<SharksLayout><SharksTeam /></SharksLayout>} />
@@ -214,6 +219,7 @@ function AppRoutes() {
         <Route path="/estrategos/implementations" element={<EstrategosLayout><EstrategosImplementations /></EstrategosLayout>} />
         <Route path="/estrategos/access-requests" element={<EstrategosLayout><EstrategosAccessRequests /></EstrategosLayout>} />
         <Route path="/estrategos/team" element={<EstrategosLayout><EstrategosTeam /></EstrategosLayout>} />
+        <Route path="/estrategos/crm" element={<EstrategosLayout><EstrategosCRM /></EstrategosLayout>} />
 
         {/* Legal (público, exigência OAuth Google) */}
         <Route path="/privacy" element={<PrivacyPolicy />} />

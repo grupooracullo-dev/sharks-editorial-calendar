@@ -11,7 +11,7 @@ function json(status: number, body: unknown) {
 const VALID_ROLES = ['admin_sharks', 'sharks_team', 'client'];
 const VALID_ENVS = ['sharks_company', 'estrategos'];
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const VALID_PERMISSIONS = ['calendar', 'campaigns', 'editorial', 'templates', 'history', 'chat', 'clients', 'integrations', 'team'];
+const VALID_PERMISSIONS = ['calendar', 'campaigns', 'editorial', 'templates', 'history', 'chat', 'crm', 'clients', 'integrations', 'team'];
 
 const DEFAULT_PERMISSIONS = [
   { permission: 'calendar',     can_create: true,  can_read: true,  can_update: true,  can_delete: true },
@@ -20,6 +20,7 @@ const DEFAULT_PERMISSIONS = [
   { permission: 'templates',    can_create: true,  can_read: true,  can_update: true,  can_delete: true },
   { permission: 'history',      can_create: false, can_read: true,  can_update: false, can_delete: false },
   { permission: 'chat',         can_create: true,  can_read: true,  can_update: true,  can_delete: false },
+  { permission: 'crm',          can_create: true,  can_read: true,  can_update: true,  can_delete: false },
   { permission: 'clients',      can_create: false, can_read: true,  can_update: false, can_delete: false },
   { permission: 'integrations', can_create: false, can_read: true,  can_update: false, can_delete: false },
   { permission: 'team',         can_create: false, can_read: true,  can_update: false, can_delete: false },
