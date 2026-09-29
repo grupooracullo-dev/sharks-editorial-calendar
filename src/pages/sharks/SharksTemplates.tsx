@@ -173,7 +173,7 @@ export default function SharksTemplates() {
               })}
             </div>
 
-            <p className="text-xs text-gray-500 bg-blue-50 p-3 rounded-lg mb-4">
+            <p className="text-xs text-gray-500 bg-primary-50 p-3 rounded-lg mb-4">
               As ações serão criadas como <strong>rascunhos</strong> na próxima semana de {currentWorkspace?.name}. Nada será publicado automaticamente.
             </p>
 

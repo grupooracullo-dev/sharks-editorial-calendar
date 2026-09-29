@@ -49,7 +49,7 @@ export default function Drawer({ isOpen, onClose, title, children, width = 'md' 
   return (
     <div className="fixed inset-0 z-[70]">
       <div
-        className="absolute inset-0 bg-black/30 transition-opacity"
+        className="absolute inset-0 bg-black/40 transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -60,7 +60,7 @@ export default function Drawer({ isOpen, onClose, title, children, width = 'md' 
         aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
         className={cn(
-          'absolute right-0 top-0 h-full bg-white shadow-2xl drawer-enter w-full flex flex-col outline-none',
+          'absolute right-0 top-0 h-full bg-white shadow-2xl drawer-enter w-full flex flex-col outline-none rounded-l-xl',
           widths[width]
         )}
       >

@@ -310,9 +310,9 @@ export default function ClientWizard({ open, onClose, environment, onCreated }: 
           )}
 
           {formData.state && formData.city && (
-            <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-lg p-3">
-              <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
-              <p className="text-xs text-blue-700 leading-relaxed">
+            <div className="flex items-start gap-2 bg-primary-50 border border-primary-100 rounded-lg p-3">
+              <Info className="w-4 h-4 text-primary-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-primary-700 leading-relaxed">
                 Datas comemorativas de <strong>{formData.city}</strong> serão detectadas automaticamente
                 na etapa de Datas Estratégicas.
               </p>

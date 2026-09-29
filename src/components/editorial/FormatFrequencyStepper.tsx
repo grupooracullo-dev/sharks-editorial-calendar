@@ -85,7 +85,7 @@ export default function FormatFrequencyStepper({ value, onChange, disabled }: Pr
                   value={Number.isFinite(count) ? count : 0}
                   disabled={disabled}
                   onChange={(e) => updateValue(key, e.target.value)}
-                  className="w-14 text-center text-sm font-semibold text-gray-900 tabular-nums border border-gray-200 rounded-md py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 disabled:opacity-50"
+                  className="w-14 text-center text-sm font-semibold text-gray-900 tabular-nums border border-gray-200 rounded-md py-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:border-primary-500 disabled:opacity-50"
                   aria-label={`Quantidade semanal de ${label}`}
                 />
                 <button

@@ -62,7 +62,7 @@ export default function EstrategosChat() {
             <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
           </button>
           {showWsList && (
-            <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
+            <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden">
               {wsList.map(ws => (
                 <button
                   key={ws.id}

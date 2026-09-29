@@ -18,12 +18,12 @@ export const USER_ROLES: Record<UserRole, string> = {
 // Action Statuses
 export const ACTION_STATUSES: Record<ActionStatus, { label: string; color: string; bgColor: string }> = {
   draft: { label: 'Rascunho', color: 'text-gray-500', bgColor: 'bg-gray-100' },
-  briefing: { label: 'Briefing', color: 'text-blue-500', bgColor: 'bg-blue-50' },
-  in_production: { label: 'Em Produção', color: 'text-yellow-600', bgColor: 'bg-yellow-50' },
+  briefing: { label: 'Briefing', color: 'text-primary-600', bgColor: 'bg-primary-50' },
+  in_production: { label: 'Em Produção', color: 'text-amber-600', bgColor: 'bg-amber-50' },
   sharks_review: { label: 'Revisão Sharks', color: 'text-purple-600', bgColor: 'bg-purple-50' },
   scheduled: { label: 'Programado', color: 'text-indigo-600', bgColor: 'bg-indigo-50' },
-  published: { label: 'Publicado', color: 'text-green-600', bgColor: 'bg-green-50' },
-  completed: { label: 'Concluído', color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
+  published: { label: 'Publicado', color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
+  completed: { label: 'Concluído', color: 'text-emerald-700', bgColor: 'bg-emerald-100' },
   cancelled: { label: 'Cancelado', color: 'text-red-500', bgColor: 'bg-red-50' },
   overdue: { label: 'Atrasado', color: 'text-orange-600', bgColor: 'bg-orange-50' },
 };
@@ -31,12 +31,12 @@ export const ACTION_STATUSES: Record<ActionStatus, { label: string; color: strin
 // Cores de "dot" de status no calendário (classes Tailwind — fonte única)
 export const ACTION_STATUS_DOT_CLASSES: Record<ActionStatus, string> = {
   draft: 'bg-gray-400',
-  briefing: 'bg-blue-500',
-  in_production: 'bg-yellow-500',
+  briefing: 'bg-primary-500',
+  in_production: 'bg-amber-500',
   sharks_review: 'bg-purple-500',
   scheduled: 'bg-indigo-500',
-  published: 'bg-green-500',
-  completed: 'bg-emerald-500',
+  published: 'bg-emerald-500',
+  completed: 'bg-emerald-600',
   cancelled: 'bg-red-400',
   overdue: 'bg-orange-500',
 };
@@ -44,12 +44,12 @@ export const ACTION_STATUS_DOT_CLASSES: Record<ActionStatus, string> = {
 // Cores de "dot" de status no calendário (hex — para estilos inline)
 export const ACTION_STATUS_DOT_HEX: Record<ActionStatus, string> = {
   draft: '#9ca3af',
-  briefing: '#3b82f6',
-  in_production: '#eab308',
+  briefing: '#0066FF',
+  in_production: '#f59e0b',
   sharks_review: '#a855f7',
   scheduled: '#6366f1',
-  published: '#22c55e',
-  completed: '#10b981',
+  published: '#10b981',
+  completed: '#059669',
   cancelled: '#f87171',
   overdue: '#f97316',
 };
@@ -163,7 +163,7 @@ export const DEFAULT_PILLARS = [
 // Date Relevance
 export const DATE_RELEVANCE: Record<DateRelevance, { label: string; color: string }> = {
   high: { label: 'Alta', color: 'text-red-500 bg-red-50' },
-  medium: { label: 'Média', color: 'text-yellow-600 bg-yellow-50' },
+  medium: { label: 'Média', color: 'text-amber-600 bg-amber-50' },
   low: { label: 'Baixa', color: 'text-gray-500 bg-gray-50' },
 };
 
@@ -185,8 +185,8 @@ export const NOTIFICATION_TYPES: Record<NotificationType, { label: string; icon:
 // Sync Status
 export const SYNC_STATUS: Record<SyncStatus, { label: string; color: string }> = {
   not_synced: { label: 'Não sincronizado', color: 'text-gray-400' },
-  synced: { label: 'Sincronizado', color: 'text-green-500' },
-  modified_after_sync: { label: 'Alterado após sync', color: 'text-yellow-500' },
+  synced: { label: 'Sincronizado', color: 'text-emerald-500' },
+  modified_after_sync: { label: 'Alterado após sync', color: 'text-amber-500' },
   sync_error: { label: 'Erro de sync', color: 'text-red-500' },
 };
 

@@ -183,7 +183,7 @@ export default function SharksSettings() {
           />
         </div>
         <p className="text-[11px] text-gray-400 mt-3 flex items-center gap-1">
-          <Check className="w-3 h-3 text-green-500" />
+          <Check className="w-3 h-3 text-emerald-500" />
           Preferências salvas automaticamente neste dispositivo
         </p>
       </Card>
@@ -216,15 +216,15 @@ export default function SharksSettings() {
         <div className="space-y-3 text-sm">
           <div className="flex justify-between py-2 border-b border-gray-50">
             <span className="text-gray-500">Modo de dados</span>
-            <span className="text-green-600 font-medium">Supabase (produção)</span>
+            <span className="text-emerald-600 font-medium">Supabase (produção)</span>
           </div>
           <div className="flex justify-between py-2 border-b border-gray-50">
             <span className="text-gray-500">Autenticação</span>
-            <span className="text-green-600 font-medium">Supabase Auth + RLS</span>
+            <span className="text-emerald-600 font-medium">Supabase Auth + RLS</span>
           </div>
           <div className="flex justify-between py-2 border-b border-gray-50">
             <span className="text-gray-500">Tempo real</span>
-            <span className="text-green-600 font-medium">Ativo (calendário, chat, campanhas)</span>
+            <span className="text-emerald-600 font-medium">Ativo (calendário, chat, campanhas)</span>
           </div>
           <div className="flex justify-between py-2 border-b border-gray-50">
             <span className="text-gray-500">Versão</span>

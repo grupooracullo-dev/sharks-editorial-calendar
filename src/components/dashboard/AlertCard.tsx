@@ -12,7 +12,7 @@ interface AlertCardProps {
 const configs = {
   danger: { icon: AlertCircle, bg: 'bg-red-50 border-red-100', iconColor: 'text-red-500', titleColor: 'text-red-900' },
   warning: { icon: AlertTriangle, bg: 'bg-amber-50 border-amber-100', iconColor: 'text-amber-500', titleColor: 'text-amber-900' },
-  info: { icon: Info, bg: 'bg-blue-50 border-blue-100', iconColor: 'text-blue-500', titleColor: 'text-blue-900' },
+  info: { icon: Info, bg: 'bg-primary-50 border-primary-100', iconColor: 'text-primary-500', titleColor: 'text-primary-900' },
   success: { icon: CheckCircle2, bg: 'bg-emerald-50 border-emerald-100', iconColor: 'text-emerald-500', titleColor: 'text-emerald-900' },
 };
 

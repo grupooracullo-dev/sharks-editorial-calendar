@@ -304,7 +304,7 @@ for (const row of rows) {
                 <div key={h.id} className="flex items-center gap-3 px-4 sm:px-5 py-2.5">
                   <span className={cn(
                     'w-7 h-7 rounded-full flex items-center justify-center shrink-0',
-                    isRevoke ? 'bg-red-50 text-red-500' : isChange ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600'
+                    isRevoke ? 'bg-red-50 text-red-500' : isChange ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
                   )}>
                     <Icon className="w-3.5 h-3.5" />
                   </span>
@@ -331,7 +331,7 @@ for (const row of rows) {
 
       <Modal isOpen={modal} onClose={() => setModal(false)} title="Vincular acesso a ambiente">
         <div className="space-y-4">
-          <div className="flex items-start gap-2 bg-blue-50 text-blue-700 text-xs px-3 py-2 rounded-lg">
+          <div className="flex items-start gap-2 bg-primary-50 text-primary-700 text-xs px-3 py-2 rounded-lg">
             <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
             <p>
               Acesso concedido + vínculo à empresa do ambiente em uma operação atômica.

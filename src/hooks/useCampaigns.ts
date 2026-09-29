@@ -91,7 +91,7 @@ export async function createCampaign(data: Partial<Campaign>): Promise<CampaignR
     product: data.product || null,
     priority: data.priority || 'medium',
     status: data.status || 'draft',
-    color: data.color || '#3B82F6',
+    color: data.color || '#0066FF',
   };
 
   const { data: inserted, error } = await supabase

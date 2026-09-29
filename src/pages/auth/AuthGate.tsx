@@ -115,8 +115,8 @@ export default function AuthGate() {
           Esta tela vai liberar o acesso automaticamente assim que o administrador aprovar —
           você não precisa recarregar nada.
         </p>
-        <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-xs font-medium px-3 py-1.5 rounded-full">
-          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+        <div className="inline-flex items-center gap-2 bg-primary-50 text-primary-700 text-xs font-medium px-3 py-1.5 rounded-full">
+          <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
           Acompanhando em tempo real
         </div>
       </Shell>

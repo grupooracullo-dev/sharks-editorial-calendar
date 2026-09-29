@@ -309,15 +309,15 @@ export default function OraculloClients() {
 
       <div className="grid grid-cols-3 gap-3 sm:max-w-md">
         <div className="rounded-xl border border-gray-200 bg-white p-3 text-center">
-          <p className="text-xl font-bold text-gray-900">{groups.length}</p>
+          <p className="text-xl font-bold text-gray-900 tabular-nums">{groups.length}</p>
           <p className="text-[11px] font-medium text-gray-500">Empresas</p>
         </div>
-        <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-center">
-          <p className="text-xl font-bold text-blue-700">{envCount('sharks_company')}</p>
-          <p className="text-[11px] font-medium text-blue-600">🦈 Sharks Company</p>
+        <div className="rounded-xl border border-primary-100 bg-primary-50 p-3 text-center">
+          <p className="text-xl font-bold text-primary-700 tabular-nums">{envCount('sharks_company')}</p>
+          <p className="text-[11px] font-medium text-primary-600">🦈 Sharks Company</p>
         </div>
         <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-center">
-          <p className="text-xl font-bold text-emerald-700">{envCount('estrategos')}</p>
+          <p className="text-xl font-bold text-emerald-700 tabular-nums">{envCount('estrategos')}</p>
           <p className="text-[11px] font-medium text-emerald-600">📊 Estratégos</p>
         </div>
       </div>
@@ -490,7 +490,7 @@ export default function OraculloClients() {
                 );
               })}
             </div>
-            <div className="flex items-start gap-2 bg-blue-50 text-blue-700 text-xs px-3 py-2 rounded-lg">
+            <div className="flex items-start gap-2 bg-primary-50 text-primary-700 text-xs px-3 py-2 rounded-lg">
               <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
               <p>
                 Incluir cria o cadastro no ambiente (com pilares, perfil e datas da empresa).

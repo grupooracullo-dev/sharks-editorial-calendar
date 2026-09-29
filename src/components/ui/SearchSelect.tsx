@@ -54,7 +54,7 @@ export default function SearchSelect({
         <div
           className={cn(
             'flex items-center gap-2 px-3 border rounded-lg bg-white transition-colors',
-            open ? 'border-primary-500 ring-2 ring-primary-500/20' : 'border-gray-300'
+            open ? 'border-primary-500 ring-2 ring-primary-500/40' : 'border-gray-300'
           )}
         >
           <Search className="w-4 h-4 text-gray-400 shrink-0" />
@@ -68,7 +68,7 @@ export default function SearchSelect({
           <ChevronDown className="w-4 h-4 text-gray-400 shrink-0 pointer-events-none" />
         </div>
         {open && (
-          <div className="absolute z-20 w-full mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+          <div className="absolute z-20 w-full mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg">
             {filtered.length === 0 ? (
               <p className="px-3 py-2 text-sm text-gray-400">{emptyMessage}</p>
             ) : (

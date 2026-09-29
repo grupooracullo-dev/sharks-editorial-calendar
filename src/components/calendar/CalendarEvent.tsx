@@ -89,8 +89,8 @@ const CalendarEvent = forwardRef<HTMLButtonElement, CalendarEventProps>(function
                   compact ? 'text-[8px]' : 'text-[9px]'
                 )}
                 style={{
-                  backgroundColor: `${campaign.color || '#3B82F6'}20`,
-                  color: campaign.color || '#3B82F6',
+                  backgroundColor: `${campaign.color || '#0066FF'}20`,
+                  color: campaign.color || '#0066FF',
                 }}
               >
                 <Megaphone className="w-2 h-2" />
@@ -123,7 +123,7 @@ const CalendarEvent = forwardRef<HTMLButtonElement, CalendarEventProps>(function
 
       {/* Hover preview popover */}
       {hovered && !isDragging && !compact && (
-        <div className="absolute z-50 bottom-full left-0 mb-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-3 pointer-events-none">
+        <div className="absolute z-50 bottom-full left-0 mb-1 w-64 bg-white rounded-xl shadow-lg border border-gray-200 p-3 pointer-events-none">
           <div className="flex items-center gap-2 mb-1.5">
             <span className={cn('w-2 h-2 rounded-full', ACTION_STATUS_DOT_CLASSES[action.status])} />
             <span className="text-xs font-semibold text-gray-900 truncate">{action.title}</span>
@@ -144,8 +144,8 @@ const CalendarEvent = forwardRef<HTMLButtonElement, CalendarEventProps>(function
             )}
             {campaign && (
               <div className="flex items-center gap-1.5">
-                <Megaphone className="w-3 h-3" style={{ color: campaign.color || '#3B82F6' }} />
-                <span style={{ color: campaign.color || '#3B82F6' }}>{campaign.name}</span>
+                <Megaphone className="w-3 h-3" style={{ color: campaign.color || '#0066FF' }} />
+                <span style={{ color: campaign.color || '#0066FF' }}>{campaign.name}</span>
               </div>
             )}
             {responsible && (

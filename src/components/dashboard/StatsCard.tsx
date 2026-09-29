@@ -32,7 +32,7 @@ export default function StatsCard({ icon: Icon, label, value, trend, trendUp, ic
           </span>
         )}
       </div>
-      <p className="text-2xl font-bold text-gray-900 mt-3">{value}</p>
+      <p className="text-2xl font-bold text-gray-900 mt-3 tabular-nums">{value}</p>
       <p className="text-xs text-gray-500 mt-0.5">{label}</p>
     </div>
   );

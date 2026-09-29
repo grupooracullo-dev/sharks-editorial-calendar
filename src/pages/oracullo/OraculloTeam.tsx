@@ -531,13 +531,13 @@ export default function OraculloTeam() {
                   {/* Summary badges */}
                   <div className="hidden sm:flex items-center gap-2">
                     {clientCount > 0 && (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-blue-50 text-blue-700">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-primary-50 text-primary-700">
                         <Building2 className="w-3 h-3" />
                         {clientCount} cliente{clientCount > 1 ? 's' : ''}
                       </span>
                     )}
                     {permSummary > 0 && (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-green-50 text-green-700">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-emerald-50 text-emerald-700">
                         <Settings className="w-3 h-3" />
                         {permSummary} módulo{permSummary > 1 ? 's' : ''}
                       </span>
@@ -634,9 +634,9 @@ export default function OraculloTeam() {
                                 <Icon className="w-4 h-4 text-gray-400 shrink-0" />
                                 <span className="text-sm font-medium text-gray-700 flex-1">{meta.label}</span>
                                 <div className="flex items-center gap-0.5">
-                                  {perm.can_create && <span className="text-[10px] px-1 py-0.5 rounded bg-green-100 text-green-700">C</span>}
-                                  {perm.can_read && <span className="text-[10px] px-1 py-0.5 rounded bg-blue-100 text-blue-700">L</span>}
-                                  {perm.can_update && <span className="text-[10px] px-1 py-0.5 rounded bg-yellow-100 text-yellow-700">U</span>}
+                                  {perm.can_create && <span className="text-[10px] px-1 py-0.5 rounded bg-emerald-100 text-emerald-700">C</span>}
+                                  {perm.can_read && <span className="text-[10px] px-1 py-0.5 rounded bg-primary-100 text-primary-700">L</span>}
+                                  {perm.can_update && <span className="text-[10px] px-1 py-0.5 rounded bg-amber-100 text-amber-700">U</span>}
                                   {perm.can_delete && <span className="text-[10px] px-1 py-0.5 rounded bg-red-100 text-red-700">D</span>}
                                 </div>
                               </div>
@@ -663,7 +663,7 @@ export default function OraculloTeam() {
                       ) : (member.workspaces[activeTab]?.length ?? 0) > 0 ? (
                         <div className="flex flex-wrap gap-2">
                           {member.workspaces[activeTab]!.map(ws => (
-                            <span key={ws.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-700 font-medium">
+                            <span key={ws.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-primary-50 text-primary-700 font-medium">
                               <Building2 className="w-3 h-3" />
                               {ws.name}
                             </span>
@@ -840,7 +840,7 @@ export default function OraculloTeam() {
                           }))}
                           className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
                             p[action]
-                              ? action === 'can_delete' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                              ? action === 'can_delete' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
                               : 'bg-gray-100 text-gray-400'
                           }`}
                           title={label}
@@ -1000,7 +1000,7 @@ export default function OraculloTeam() {
                             }))}
                             className={`w-7 h-7 rounded text-[11px] font-bold transition-colors ${
                               p[action]
-                                ? action === 'can_delete' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                                ? action === 'can_delete' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
                                 : 'bg-gray-200 text-gray-400'
                             }`}
                             title={fullLabel}

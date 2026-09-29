@@ -239,7 +239,7 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate, camp
                         key={c.id}
                         title={`${c.name}${c.start_date ? ` · ${c.start_date.split('-').reverse().join('/')} → ${(c.end_date || c.start_date).split('-').reverse().join('/')}` : ''}`}
                         className="h-1.5 rounded-full flex-1"
-                        style={{ backgroundColor: c.color || '#3B82F6' }}
+                        style={{ backgroundColor: c.color || '#0066FF' }}
                       />
                     ))}
                     {dayStrategic.length > 0 && (
@@ -308,7 +308,7 @@ export default function MiniCalendar({ actions, selectedDate, onSelectDate, camp
         </span>
         {campaigns.length > 0 && (
           <span className="flex items-center gap-1.5 text-[11px] text-gray-500">
-            <Megaphone className="w-3 h-3" style={{ color: campaigns[0]?.color || '#3B82F6' }} /> Campanha
+            <Megaphone className="w-3 h-3" style={{ color: campaigns[0]?.color || '#0066FF' }} /> Campanha
           </span>
         )}
         {strategicDates.length > 0 && (
@@ -388,7 +388,7 @@ function DayActionsModal({
                     {action.campaign?.name && (
                       <span
                         className="px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
-                        style={{ backgroundColor: action.campaign.color || '#3B82F6' }}
+                        style={{ backgroundColor: action.campaign.color || '#0066FF' }}
                       >
                         {action.campaign.name}
                       </span>
