@@ -27,7 +27,7 @@ export default function ClientChat() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex-1 min-h-0 flex flex-col gap-4">
       {/* Cabeçalho da página apenas no desktop — no mobile o painel já tem título */}
       <div className="hidden sm:block">
         <PageHeader title="Chat" />
@@ -36,8 +36,8 @@ export default function ClientChat() {
         </p>
       </div>
 
-      {/* Mobile: ocupa até o BottomNav (topo ~60 + padding 16 + nav 56 + safe area) */}
-      <div className="h-[calc(100dvh-8.25rem-env(safe-area-inset-bottom))] min-h-[380px] sm:h-[calc(100dvh-316px)]">
+      {/* Preenche o espaço disponível até o BottomNav / fim da viewport */}
+      <div className="flex-1 min-h-[380px]">
         <ChatPanel
           messages={messages}
           currentUser={user!}

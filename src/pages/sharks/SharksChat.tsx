@@ -45,7 +45,7 @@ export default function SharksChat() {
   };
 
   return (
-    <div className="space-y-4 lg:space-y-6">
+    <div className="flex-1 min-h-0 flex flex-col space-y-4 lg:space-y-6">
       <PageHeader title="Chat" subtitle="Converse com os clientes em tempo real" />
 
       {isMobile && (
@@ -89,11 +89,11 @@ export default function SharksChat() {
         </div>
       )}
 
-      <div className={isMobile ? '' : 'grid grid-cols-1 lg:grid-cols-3 gap-4'}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 grid-rows-[1fr] gap-4 flex-1 min-h-0">
         {!isMobile && (
-          <Card padding="sm" className="lg:col-span-1">
-            <h3 className="font-semibold text-gray-900 mb-3 px-2">Clientes</h3>
-            <div className="space-y-1">
+          <Card padding="sm" className="lg:col-span-1 h-full flex flex-col min-h-0 overflow-hidden">
+            <h3 className="font-semibold text-gray-900 mb-3 px-2 shrink-0">Clientes</h3>
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
               {workspaces.map(ws => {
                 const wsMessages = messages;
                 const lastMessage = activeWsId === ws.id ? wsMessages[wsMessages.length - 1] : null;
@@ -129,7 +129,7 @@ export default function SharksChat() {
           </Card>
         )}
 
-        <div className={isMobile ? 'h-[calc(100vh-296px)] min-h-[350px]' : 'lg:col-span-2 h-[calc(100vh-260px)] min-h-[450px]'}>
+        <div className="lg:col-span-2 h-full min-h-[350px]">
           {!activeWsId ? (
             <Card padding="sm" className="h-full flex items-center justify-center">
               <EmptyState

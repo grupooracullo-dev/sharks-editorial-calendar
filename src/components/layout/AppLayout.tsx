@@ -30,12 +30,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-dvh bg-gray-50 flex flex-col">
       <AppSidebar open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
-      <div className="lg:ml-[240px] transition-all duration-300">
+      <div className="lg:ml-[240px] transition-all duration-300 flex flex-col flex-1">
         <TopHeader onOpenMobileNav={() => setMobileNavOpen(true)} />
-        <main className="p-4 pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-6">
-          <div className="mx-auto w-full max-w-[1400px]">
+        <main className="p-4 pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-6 flex-1 flex flex-col">
+          <div className="mx-auto w-full max-w-[1400px] flex-1 flex flex-col">
             {children}
           </div>
         </main>
