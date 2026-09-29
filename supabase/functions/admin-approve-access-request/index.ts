@@ -50,10 +50,16 @@ function slugify(name: string): string {
 
 function generateTempPassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  const rnd = crypto.getRandomValues(new Uint32Array(12));
-  let pwd = '';
-  for (let i = 0; i < 12; i++) pwd += chars[rnd[i] % chars.length];
-  return pwd;
+  const out: number[] = [];
+  while (out.length < 12) {
+    const rnd = crypto.getRandomValues(new Uint32Array(8));
+    for (const v of rnd) {
+      const idx = v & 63;
+      if (idx < chars.length) out.push(idx);
+      if (out.length === 12) break;
+    }
+  }
+  return out.map(i => chars[i]).join('');
 }
 
 Deno.serve(async req => {
