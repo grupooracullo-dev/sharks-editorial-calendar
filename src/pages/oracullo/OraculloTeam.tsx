@@ -105,7 +105,7 @@ export default function OraculloTeam() {
   const [editForm, setEditForm] = useState({
     full_name: '',
     permissions: [] as Permission[],
-    workspace_ids: [] as string[],
+    workspaces: {} as Partial<Record<EnvironmentType, string[]>>,
     environments: [] as EnvironmentType[],
     envRoles: {
       sharks_company: 'team',
@@ -305,7 +305,9 @@ export default function OraculloTeam() {
     setEditForm({
       full_name: member.full_name,
       permissions: member.permissions[activeTab]?.length > 0 ? member.permissions[activeTab] : defaultPermissions(),
-      workspace_ids: member.workspaces[activeTab]?.map(w => w.id) ?? [],
+      workspaces: Object.fromEntries(
+        ENV_ORDER.map(env => [env, member.workspaces[env]?.map(w => w.id) ?? []]),
+      ) as Partial<Record<EnvironmentType, string[]>>,
       environments: member.environments.map(e => e.environment),
       envRoles: {
         sharks_company: member.environments.find(e => e.environment === 'sharks_company')?.role ?? 'team',
@@ -334,7 +336,7 @@ export default function OraculloTeam() {
     setSubmitting(true);
     try {
       // 1) Novos ambientes / troca de função — antes do update, pois
-      //    workspace_ids é validado contra a org do ambiente da aba ativa.
+      //    workspace_ids é validado contra a org de cada ambiente.
       for (const env of toLink) {
         const { data, error } = await supabase.functions.invoke('admin-link-user-env', {
           body: { op: 'link', user_id: editingMember.id, environment: env, env_role: editForm.envRoles[env] },
@@ -343,18 +345,22 @@ export default function OraculloTeam() {
         if (data?.error) throw new Error(data.error);
       }
 
-      // 2) Nome, permissões e clientes do ambiente da aba ativa
-      const { data, error } = await supabase.functions.invoke('admin-update-user', {
-        body: {
-          user_id: editingMember.id,
-          full_name: editForm.full_name.trim(),
-          environment: activeTab,
-          permissions: editForm.permissions,
-          workspace_ids: editForm.environments.includes(activeTab) ? editForm.workspace_ids : [],
-        },
-      });
-      if (error) throw new Error(await functionErrorMessage(error));
-      if (data?.error) throw new Error(data.error);
+      // 2) Nome, permissões e clientes — uma chamada por ambiente marcado.
+      //    permissions é global (team_member_access nao tem ambiente);
+      //    workspace_ids substitui apenas as memberships da org do ambiente.
+      for (const env of editForm.environments) {
+        const { data, error } = await supabase.functions.invoke('admin-update-user', {
+          body: {
+            user_id: editingMember.id,
+            full_name: editForm.full_name.trim(),
+            environment: env,
+            permissions: editForm.permissions,
+            workspace_ids: editForm.workspaces[env] ?? [],
+          },
+        });
+        if (error) throw new Error(await functionErrorMessage(error));
+        if (data?.error) throw new Error(data.error);
+      }
 
       // 3) Ambientes desmarcados — unlink remove o vínculo e as memberships
       for (const env of toUnlink) {
@@ -435,7 +441,6 @@ export default function OraculloTeam() {
 
   /* ─── Derived ─── */
   const filteredMembers = members.filter(m => m.environments.some(e => e.environment === activeTab));
-  const envWorkspaces = allWorkspaces.filter(w => wsEnvById.get(w.id) === activeTab);
 
   /* ─── Render ─── */
   return (
@@ -897,8 +902,7 @@ export default function OraculloTeam() {
 
           {editingMember && (
             <p className="text-xs text-gray-400">
-              E-mail: {editingMember.email} (não pode ser alterado) · Ambiente da edição:{' '}
-              {ENVIRONMENT_META[activeTab].emoji} {ENVIRONMENT_META[activeTab].label}
+              E-mail: {editingMember.email} (não pode ser alterado)
             </p>
           )}
 
@@ -973,9 +977,10 @@ export default function OraculloTeam() {
 
           {/* Permissions */}
           <div>
-            <h4 className="text-sm font-semibold text-gray-900 mb-3">
-              Permissões — {ENVIRONMENT_META[activeTab].short}
-            </h4>
+            <h4 className="text-sm font-semibold text-gray-900 mb-1">Permissões</h4>
+            <p className="text-xs text-gray-400 mb-3">
+              Valem para todos os ambientes de acesso do membro.
+            </p>
             <div className="space-y-2">
               {ALL_PERMISSIONS.map(perm => {
                 const meta = PERMISSION_META[perm];
@@ -1014,43 +1019,67 @@ export default function OraculloTeam() {
             </div>
           </div>
 
-          {/* Client assignment */}
-          <div>
-            <h4 className="text-sm font-semibold text-gray-900 mb-3">
-              Clientes atribuídos — {ENVIRONMENT_META[activeTab].short}
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {envWorkspaces.map(ws => {
-                const selected = editForm.workspace_ids.includes(ws.id);
-                return (
-                  <button
-                    key={ws.id}
-                    onClick={() => setEditForm(f => ({
-                      ...f,
-                      workspace_ids: selected
-                        ? f.workspace_ids.filter(id => id !== ws.id)
-                        : [...f.workspace_ids, ws.id],
-                    }))}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-all ${
-                      selected
-                        ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-200'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                    }`}
-                  >
-                    <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${
-                      selected ? 'bg-primary-500 text-white' : 'border-2 border-gray-300'
-                    }`}>
-                      {selected && <Check className="w-3 h-3" />}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{ws.name}</p>
-                      {ws.segment && <p className="text-[11px] text-gray-400 truncate">{ws.segment}</p>}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {/* Client assignment — uma seção por ambiente marcado */}
+          {editForm.environments.map(env => {
+            const meta = ENVIRONMENT_META[env];
+            const envWs = allWorkspaces.filter(w => wsEnvById.get(w.id) === env);
+            const selectedIds = editForm.workspaces[env] ?? [];
+            const isAdminEnv = editForm.envRoles[env] === 'admin';
+            return (
+              <div key={env}>
+                <h4 className="text-sm font-semibold text-gray-900 mb-1">
+                  Clientes atribuídos — {meta.short}
+                </h4>
+                <p className="text-xs text-gray-400 mb-3">
+                  {meta.emoji} {meta.label}
+                  {isAdminEnv && ' · Admin do ambiente — acesso total aos clientes'}
+                </p>
+                {envWs.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic">
+                    Nenhum cliente cadastrado neste ambiente.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {envWs.map(ws => {
+                      const selected = selectedIds.includes(ws.id);
+                      return (
+                        <button
+                          key={ws.id}
+                          onClick={() => setEditForm(f => {
+                            const cur = f.workspaces[env] ?? [];
+                            return {
+                              ...f,
+                              workspaces: {
+                                ...f.workspaces,
+                                [env]: selected
+                                  ? cur.filter(id => id !== ws.id)
+                                  : [...cur, ws.id],
+                              },
+                            };
+                          })}
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-all ${
+                            selected
+                              ? 'border-primary-300 bg-primary-50 ring-1 ring-primary-200'
+                              : 'border-gray-200 bg-white hover:border-gray-300'
+                          }`}
+                        >
+                          <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${
+                            selected ? 'bg-primary-500 text-white' : 'border-2 border-gray-300'
+                          }`}>
+                            {selected && <Check className="w-3 h-3" />}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{ws.name}</p>
+                            {ws.segment && <p className="text-[11px] text-gray-400 truncate">{ws.segment}</p>}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div className="flex justify-between mt-6 pt-4 border-t border-gray-100">
