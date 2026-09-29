@@ -173,7 +173,7 @@ export default function EstrategosIntegrations() {
               <Loader2 className="w-3 h-3 animate-spin" /> Carregando
             </span>
           ) : (
-            <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${isConnected ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+            <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${isConnected ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
               {isConnected ? <><CheckCircle2 className="w-3 h-3" /> Conectado</> : <><XCircle className="w-3 h-3" /> Não conectado</>}
             </span>
           )}

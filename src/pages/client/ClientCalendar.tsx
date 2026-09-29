@@ -106,7 +106,7 @@ const goNext = () => {
                 <div
                   key={i}
                   style={dayCampaigns.length > 0 ? {
-                    backgroundImage: `linear-gradient(${dayCampaigns[0].color || '#3B82F6'}0F, ${dayCampaigns[0].color || '#3B82F6'}0F)`,
+                    backgroundImage: `linear-gradient(${dayCampaigns[0].color || '#0066FF'}0F, ${dayCampaigns[0].color || '#0066FF'}0F)`,
                   } : undefined}
                   className={cn(
                     'min-h-0 overflow-y-auto border-r border-b last:border-r-0 p-1.5',
@@ -131,7 +131,7 @@ const goNext = () => {
                         const isStart = dateStr === c.start_date || col === 0;
                         const isEnd = dateStr === rangeEnd || col === 6;
                         const showLabel = dateStr === c.start_date || (col === 0 && c.start_date! < dateStr);
-                        const color = c.color || '#3B82F6';
+                        const color = c.color || '#0066FF';
                         return (
                           <div
                             key={c.id}
@@ -201,7 +201,7 @@ const goNext = () => {
             <div className="flex flex-wrap items-center gap-3 px-3 py-2 border-t border-gray-100 bg-gray-50/50">
               {activeCampaigns.filter(c => c.start_date).map(c => (
                 <span key={c.id} className="flex items-center gap-1.5 text-[11px] text-gray-600">
-                  <span className="w-3 h-1.5 rounded-full" style={{ backgroundColor: c.color || '#3B82F6' }} />
+                  <span className="w-3 h-1.5 rounded-full" style={{ backgroundColor: c.color || '#0066FF' }} />
                   🏁 {c.name}
                 </span>
               ))}
@@ -243,11 +243,11 @@ const goNext = () => {
                               <div
                                 key={c.id}
                                 className="flex items-center gap-1 px-1.5 py-0.5 rounded-md"
-                                style={{ backgroundColor: `${c.color || '#3B82F6'}1F` }}
+                                style={{ backgroundColor: `${c.color || '#0066FF'}1F` }}
                                 title={`${c.name}${c.start_date ? ` · ${c.start_date.split('-').reverse().join('/')} → ${(c.end_date || c.start_date).split('-').reverse().join('/')}` : ''}`}
                               >
-                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.color || '#3B82F6' }} />
-                                <span className="text-[9px] font-semibold truncate" style={{ color: c.color || '#3B82F6' }}>
+                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.color || '#0066FF' }} />
+                                <span className="text-[9px] font-semibold truncate" style={{ color: c.color || '#0066FF' }}>
                                   🏁 {c.name}
                                 </span>
                               </div>
@@ -369,7 +369,7 @@ const goNext = () => {
               </div>
             )}
 
-            <p className="text-xs text-gray-400 bg-blue-50 p-3 rounded-lg">
+            <p className="text-xs text-gray-400 bg-primary-50 p-3 rounded-lg">
               💡 Dúvidas ou sugestões sobre esta ação? Use o Chat para conversar com a equipe Sharks!
             </p>
           </div>

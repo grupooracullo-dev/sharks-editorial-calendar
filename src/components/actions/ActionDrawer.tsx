@@ -107,8 +107,8 @@ export default function ActionDrawer({ action, isOpen, onClose, onEdit, onDelete
         {action.sync_status !== 'not_synced' && (
           <div className={cn(
             'flex items-center gap-2 px-3 py-2 rounded-lg text-sm',
-            action.sync_status === 'synced' && 'bg-green-50 text-green-700',
-            action.sync_status === 'modified_after_sync' && 'bg-yellow-50 text-yellow-700',
+            action.sync_status === 'synced' && 'bg-emerald-50 text-emerald-700',
+            action.sync_status === 'modified_after_sync' && 'bg-amber-50 text-amber-700',
             action.sync_status === 'sync_error' && 'bg-red-50 text-red-700',
           )}>
             <ExternalLink className="w-4 h-4" />

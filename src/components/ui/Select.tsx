@@ -27,9 +27,9 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
             id={inputId}
             className={cn(
               'w-full px-3 py-2 text-sm border rounded-lg bg-white appearance-none transition-colors duration-150',
-              'focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:border-primary-500',
               'pr-8',
-              error ? 'border-red-300' : 'border-gray-300',
+              error ? 'border-red-300 focus-visible:ring-red-500 focus-visible:border-red-500' : 'border-gray-300',
               className
             )}
             {...props}

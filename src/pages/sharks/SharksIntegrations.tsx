@@ -240,17 +240,17 @@ export default function SharksIntegrations() {
 
       {/* SINALIZADOR: integracao ATIVA */}
       {!loading && isConnected && (
-        <div className="rounded-xl border border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 p-4">
+        <div className="rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-white p-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <span className="relative flex h-3 w-3 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
             </span>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-green-900">Integração Google Calendar ativa</p>
+              <p className="font-semibold text-emerald-900">Integração Google Calendar ativa</p>
             </div>
             <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
-              <span className="text-xs font-medium text-green-700 bg-green-100 border border-green-200 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+              <span className="text-xs font-medium text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full flex items-center gap-1.5">
                 <Zap className="w-3 h-3" />
                 {integration?.auto_sync ? 'Sincronizando em tempo real' : 'Sync automático pausado'}
               </span>
@@ -264,7 +264,7 @@ export default function SharksIntegrations() {
                   </button>
                   <button
                     onClick={() => setConfirmDisconnect(false)}
-                    className="text-xs font-medium text-green-700 bg-green-100 hover:bg-green-200 px-2.5 py-1 rounded-full transition-colors"
+                    className="text-xs font-medium text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2.5 py-1 rounded-full transition-colors"
                   >
                     Cancelar
                   </button>
@@ -280,28 +280,28 @@ export default function SharksIntegrations() {
               )}
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-3 pt-3 border-t border-green-100 text-sm">
-            <p className="text-green-800 truncate">
-              <span className="text-green-600 text-xs uppercase tracking-wide font-medium block">Cliente</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-3 pt-3 border-t border-emerald-100 text-sm">
+            <p className="text-emerald-800 truncate">
+              <span className="text-emerald-600 text-xs uppercase tracking-wide font-medium block">Cliente</span>
               {sharksWs?.name ?? '—'}
             </p>
-            <p className="text-green-800 truncate">
-              <span className="text-green-600 text-xs uppercase tracking-wide font-medium block">Conta Google</span>
+            <p className="text-emerald-800 truncate">
+              <span className="text-emerald-600 text-xs uppercase tracking-wide font-medium block">Conta Google</span>
               <span className="flex items-center gap-1.5">
                 {integration?.google_account_email ?? '—'}
                 {isAgencyAccount && (
-                  <span className="text-[10px] font-semibold uppercase tracking-wide bg-green-600 text-white px-1.5 py-0.5 rounded shrink-0">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide bg-emerald-600 text-white px-1.5 py-0.5 rounded shrink-0">
                     conta da agência
                   </span>
                 )}
               </span>
             </p>
-            <p className="text-green-800 truncate">
-              <span className="text-green-600 text-xs uppercase tracking-wide font-medium block">Agenda destino</span>
+            <p className="text-emerald-800 truncate">
+              <span className="text-emerald-600 text-xs uppercase tracking-wide font-medium block">Agenda destino</span>
               {calDisplayName}
             </p>
-            <p className="text-green-800 truncate">
-              <span className="text-green-600 text-xs uppercase tracking-wide font-medium block">Última sincronização</span>
+            <p className="text-emerald-800 truncate">
+              <span className="text-emerald-600 text-xs uppercase tracking-wide font-medium block">Última sincronização</span>
               {formatDateTime(integration?.last_synced_at ?? null)}
             </p>
           </div>
@@ -325,7 +325,7 @@ export default function SharksIntegrations() {
           ) : (
             <span
               className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                isConnected ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+                isConnected ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
               }`}
             >
               {isConnected ? (
@@ -347,11 +347,11 @@ export default function SharksIntegrations() {
             {isSharks && (
             <div className="mb-4">
               {globalInteg?.is_connected ? (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-green-900">Minha agenda Google</p>
-                      <p className="text-xs text-green-700">
+                      <p className="text-sm font-semibold text-emerald-900">Minha agenda Google</p>
+                      <p className="text-xs text-emerald-700">
                         {globalInteg.google_account_email} · Sincroniza TODOS os clientes para a sua agenda
                       </p>
                     </div>
@@ -361,7 +361,7 @@ export default function SharksIntegrations() {
                         size="sm"
                         onClick={handleSyncNow}
                         disabled={syncing}
-                        className="bg-white border-green-300 text-green-700 hover:bg-green-100"
+                        className="bg-white border-emerald-300 text-emerald-700 hover:bg-emerald-100"
                       >
                         {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                         Sincronizar agora
@@ -371,12 +371,12 @@ export default function SharksIntegrations() {
                         size="sm"
                         onClick={handleSwitchMode}
                         disabled={switchingMode}
-                        className="bg-white border-green-300 text-green-700 hover:bg-green-100"
+                        className="bg-white border-emerald-300 text-emerald-700 hover:bg-emerald-100"
                       >
                         {switchingMode ? <Loader2 className="w-4 h-4 animate-spin" /> : <Repeat className="w-4 h-4" />}
                         {globalInteg?.sync_mode === 'split' ? 'Usar uma agenda só' : 'Separar por ambiente'}
                       </Button>
-                      <span className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded-full">
+                      <span className="flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full">
                         <Zap className="w-3 h-3" /> Ativa
                       </span>
                     </div>
@@ -421,7 +421,7 @@ export default function SharksIntegrations() {
                     </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {connected && (
-                          <span className="flex items-center gap-1 text-[11px] font-medium text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded-full">
+                          <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full">
                             <CheckCircle2 className="w-3 h-3" /> Ativa
                           </span>
                         )}

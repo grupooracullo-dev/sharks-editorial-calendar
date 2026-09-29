@@ -255,7 +255,7 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
                 <ChevronDown className={cn('w-4 h-4 text-gray-400 transition-transform', envMenuOpen && 'rotate-180')} />
               </button>
               {envMenuOpen && (
-                <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-50">
+                <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
                   {switcherTargets.map(t => (
                     <button
                       key={`${t.id}-${t.home}`}

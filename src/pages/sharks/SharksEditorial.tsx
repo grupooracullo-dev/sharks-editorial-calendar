@@ -33,7 +33,7 @@ function PillarPercentageInput({ pillar, onSave }: { pillar: EditorialPillar; on
         onKeyDown={(e) => {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
         }}
-        className="w-14 text-center text-sm font-semibold text-gray-900 tabular-nums border border-gray-200 rounded-md py-1 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+        className="w-14 text-center text-sm font-semibold text-gray-900 tabular-nums border border-gray-200 rounded-md py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:border-primary-500"
         aria-label="Percentual do pilar"
       />
       <span className="text-xs text-gray-400">%</span>
@@ -155,7 +155,7 @@ export default function SharksEditorial() {
                     setAudienceDraft(null);
                   }}
                   rows={3}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
                   placeholder="Descreva o público prioritário..."
                 />
               </div>
@@ -174,7 +174,7 @@ export default function SharksEditorial() {
                     setRestrictionsDraft(null);
                   }}
                   rows={2}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
                   placeholder="Ex: Não publicar ofertas aos domingos"
                 />
               </div>
@@ -230,7 +230,7 @@ export default function SharksEditorial() {
             value={newPillarName}
             onChange={(e) => setNewPillarName(e.target.value)}
             placeholder="Nome do novo pilar..."
-            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           />
           <Button
             variant="outline"

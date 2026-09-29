@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 const TYPE_CONFIG: Record<MessageType, { label: string; icon: typeof MessageSquare; color: string }> = {
   message: { label: 'Mensagem', icon: MessageSquare, color: 'text-gray-500' },
   doubt: { label: 'Dúvida', icon: HelpCircle, color: 'text-amber-600' },
-  suggestion: { label: 'Sugestão', icon: Lightbulb, color: 'text-blue-600' },
+  suggestion: { label: 'Sugestão', icon: Lightbulb, color: 'text-primary-600' },
 };
 
 interface ChatMessageData {

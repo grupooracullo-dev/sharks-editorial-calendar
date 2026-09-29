@@ -223,8 +223,8 @@ export default function WeekGeneratorModal({
         </div>
 
         {/* Info */}
-        <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
-          <p className="text-xs text-blue-700 leading-relaxed">
+        <div className="bg-primary-50 border border-primary-100 rounded-lg p-4">
+          <p className="text-xs text-primary-700 leading-relaxed">
             O motor editorial analisa o perfil de <strong>{workspaceName}</strong>, campanhas ativas,
             datas comemorativas e histórico recente para gerar uma semana equilibrada.
             Clique no cadeado para manter uma ação entre re-gerações. As ações entram como <strong>rascunhos</strong>.
@@ -320,7 +320,7 @@ export default function WeekGeneratorModal({
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(result.coverage).map(([name, { target, assigned, pct }]) => (
                     <span key={name} className={`text-[11px] px-2 py-0.5 rounded-full ${
-                      pct >= 80 ? 'bg-green-100 text-green-700' :
+                      pct >= 80 ? 'bg-emerald-100 text-emerald-700' :
                       pct >= 50 ? 'bg-amber-100 text-amber-700' :
                       'bg-red-100 text-red-700'
                     }`}>

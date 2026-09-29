@@ -151,7 +151,7 @@ export default function ClientDashboard() {
               <div className="flex items-center gap-2">
                 <span
                   className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: data.activeCampaign.color || '#3B82F6' }}
+                  style={{ backgroundColor: data.activeCampaign.color || '#0066FF' }}
                 />
                 <p className="font-semibold text-gray-900 truncate">{data.activeCampaign.name}</p>
               </div>
@@ -167,7 +167,7 @@ export default function ClientDashboard() {
                   <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${campaignProgress}%`, backgroundColor: data.activeCampaign.color || '#3B82F6' }}
+                      style={{ width: `${campaignProgress}%`, backgroundColor: data.activeCampaign.color || '#0066FF' }}
                     />
                   </div>
                 </div>

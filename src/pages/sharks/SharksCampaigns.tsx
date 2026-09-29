@@ -16,15 +16,15 @@ import { Plus, Megaphone, Calendar, Users, Pencil, Trash2, Pause, Play, CheckCir
 import { Campaign, CampaignStatus } from '@/types';
 
 const PRESET_COLORS = [
-  '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
+  '#0066FF', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
   '#EC4899', '#06B6D4', '#F97316', '#6366F1', '#14B8A6',
 ];
 
 const STATUS_OPTIONS: { value: CampaignStatus; label: string; color: string }[] = [
   { value: 'draft', label: 'Rascunho', color: 'bg-gray-400' },
-  { value: 'active', label: 'Ativa', color: 'bg-green-500' },
-  { value: 'paused', label: 'Pausada', color: 'bg-yellow-500' },
-  { value: 'completed', label: 'Concluída', color: 'bg-blue-500' },
+  { value: 'active', label: 'Ativa', color: 'bg-emerald-500' },
+  { value: 'paused', label: 'Pausada', color: 'bg-amber-500' },
+  { value: 'completed', label: 'Concluída', color: 'bg-primary-500' },
 ];
 
 const emptyForm = {
@@ -36,7 +36,7 @@ const emptyForm = {
   audience: '',
   product: '',
   priority: 'medium',
-  color: '#3B82F6',
+  color: '#0066FF',
 };
 
 function statusBadge(status: CampaignStatus) {
@@ -65,7 +65,7 @@ export default function SharksCampaigns() {
       audience: c.audience || '',
       product: c.product || '',
       priority: c.priority || 'medium',
-      color: c.color || '#3B82F6',
+      color: c.color || '#0066FF',
     });
     setModalOpen(true);
   };
@@ -143,12 +143,12 @@ export default function SharksCampaigns() {
             return (
               <Card key={c.id} className="relative overflow-hidden">
                 {/* Barra de cor no topo */}
-                <div className="h-1.5 w-full rounded-t-lg -mt-px" style={{ backgroundColor: c.color || '#3B82F6' }} />
+                <div className="h-1.5 w-full rounded-t-lg -mt-px" style={{ backgroundColor: c.color || '#0066FF' }} />
 
                 <div className="flex items-start justify-between mb-3 mt-1">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${c.color || '#3B82F6'}20` }}>
-                      <Megaphone className="w-5 h-5" style={{ color: c.color || '#3B82F6' }} />
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${c.color || '#0066FF'}20` }}>
+                      <Megaphone className="w-5 h-5" style={{ color: c.color || '#0066FF' }} />
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900">{c.name}</h3>
@@ -182,11 +182,11 @@ export default function SharksCampaigns() {
                   <Button variant="ghost" size="sm" onClick={() => openEdit(c)} className="text-gray-600">
                     <Pencil className="w-3.5 h-3.5 mr-1" /> Editar
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(c)} className={isActive ? 'text-yellow-600' : 'text-green-600'}>
+                  <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(c)} className={isActive ? 'text-amber-600' : 'text-emerald-600'}>
                     {isActive ? <><Pause className="w-3.5 h-3.5 mr-1" /> Pausar</> : <><Play className="w-3.5 h-3.5 mr-1" /> Ativar</>}
                   </Button>
                   {isActive && (
-                    <Button variant="ghost" size="sm" onClick={() => handleComplete(c)} className="text-blue-600">
+                    <Button variant="ghost" size="sm" onClick={() => handleComplete(c)} className="text-primary-600">
                       <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Concluir
                     </Button>
                   )}

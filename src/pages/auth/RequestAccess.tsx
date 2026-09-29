@@ -129,8 +129,8 @@ export default function RequestAccess({ authUser = null, onSubmitted }: RequestA
             </div>
           ) : submitted ? (
             <div className="text-center py-6">
-              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 className="w-10 h-10 text-green-600" />
+              <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-10 h-10 text-emerald-600" />
               </div>
               <h2 className="text-xl font-bold text-gray-900 mb-2">Solicitação enviada!</h2>
               <p className="text-sm text-gray-600 mb-1">
@@ -160,7 +160,7 @@ export default function RequestAccess({ authUser = null, onSubmitted }: RequestA
               </p>
 
               {isGoogleFlow && (
-                <div className="flex items-center gap-2 bg-blue-50 text-blue-700 text-xs font-medium px-3 py-2 rounded-lg mb-4">
+                <div className="flex items-center gap-2 bg-primary-50 text-primary-700 text-xs font-medium px-3 py-2 rounded-lg mb-4">
                   <ShieldCheck className="w-4 h-4 shrink-0" />
                   E-mail verificado via Google — os campos preenchidos automaticamente não podem ser alterados.
                 </div>
@@ -181,7 +181,7 @@ export default function RequestAccess({ authUser = null, onSubmitted }: RequestA
                     {isGoogleFlow ? (
                       <div className="w-full border border-gray-200 bg-gray-50 text-gray-600 text-sm rounded-lg px-3 py-2.5 flex items-center gap-2">
                         <span className="truncate">{form.email}</span>
-                        <ShieldCheck className="w-4 h-4 text-blue-500 shrink-0" />
+                        <ShieldCheck className="w-4 h-4 text-primary-500 shrink-0" />
                       </div>
                     ) : (
                       <Input

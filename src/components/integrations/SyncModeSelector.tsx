@@ -113,7 +113,7 @@ export function EnvSyncToggles({
               <span className="text-base leading-none">{e.emoji}</span>
               <span className="min-w-0">
                 <span className="block text-sm font-medium text-gray-900 truncate">{e.label}</span>
-                <span className={cn('block text-xs', enabled ? 'text-green-600' : 'text-gray-400')}>
+                <span className={cn('block text-xs', enabled ? 'text-emerald-600' : 'text-gray-400')}>
                   {enabled ? 'Sincronizando' : 'Pausado'}
                 </span>
               </span>
