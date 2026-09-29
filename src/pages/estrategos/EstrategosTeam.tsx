@@ -86,12 +86,14 @@ export default function EstrategosTeam() {
     const [ueRes, wsRes, envMapRes] = await Promise.all([
       supabase
         .from('user_environments')
-        .select('user_id, role, users!inner(id, email, full_name, role, avatar_url)')
+        .select('user_id, role')
         .eq('environment', 'estrategos')
         .in('role', ['admin', 'team']),
       supabase.from('workspaces').select('id, name, segment').eq('is_active', true).order('name'),
       supabase.rpc('ws_env_map'),
     ]);
+
+    if (ueRes.error) console.error('[estrategos-team] user_environments load error:', ueRes.error.message);
 
     const sharksIds = new Set(
       ((envMapRes.data ?? []) as Array<{ id: string; environment: string }>)
@@ -104,22 +106,35 @@ export default function EstrategosTeam() {
     const ueRows = (ueRes.data as unknown as Array<{
       user_id: string;
       role: 'admin' | 'team';
-      users: { id: string; email: string; full_name: string; role: string; avatar_url: string | null };
     }>) ?? [];
+
+    // user_environments nao tem FK exposta para public.users — o embed
+    // PostgREST falhava (PGRST200); busca os usuarios em segunda chamada.
+    const userIds = [...new Set(ueRows.map(r => r.user_id))];
+    const usersRes = userIds.length > 0
+      ? await supabase.from('users').select('id, email, full_name, role, avatar_url').in('id', userIds)
+      : null;
+    if (usersRes?.error) console.error('[estrategos-team] users load error:', usersRes.error.message);
+    const usersById = new Map<string, { id: string; email: string; full_name: string; role: string; avatar_url: string | null }>(
+      ((usersRes?.data ?? []) as Array<{ id: string; email: string; full_name: string; role: string; avatar_url: string | null }>)
+        .map(u => [u.id, u]),
+    );
 
     // Deduplica (uma row por usuário/ambiente — mas protege contra duplicatas)
     const seen = new Set<string>();
     const baseMembers: EnvMember[] = [];
     for (const row of ueRows) {
       if (seen.has(row.user_id)) continue;
+      const user = usersById.get(row.user_id);
+      if (!user) continue;
       seen.add(row.user_id);
       baseMembers.push({
-        id: row.users.id,
-        email: row.users.email,
-        full_name: row.users.full_name,
-        global_role: row.users.role,
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        global_role: user.role,
         env_role: row.role,
-        avatar_url: row.users.avatar_url ?? undefined,
+        avatar_url: user.avatar_url ?? undefined,
       });
     }
 
