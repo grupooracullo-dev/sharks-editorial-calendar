@@ -125,6 +125,6 @@ Deno.serve(async req => {
     }
   } catch (e) {
     console.error('[admin-env-access]', e);
-    return json(500, { error: String((e as Error).message ?? e).slice(0, 300) });
+    return json(500, { error: 'Erro interno' });
   }
 });
