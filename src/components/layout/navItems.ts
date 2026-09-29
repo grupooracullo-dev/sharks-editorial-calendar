@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   CalendarDays,
   Building2,
+  Target,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -35,6 +36,7 @@ export const SHARKS_NAV: NavItem[] = [
   { icon: LayoutTemplate, label: 'Modelos', path: '/sharks/templates' },
   { icon: MessageSquare, label: 'Chat', path: '/sharks/chat' },
   { icon: History, label: 'Histórico', path: '/sharks/history' },
+  { icon: Target, label: 'CRM', path: '/sharks/crm' },
   { icon: Users, label: 'Clientes', path: '/sharks/clients' },
   { icon: UserCog, label: 'Time', path: '/sharks/team' },
   { icon: UserPlus, label: 'Acessos', path: '/sharks/access-requests', adminOnly: true },
@@ -56,6 +58,7 @@ export const ESTRATEGOS_NAV: NavItem[] = [
   { icon: Briefcase, label: 'Projetos', path: '/estrategos/projects' },
   { icon: CalendarDays, label: 'Reuniões', path: '/estrategos/meetings' },
   { icon: Rocket, label: 'Implementações', shortLabel: 'Impl.', path: '/estrategos/implementations' },
+  { icon: Target, label: 'CRM', path: '/estrategos/crm' },
   { icon: MessageSquare, label: 'Chat', path: '/estrategos/chat' },
   { icon: Users, label: 'Clientes', path: '/estrategos/clients', adminOnly: true },
   { icon: UserCog, label: 'Time', path: '/estrategos/team' },
@@ -65,6 +68,7 @@ export const ESTRATEGOS_NAV: NavItem[] = [
 
 export const ORACULLO_NAV: NavItem[] = [
   { icon: LayoutDashboard, label: 'Visão Geral', path: '/oracullo' },
+  { icon: Target, label: 'CRM', path: '/oracullo/crm' },
   { icon: ShieldCheck, label: 'Acessos', path: '/oracullo/access' },
   { icon: UserPlus, label: 'Solicitações', path: '/oracullo/access-requests' },
   { icon: Users, label: 'Usuários', path: '/oracullo/users' },
