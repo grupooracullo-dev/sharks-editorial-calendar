@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import PageHeader from '@/components/ui/PageHeader';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Modal from '@/components/ui/Modal';
@@ -28,7 +27,7 @@ interface ProspectingPageProps {
   canDelete?: boolean;
 }
 
-export default function ProspectingPage({ environment, canDelete = false }: ProspectingPageProps) {
+export default function CampaignsSection({ environment }: ProspectingPageProps) {
   const { user } = useAuth();
   const { campaigns, loading, createCampaign, updateCampaign, deleteCampaign, setStatus } =
     useProspectingCampaigns(environment);
@@ -46,7 +45,7 @@ export default function ProspectingPage({ environment, canDelete = false }: Pros
     { label: 'Leads qualificados', value: metrics.qualified, icon: Target },
     { label: 'Em abordagem', value: metrics.approach, icon: MessageSquare },
     { label: 'Interessados', value: metrics.interested, icon: TrendingUp },
-    { label: 'Reuniões', value: metrics.meetings, icon: CalendarCheck },
+    { label: 'ReuniÃƒÂµes', value: metrics.meetings, icon: CalendarCheck },
   ];
 
   const handleSubmit = async (values: CampaignFormValues) => {
@@ -58,7 +57,7 @@ export default function ProspectingPage({ environment, canDelete = false }: Pros
         toast.success('Campanha atualizada!');
       } else {
         await createCampaign(environment, payload, user?.id ?? null);
-        toast.success('Campanha criada! Inicie-a para começar a prospecção.');
+        toast.success('Campanha criada! Inicie-a para comeÃƒÂ§ar a prospecÃƒÂ§ÃƒÂ£o.');
       }
       setFormOpen(false);
       setEditing(null);
@@ -72,7 +71,7 @@ export default function ProspectingPage({ environment, canDelete = false }: Pros
   const handleStatus = async (campaign: ProspectingCampaign, status: CampaignStatus) => {
     try {
       await setStatus(campaign.id, status);
-      toast.success(status === 'running' ? 'Campanha em execução' : `Campanha ${CAMPAIGN_STATUS_META[status].label.toLowerCase()}`);
+      toast.success(status === 'running' ? 'Campanha em execuÃƒÂ§ÃƒÂ£o' : `Campanha ${CAMPAIGN_STATUS_META[status].label.toLowerCase()}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao atualizar status');
     }
@@ -83,7 +82,7 @@ export default function ProspectingPage({ environment, canDelete = false }: Pros
     setSubmitting(true);
     try {
       await deleteCampaign(deleting.id);
-      toast.success('Campanha excluída');
+      toast.success('Campanha excluÃƒÂ­da');
       setDeleting(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao excluir campanha');
@@ -94,18 +93,13 @@ export default function ProspectingPage({ environment, canDelete = false }: Pros
 
   return (
     <div className="flex-1 min-h-0 flex flex-col space-y-4">
-      <PageHeader
-        title="Prospecção IA"
-        subtitle="Campanhas inteligentes para descobrir, qualificar e converter novas oportunidades comerciais."
-        actions={
-          <Button onClick={() => { setEditing(null); setFormOpen(true); }}>
-            <Plus className="w-4 h-4" />
-            Nova campanha
-          </Button>
-        }
-      />
-
-      {/* Métricas */}
+      <div className="flex items-center justify-end">
+        <Button onClick={() => { setEditing(null); setFormOpen(true); }}>
+          <Plus className="w-4 h-4" />
+          Nova campanha
+        </Button>
+      </div>
+      {/* MÃƒÂ©tricas */}
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
         {metricCards.map(({ label, value, icon: Icon }) => (
           <Card key={label} padding="sm" className="flex items-center gap-3">
@@ -130,7 +124,7 @@ export default function ProspectingPage({ environment, canDelete = false }: Pros
           <Card padding="md">
             <EmptyState
               icon={Radar}
-              title="Nenhuma campanha de prospecção"
+              title="Nenhuma campanha de prospecÃƒÂ§ÃƒÂ£o"
               description="Crie uma campanha definindo o ICP, os produtos do ambiente e os canais de abordagem."
             />
             <div className="flex justify-center pb-2 -mt-2">
@@ -161,7 +155,7 @@ export default function ProspectingPage({ environment, canDelete = false }: Pros
                       {(c.segment || c.location) && (
                         <span className="inline-flex items-center gap-1">
                           <Building2 className="w-3 h-3" />
-                          {[c.segment, c.location].filter(Boolean).join(' · ')}
+                          {[c.segment, c.location].filter(Boolean).join(' Ã‚Â· ')}
                         </span>
                       )}
                       {c.company_size && <span>Porte: {c.company_size}</span>}
@@ -186,10 +180,10 @@ export default function ProspectingPage({ environment, canDelete = false }: Pros
                         </>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-                          <Users className="w-3 h-3" /> Sem responsável
+                          <Users className="w-3 h-3" /> Sem responsÃƒÂ¡vel
                         </span>
                       )}
-                      <span className="text-xs text-gray-300">·</span>
+                      <span className="text-xs text-gray-300">Ã‚Â·</span>
                       <span className="text-xs text-gray-400">
                         criada em {new Date(c.created_at).toLocaleDateString('pt-BR')}
                       </span>
@@ -198,7 +192,7 @@ export default function ProspectingPage({ environment, canDelete = false }: Pros
 
                   <div className="flex items-center gap-1 shrink-0">
                     {c.status === 'draft' && (
-                      <button onClick={() => handleStatus(c, 'running')} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-colors" title="Iniciar execução">
+                      <button onClick={() => handleStatus(c, 'running')} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-colors" title="Iniciar execuÃƒÂ§ÃƒÂ£o">
                         <Play className="w-3.5 h-3.5" />
                       </button>
                     )}
@@ -215,11 +209,9 @@ export default function ProspectingPage({ environment, canDelete = false }: Pros
                     <button onClick={() => { setEditing(c); setFormOpen(true); }} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-primary-600 hover:border-primary-200 hover:bg-primary-50 transition-colors" title="Editar">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
-                    {canDelete && (
-                      <button onClick={() => setDeleting(c)} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors" title="Excluir">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                    <button onClick={() => setDeleting(c)} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors" title="Excluir">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
               </Card>
@@ -239,11 +231,11 @@ export default function ProspectingPage({ environment, canDelete = false }: Pros
         onSubmit={handleSubmit}
       />
 
-      {/* Confirmar exclusão */}
+      {/* Confirmar exclusÃƒÂ£o */}
       <Modal isOpen={!!deleting} onClose={() => setDeleting(null)} title="Excluir campanha" size="sm">
         <p className="text-sm text-gray-600">
-          Excluir <strong>{deleting?.name}</strong> e todo o histórico de jobs?
-          Leads já criados no CRM não são afetados.
+          Excluir <strong>{deleting?.name}</strong> e todo o histÃƒÂ³rico de jobs?
+          Leads jÃƒÂ¡ criados no CRM nÃƒÂ£o sÃƒÂ£o afetados.
         </p>
         <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100">
           <Button variant="ghost" onClick={() => setDeleting(null)}>Cancelar</Button>

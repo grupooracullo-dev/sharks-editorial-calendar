@@ -64,9 +64,7 @@ export const SHARKS_NAV: NavSection[] = [
     label: 'Comercial',
     items: [
       { icon: Target, label: 'CRM', path: '/sharks/crm' },
-      { icon: Telescope, label: 'Prospecção', path: '/sharks/prospeccao' },
-      { icon: Bot, label: 'Agente IA', path: '/sharks/prospeccao/agente' },
-      { icon: MessagesSquare, label: 'Abordagens', path: '/sharks/abordagens' },
+      { icon: Telescope, label: 'Prospecção IA', path: '/sharks/prospeccao' },
       { icon: Users, label: 'Clientes', path: '/sharks/clients' },
     ],
   },
@@ -121,9 +119,7 @@ export const ESTRATEGOS_NAV: NavSection[] = [
     label: 'Comercial',
     items: [
       { icon: Target, label: 'CRM', path: '/estrategos/crm' },
-      { icon: Telescope, label: 'Prospecção', path: '/estrategos/prospeccao' },
-      { icon: Bot, label: 'Agente IA', path: '/estrategos/prospeccao/agente' },
-      { icon: MessagesSquare, label: 'Abordagens', path: '/estrategos/abordagens' },
+      { icon: Telescope, label: 'Prospecção IA', path: '/estrategos/prospeccao' },
       { icon: Package, label: 'Produtos', path: '/estrategos/products' },
       { icon: Users, label: 'Clientes', path: '/estrategos/clients', adminOnly: true },
     ],

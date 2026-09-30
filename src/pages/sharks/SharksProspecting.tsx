@@ -1,7 +1,5 @@
-import ProspectingPage from '@/components/prospecting/ProspectingPage';
-import { useAuth } from '@/contexts/AuthContext';
+import ProspectingHub from '@/components/prospecting/ProspectingHub';
 
 export default function SharksProspecting() {
-  const { isAdmin } = useAuth();
-  return <ProspectingPage environment="sharks_company" canDelete={isAdmin} />;
+  return <ProspectingHub environment="sharks_company" />;
 }
