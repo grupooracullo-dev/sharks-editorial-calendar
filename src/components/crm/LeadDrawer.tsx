@@ -7,7 +7,7 @@ import Badge from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
 import {
   Building2, Calendar, Mail, Phone, StickyNote, ArrowRight, Info,
-  Trash2, Pencil, TrendingUp, Send, MessageSquare, Loader2,
+  Trash2, Pencil, TrendingUp, Send, MessageSquare, Loader2, Bot,
 } from 'lucide-react';
 import {
   LEAD_STAGES, STAGE_META, ACTIVITY_TYPE_META, formatBRL, type LeadStage,
@@ -93,6 +93,36 @@ export default function LeadDrawer({
           <div className="bg-red-50 border border-red-200 rounded-lg p-3">
             <p className="text-xs font-semibold text-red-700 mb-0.5">Motivo da perda</p>
             <p className="text-sm text-red-700">{lead.lost_reason}</p>
+          </div>
+        )}
+
+        {/* Análise do agente */}
+        {lead.ai_analyzed_at && (
+          <div className="bg-primary-50 border border-primary-200 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs font-semibold text-primary-700 flex items-center gap-1.5">
+                <Bot className="w-3.5 h-3.5" />
+                Análise do Agente IA
+              </p>
+              <span className="text-[11px] text-primary-500">
+                {new Date(lead.ai_analyzed_at).toLocaleDateString('pt-BR')}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs mt-1">
+              <span className="font-semibold text-primary-900 tabular-nums">
+                Fit: {Math.round((Number(lead.ai_fit) || 0) * 100)}%
+              </span>
+              {lead.ai_priority && (
+                <span className="px-1.5 py-0.5 rounded-full bg-white text-primary-700 border border-primary-100">
+                  Prioridade: {lead.ai_priority}
+                </span>
+              )}
+              {lead.ai_next_step && (
+                <span className="text-gray-600">
+                  Próximo passo: {lead.ai_next_step.replace(/_/g, ' ')}
+                </span>
+              )}
+            </div>
           </div>
         )}
 
