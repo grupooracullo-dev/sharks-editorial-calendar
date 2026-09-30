@@ -16,10 +16,11 @@ const SUBTITLES: Record<HubTab, string> = {
 
 interface ProspectingHubProps {
   environment: ProspectingEnvironment;
+  editable?: boolean;
 }
 
 /** Hub da Prospecção IA: campanhas, agente e abordagens em um módulo só. */
-export default function ProspectingHub({ environment }: ProspectingHubProps) {
+export default function ProspectingHub({ environment, editable = false }: ProspectingHubProps) {
   const [tab, setTab] = useState<HubTab>('campanhas');
 
   return (
@@ -36,7 +37,7 @@ export default function ProspectingHub({ environment }: ProspectingHubProps) {
         className="self-start"
       />
       {tab === 'campanhas' && <CampaignsSection environment={environment} />}
-      {tab === 'agente' && <AgentSection environment={environment} />}
+      {tab === 'agente' && <AgentSection environment={environment} editable={editable} />}
       {tab === 'abordagens' && <ApproachesSection environment={environment} />}
     </div>
   );

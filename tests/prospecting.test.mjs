@@ -108,3 +108,35 @@ test('mock do provider (fallback sem key) continua determinístico', async () =>
   assert.equal(a.icpFit, b.icpFit);
   assert.ok(a.icpFit >= 0 && a.icpFit <= 1);
 });
+
+/* ─── F3: settings do agente + GLM ─── */
+test('migration 070: settings por ambiente com seeds, RLS de admin e drops', async () => {
+  const migration = await readFile(new URL('../supabase/migrations/070_limpeza_e_agent_settings.sql', import.meta.url), 'utf8');
+  assert.ok(migration.includes('prospecting_agent_settings'));
+  assert.ok(migration.includes('DROP TABLE IF EXISTS public.channels'));
+  assert.ok(migration.includes('DROP TABLE IF EXISTS public.calendar_templates'));
+  assert.ok(migration.includes('DROP TABLE IF EXISTS public.partners'));
+  assert.ok(migration.includes('DROP TABLE IF EXISTS public.action_partners'));
+  assert.ok(migration.includes('Sofia'));
+  assert.ok(migration.includes('is_env_admin((select auth.uid()), environment)'));
+});
+
+test('GLM: system prompt carrega personalidade e parse de rascunho', () => {
+  const prompt = ai.buildGlmSystemPrompt(
+    { agent_name: 'Sofia', tone: 'amigavel', language: 'pt-BR', persona: 'Consultora comercial', brand_voice_rules: 'Sem promessas', signature: '— Sharks', greeting_style: 'curto' },
+    'Distribuidores PE',
+  );
+  assert.ok(prompt.includes('Sofia'));
+  assert.ok(prompt.includes('Consultora comercial'));
+  assert.ok(prompt.includes('Sem promessas'));
+  assert.ok(prompt.includes('Distribuidores PE'));
+  assert.ok(prompt.includes('Assunto:'));
+
+  const parsed = ai.parseGlmDraft('Assunto: Ideia para voce\n\nOla, tudo bem?');
+  assert.equal(parsed.subject, 'Ideia para voce');
+  assert.equal(parsed.message, 'Ola, tudo bem?');
+
+  const fallback = ai.parseGlmDraft('Mensagem direta sem assunto');
+  assert.equal(fallback.subject, null);
+  assert.equal(fallback.message, 'Mensagem direta sem assunto');
+});

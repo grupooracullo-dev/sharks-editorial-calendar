@@ -60,7 +60,6 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
     product: '',
     product_id: '' as string | null,
     product_ids: [] as string[],
-    partner_ids: [] as string[],
     theme: '',
     hook: '',
     main_message: '',
@@ -139,7 +138,6 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
           audience: formData.audience || null,
     product_id: formData.product_id || null,
     product_ids: formData.product_ids,
-    partner_ids: formData.partner_ids,
         product: formData.product || null,
         theme: formData.theme || null,
         hook: formData.hook || null,
@@ -171,20 +169,15 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
   // independente do cliente selecionado (mesma lista da página Time)
   const [teamMembers, setTeamMembers] = useState<Array<{ id: string; full_name: string }>>([]);
 
-  // Catálogos do workspace: produtos e parceiros ativos
+  // Catálogo do workspace: produtos ativos
   const [productOptions, setProductOptions] = useState<Array<{ id: string; name: string }>>([]);
-  const [partnerOptions, setPartnerOptions] = useState<Array<{ id: string; name: string }>>([]);
   useEffect(() => {
     if (!isOpen || !workspaceId) return;
     let active = true;
     (async () => {
-      const [pRes, ptRes] = await Promise.all([
-        supabase.from('products').select('id, name').eq('workspace_id', workspaceId).eq('status', 'active').order('name'),
-        supabase.from('partners').select('id, name').eq('workspace_id', workspaceId).eq('status', 'active').order('name'),
-      ]);
+      const pRes = await supabase.from('products').select('id, name').eq('workspace_id', workspaceId).eq('status', 'active').order('name');
       if (!active) return;
       setProductOptions((pRes.data ?? []) as Array<{ id: string; name: string }>);
-      setPartnerOptions((ptRes.data ?? []) as Array<{ id: string; name: string }>);
     })();
     return () => { active = false; };
   }, [isOpen, workspaceId]);
@@ -246,7 +239,6 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
           product_ids: action.products?.length
             ? action.products.map(p => p.id)
             : (action.product_id ? [action.product_id] : []),
-          partner_ids: action.partners?.length ? action.partners.map(r => r.id) : (action.product_id ? [] : []),
           responsible_ids: action.responsibles?.length
             ? action.responsibles.map(r => r.id)
             : (action.responsible_id ? [action.responsible_id] : []),
@@ -277,7 +269,6 @@ export default function ActionForm({ action, isOpen, onClose, defaultDate, envir
           observations: '',
           product_id: '' as string | null,
           product_ids: [] as string[],
-          partner_ids: [] as string[],
           responsible_ids: [] as string[],
           internal_deadline: '',
         });

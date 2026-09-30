@@ -1,17 +1,27 @@
-import Card from '@/components/ui/Card';
+import { useState, useEffect } from 'react';
+import Card, { CardHeader, CardTitle } from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import EmptyState from '@/components/ui/EmptyState';
+import Input from '@/components/ui/Input';
+import Select from '@/components/ui/Select';
+import Textarea from '@/components/ui/Textarea';
+import Button from '@/components/ui/Button';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Search, FileSearch, Target, Send, MessageSquare, CalendarCheck,
-  Radar, Loader2, Bot, ShieldCheck, Cpu, Clock,
+  Radar, Loader2, Bot, ShieldCheck, Cpu, Clock, Settings, Save,
 } from 'lucide-react';
-import { useProspectingJobs } from '@/hooks/useProspecting';
+import {
+  useProspectingJobs, useAgentSettings, type AgentSettings,
+} from '@/hooks/useProspecting';
 import { JOB_TYPE_META, JOB_STATUS_META, type JobStatus, type ProspectingEnvironment } from '@/lib/prospecting/types';
 import type { LucideIcon } from 'lucide-react';
 
 interface AgentPageProps {
   environment: ProspectingEnvironment;
+  editable?: boolean;
 }
 
 /* Pipeline do agente — a ordem do fluxo §39 do plano */
@@ -41,8 +51,34 @@ const JOB_STATUS_ICON: Record<JobStatus, LucideIcon> = {
   retry: Clock,
 };
 
-export default function AgentSection({ environment }: AgentPageProps) {
+export default function AgentSection({ environment, editable = false }: AgentPageProps) {
   const jobs = useProspectingJobs(environment);
+  const { user } = useAuth();
+  const { settings, loading: settingsLoading, saveSettings } = useAgentSettings(environment);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsForm, setSettingsForm] = useState<AgentSettings | null>(null);
+
+  useEffect(() => {
+    if (!settingsLoading) setSettingsForm(settings);
+  }, [settings, settingsLoading]);
+
+  const setP = (key: keyof AgentSettings['params'], value: string | number) =>
+    setSettingsForm(f => (f ? { ...f, params: { ...f.params, [key]: typeof value === 'number' ? value : Number(value) } } : f));
+  const setPer = (key: keyof AgentSettings['personality'], value: string) =>
+    setSettingsForm(f => (f ? { ...f, personality: { ...f.personality, [key]: value } } : f));
+
+  const handleSaveSettings = async () => {
+    if (!settingsForm) return;
+    setSavingSettings(true);
+    try {
+      await saveSettings(settingsForm, user?.id ?? null);
+      toast.success('Personalidade e parâmetros salvos! Valem para as próximas execuções.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao salvar configurações');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   return (
     <div className="flex-1 min-h-0 flex flex-col space-y-4 overflow-y-auto pb-2">
@@ -108,6 +144,100 @@ export default function AgentSection({ environment }: AgentPageProps) {
           <li>· Campanhas Sharks e Estrategos são isoladas por ambiente (RLS).</li>
           <li>· Integrações externas (e-mail, WhatsApp) passam obrigatoriamente pela validação do backend.</li>
         </ul>
+      </Card>
+
+      {/* Personalidade & Parâmetros */}
+      <Card padding="md">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <span className="w-8 h-8 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center">
+              <Settings className="w-4 h-4" />
+            </span>
+            Personalidade & Parâmetros
+          </CardTitle>
+          {!editable && <span className="text-[11px] text-gray-400">Somente admin edita</span>}
+        </CardHeader>
+        {settingsForm && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Input label="Nome do agente" value={settingsForm.personality.agent_name} onChange={(e) => setPer('agent_name', e.target.value)} disabled={!editable} />
+              <Select
+                label="Tom de voz"
+                value={settingsForm.personality.tone}
+                onChange={(e) => setPer('tone', e.target.value)}
+                options={[
+                  { value: 'amigavel', label: 'Amigável' },
+                  { value: 'formal', label: 'Formal' },
+                  { value: 'direto', label: 'Direto' },
+                ]}
+                disabled={!editable}
+              />
+              <Input
+                label="Assinatura"
+                value={settingsForm.personality.signature}
+                onChange={(e) => setPer('signature', e.target.value)}
+                disabled={!editable}
+              />
+            </div>
+            <Textarea
+              label="Persona (como o agente se apresenta)"
+              value={settingsForm.personality.persona}
+              onChange={(e) => setPer('persona', e.target.value)}
+              placeholder="Ex.: Consultora comercial prática, focada em resultado do cliente..."
+              rows={2}
+              disabled={!editable}
+            />
+            <Textarea
+              label="Regras de voz (o que o agente pode/não pode dizer)"
+              value={settingsForm.personality.brand_voice_rules}
+              onChange={(e) => setPer('brand_voice_rules', e.target.value)}
+              placeholder="Ex.: nunca prometer resultado garantido; frases curtas; 1 pergunta por mensagem..."
+              rows={2}
+              disabled={!editable}
+            />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Input
+                label="Rascunho auto (fit ≥)"
+                type="number" min="0" max="1" step="0.05"
+                value={settingsForm.params.fit_draft_threshold}
+                onChange={(e) => setP('fit_draft_threshold', e.target.value)}
+                disabled={!editable}
+              />
+              <Input
+                label="Descartar (fit <)"
+                type="number" min="0" max="1" step="0.05"
+                value={settingsForm.params.fit_discard_threshold}
+                onChange={(e) => setP('fit_discard_threshold', e.target.value)}
+                disabled={!editable}
+              />
+              <Input
+                label="Confiança p/ agir"
+                type="number" min="0" max="1" step="0.05"
+                value={settingsForm.params.confidence_auto}
+                onChange={(e) => setP('confidence_auto', e.target.value)}
+                disabled={!editable}
+              />
+              <Input
+                label="Empresas/execução"
+                type="number" min="1" max="20"
+                value={settingsForm.params.max_companies_per_run}
+                onChange={(e) => setP('max_companies_per_run', e.target.value)}
+                disabled={!editable}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <p className="text-[11px] text-gray-400">
+                Valores valem para as próximas execuções do agente neste ambiente.
+              </p>
+              {editable && (
+                <Button size="sm" onClick={handleSaveSettings} loading={savingSettings}>
+                  <Save className="w-3.5 h-3.5" />
+                  Salvar configurações
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Atividade recente (jobs) */}
