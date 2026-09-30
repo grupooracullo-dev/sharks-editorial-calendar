@@ -18,6 +18,7 @@ import {
   Building2,
   Target,
   Package,
+  Telescope,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -39,6 +40,7 @@ export const SHARKS_NAV: NavItem[] = [
   { icon: MessageSquare, label: 'Chat', path: '/sharks/chat' },
   { icon: History, label: 'Histórico', path: '/sharks/history' },
   { icon: Target, label: 'CRM', path: '/sharks/crm' },
+  { icon: Telescope, label: 'Prospecção', path: '/sharks/prospeccao' },
   { icon: Users, label: 'Clientes', path: '/sharks/clients' },
   { icon: UserCog, label: 'Time', path: '/sharks/team' },
   { icon: UserPlus, label: 'Acessos', path: '/sharks/access-requests', adminOnly: true },
@@ -62,6 +64,7 @@ export const ESTRATEGOS_NAV: NavItem[] = [
   { icon: Rocket, label: 'Implementações', shortLabel: 'Impl.', path: '/estrategos/implementations' },
   { icon: Package, label: 'Produtos', path: '/estrategos/products' },
   { icon: Target, label: 'CRM', path: '/estrategos/crm' },
+  { icon: Telescope, label: 'Prospecção', path: '/estrategos/prospeccao' },
   { icon: MessageSquare, label: 'Chat', path: '/estrategos/chat' },
   { icon: Users, label: 'Clientes', path: '/estrategos/clients', adminOnly: true },
   { icon: UserCog, label: 'Time', path: '/estrategos/team' },

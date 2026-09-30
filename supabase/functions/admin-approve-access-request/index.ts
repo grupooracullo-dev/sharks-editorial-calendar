@@ -11,7 +11,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const GRANTABLE_ROLES = ['client', 'sharks_team'] as const;
 type GrantableRole = typeof GRANTABLE_ROLES[number];
 
-const VALID_PERMISSIONS = ['calendar', 'campaigns', 'editorial', 'templates', 'history', 'chat', 'crm', 'clients', 'integrations', 'team'];
+const VALID_PERMISSIONS = ['calendar', 'campaigns', 'editorial', 'templates', 'history', 'chat', 'crm', 'prospecting', 'clients', 'integrations', 'team'];
 
 const DEFAULT_PERMISSIONS = [
   { permission: 'calendar',     can_create: true,  can_read: true,  can_update: true,  can_delete: true },
@@ -21,6 +21,7 @@ const DEFAULT_PERMISSIONS = [
   { permission: 'history',      can_create: false, can_read: true,  can_update: false, can_delete: false },
   { permission: 'chat',         can_create: true,  can_read: true,  can_update: true,  can_delete: false },
   { permission: 'crm',          can_create: true,  can_read: true,  can_update: true,  can_delete: false },
+  { permission: 'prospecting',  can_create: true,  can_read: true,  can_update: true,  can_delete: false },
   { permission: 'clients',      can_create: false, can_read: true,  can_update: false, can_delete: false },
   { permission: 'integrations', can_create: false, can_read: true,  can_update: false, can_delete: false },
   { permission: 'team',         can_create: false, can_read: true,  can_update: false, can_delete: false },
