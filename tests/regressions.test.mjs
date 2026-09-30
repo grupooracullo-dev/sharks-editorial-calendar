@@ -102,7 +102,7 @@ test('client routes take precedence over Sharks membership in both menus and con
   const header = await readFile(new URL('../src/components/layout/TopHeader.tsx', import.meta.url), 'utf8');
   const layout = await readFile(new URL('../src/components/layout/AppLayout.tsx', import.meta.url), 'utf8');
   assert.match(sidebar, /env === 'client' \? CLIENT_NAV\s*: isSharks/);
-  assert.match(bottom, /pathname.startsWith\('\/client'\) \? itemsFor\(CLIENT_BOTTOM_PATHS, CLIENT_NAV\)\s*: isSharks/);
+  assert.match(bottom, /pathname\.startsWith\('\/client'\) \? itemsFor\(CLIENT_BOTTOM_PATHS, flattenNav\(CLIENT_NAV\)\)\s*: isSharks/);
   assert.equal((header.match(/isSharks && !location.pathname.startsWith\('\/client'\)/g) ?? []).length, 2);
   assert.match(layout, /if \(!isClient\) return <Navigate to="\/select-environment"/);
 });
