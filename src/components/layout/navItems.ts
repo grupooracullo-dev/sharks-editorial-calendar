@@ -20,6 +20,7 @@ import {
   Package,
   Telescope,
   Bot,
+  MessagesSquare,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -56,7 +57,6 @@ export const SHARKS_NAV: NavSection[] = [
     items: [
       { icon: Megaphone, label: 'Campanhas', path: '/sharks/campaigns' },
       { icon: BookOpen, label: 'Linha Editorial', path: '/sharks/editorial' },
-      { icon: LayoutTemplate, label: 'Modelos', path: '/sharks/templates' },
       { icon: Package, label: 'Produtos', path: '/sharks/products' },
     ],
   },
@@ -66,6 +66,7 @@ export const SHARKS_NAV: NavSection[] = [
       { icon: Target, label: 'CRM', path: '/sharks/crm' },
       { icon: Telescope, label: 'Prospecção', path: '/sharks/prospeccao' },
       { icon: Bot, label: 'Agente IA', path: '/sharks/prospeccao/agente' },
+      { icon: MessagesSquare, label: 'Abordagens', path: '/sharks/abordagens' },
       { icon: Users, label: 'Clientes', path: '/sharks/clients' },
     ],
   },
@@ -122,6 +123,7 @@ export const ESTRATEGOS_NAV: NavSection[] = [
       { icon: Target, label: 'CRM', path: '/estrategos/crm' },
       { icon: Telescope, label: 'Prospecção', path: '/estrategos/prospeccao' },
       { icon: Bot, label: 'Agente IA', path: '/estrategos/prospeccao/agente' },
+      { icon: MessagesSquare, label: 'Abordagens', path: '/estrategos/abordagens' },
       { icon: Package, label: 'Produtos', path: '/estrategos/products' },
       { icon: Users, label: 'Clientes', path: '/estrategos/clients', adminOnly: true },
     ],
