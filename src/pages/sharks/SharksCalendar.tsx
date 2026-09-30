@@ -19,7 +19,6 @@ import Button from '@/components/ui/Button';
 import Tabs from '@/components/ui/Tabs';
 import { useEditorial } from '@/hooks/useEditorial';
 import { useStrategicDates } from '@/hooks/useStrategicDates';
-import { useChannels } from '@/hooks/useChannels';
 import { useActiveCampaigns } from '@/hooks/useCampaigns';
 import { ACTION_STATUSES, ACTION_STATUS_DOT_CLASSES } from '@/lib/constants';
 import { ChevronLeft, ChevronRight, Calendar, Plus, Wand2, RefreshCw } from 'lucide-react';
@@ -144,7 +143,6 @@ export default function SharksCalendar({ initialView = 'month', environment }: S
   const { pillars, profile } = useEditorial(currentWorkspace?.id);
   const activeCampaigns = useActiveCampaigns(currentWorkspace?.id);
   const { dates: strategicDates } = useStrategicDates(currentWorkspace?.id);
-  const channels = useChannels(currentWorkspace?.id);
 
   const weekStep = 7;
   const goToToday = () => setCurrentDate(new Date());
@@ -721,7 +719,6 @@ const weekDayWindow = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(cu
           existingActions={actions}
           strategicDates={strategicDates}
           activeCampaigns={activeCampaigns}
-          channels={channels}
         />
       )}
     </div>
