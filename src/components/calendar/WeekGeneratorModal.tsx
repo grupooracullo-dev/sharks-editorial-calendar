@@ -21,7 +21,6 @@ interface WeekGeneratorModalProps {
   existingActions: Action[];
   strategicDates: StrategicDate[];
   activeCampaigns: Campaign[];
-  channels?: string[];
 }
 
 export default function WeekGeneratorModal({
@@ -34,7 +33,6 @@ export default function WeekGeneratorModal({
   existingActions,
   strategicDates,
   activeCampaigns,
-  channels = [],
 }: WeekGeneratorModalProps) {
   const minWeekStart = formatCalendarDate(addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 7));
 
@@ -101,7 +99,6 @@ export default function WeekGeneratorModal({
       recentFormats,
       recentPillars,
       recentObjectives,
-      channels,
       weekStart: weekStartDate,
       pubStart,
       pubEnd,
@@ -129,7 +126,6 @@ export default function WeekGeneratorModal({
       recentFormats: keptFormats,
       recentPillars: keptPillars,
       recentObjectives: keptObjectives,
-      channels,
       weekStart: weekStartDate,
       pubStart,
       pubEnd,

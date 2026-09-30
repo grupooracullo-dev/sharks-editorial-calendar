@@ -58,8 +58,6 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
   }
   if (hasAccess('estrategos', ['admin', 'team'])) {
     switcherTargets.push({ id: 'estrategos', label: 'Estrategos', emoji: '📊', home: '/estrategos' });
-  } else if (hasAccess('estrategos')) {
-    switcherTargets.push({ id: 'estrategos', label: 'Estrategos', emoji: '📊', home: '/client/estrategos' });
   }
   if (isOracullo) {
     switcherTargets.unshift({ id: 'sharks_company', label: 'Oracullo', emoji: '🛡️', home: '/oracullo' });
@@ -99,10 +97,7 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
     : isSharks ? SHARKS_NAV.filter(i => !i.adminOnly || isAdmin)
     : CLIENT_NAV;
 
-  // No portal do cliente dentro do contexto estrategos, reutiliza os itens do client
-  const navItems = env === 'client' && location.pathname.startsWith('/client/estrategos')
-    ? CLIENT_NAV
-    : baseItems;
+  const navItems = baseItems;
 
   const brandTitle =
     env === 'estrategos' ? 'Estrategos'

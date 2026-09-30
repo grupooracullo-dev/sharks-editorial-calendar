@@ -12,7 +12,7 @@ import {
   FunnelStage,
 } from '@/types';
 import { addDays, startOfWeek, format } from 'date-fns';
-import { CONTENT_FORMATS, OBJECTIVES, FORMAT_ZONES } from '@/lib/constants';
+import { CONTENT_FORMATS, OBJECTIVES, FORMAT_ZONES, DEFAULT_CHANNELS } from '@/lib/constants';
 
 // ==========================================
 // WEEK GENERATOR v3
@@ -29,7 +29,6 @@ interface GeneratorInput {
   recentFormats: ContentFormat[];
   recentPillars: string[];
   recentObjectives: Objective[];
-  channels: string[];
   weeksAhead?: number;      // default 1 (ignorado se weekStart informada)
   weekStart?: Date;         // data de referência da semana a gerar
   pubStart?: string;        // 'HH:MM' — início da janela diária de publicações
@@ -376,7 +375,6 @@ export function generateWeek(input: GeneratorInput): WeekGeneratorResult {
     recentFormats,
     recentPillars,
     recentObjectives,
-    channels,
     weeksAhead = 1,
     weekStart,
   } = input;
@@ -451,9 +449,7 @@ export function generateWeek(input: GeneratorInput): WeekGeneratorResult {
     const funnelStage = getFunnelStage(selectedObjective);
 
     // Canal
-    const channel = channels.length > 0
-      ? channels[Math.floor(Math.random() * channels.length)]
-      : 'Instagram';
+    const channel = DEFAULT_CHANNELS[Math.floor(Math.random() * DEFAULT_CHANNELS.length)].name;
 
     // Título contextual (com retry anti-duplicação na mesma data)
     let title = generateContextualTitle(
@@ -516,7 +512,6 @@ export function generateWeek(input: GeneratorInput): WeekGeneratorResult {
 
   // Warnings
   const warnings: string[] = [];
-  if (channels.length === 0) warnings.push('Nenhum canal configurado — canal padrão Instagram usado');
   if (pillars.filter(p => p.is_active).length === 0) warnings.push('Nenhum pilar ativo — revise os pilares editoriais');
   if (allowedDays.length === 0) warnings.push('Nenhum dia permitido — revise a configuração editorial');
   if (generated.length < totalFrequency) warnings.push(`Geradas ${generated.length} de ${totalFrequency} solicitadas (dias indisponíveis ou sem pilares)`);
