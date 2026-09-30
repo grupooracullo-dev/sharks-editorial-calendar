@@ -1,7 +1,5 @@
-import ProspectingPage from '@/components/prospecting/ProspectingPage';
-import { useAuth } from '@/contexts/AuthContext';
+import ProspectingHub from '@/components/prospecting/ProspectingHub';
 
 export default function EstrategosProspecting() {
-  const { hasAccess } = useAuth();
-  return <ProspectingPage environment="estrategos" canDelete={hasAccess('estrategos', ['admin'])} />;
+  return <ProspectingHub environment="estrategos" />;
 }

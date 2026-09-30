@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Select from '@/components/ui/Select';
 import EmptyState from '@/components/ui/EmptyState';
@@ -26,7 +25,7 @@ interface ApproachesPageProps {
   environment: ProspectingEnvironment;
 }
 
-export default function ApproachesPage({ environment }: ApproachesPageProps) {
+export default function ApproachesSection({ environment }: ApproachesPageProps) {
   const items = useApproaches(environment);
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
@@ -43,10 +42,6 @@ export default function ApproachesPage({ environment }: ApproachesPageProps) {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col space-y-4">
-      <PageHeader
-        title="Abordagens"
-        subtitle="Tudo que o agente produz e envia, em tempo real — rascunhos, envios e respostas."
-      />
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-2">

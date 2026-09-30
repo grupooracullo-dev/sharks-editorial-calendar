@@ -67,8 +67,9 @@ export default function DashboardOverview({
   const { workspacesByEnv } = useWorkspace();
   const workspaces = workspacesByEnv(env);
 
-  const allActions = useActions({});
-  const overdue = useOverdueActions();
+  const allActions = useActions({ environment: env });
+  const overdueAll = useOverdueActions();
+  const overdue = useMemo(() => overdueAll.filter(a => a.environment === env), [overdueAll, env]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [strategicDates, setStrategicDates] = useState<StrategicDate[]>([]);
 
@@ -81,6 +82,17 @@ export default function DashboardOverview({
       setStrategicDates((sd.data as unknown as StrategicDate[]) ?? []);
     });
   }, []);
+
+  // Filtra campanhas e datas estratégicas pelos workspaces do ambiente
+  const envWsIds = useMemo(() => new Set(workspaces.map(w => w.id)), [workspaces]);
+  const envCampaigns = useMemo(
+    () => campaigns.filter(c => !c.workspace_id || envWsIds.has(c.workspace_id)),
+    [campaigns, envWsIds],
+  );
+  const envStrategicDates = useMemo(
+    () => strategicDates.filter(d => !d.workspace_id || envWsIds.has(d.workspace_id)),
+    [strategicDates, envWsIds],
+  );
 
   const today = new Date();
   const todayStr = formatCalendarDate(today);
@@ -163,8 +175,8 @@ export default function DashboardOverview({
           actions={allActions.actions}
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
-          campaigns={campaigns}
-          strategicDates={strategicDates}
+          campaigns={envCampaigns}
+          strategicDates={envStrategicDates}
           onOpenCalendar={() => navigate(calendarPath)}
         />
       </Card>

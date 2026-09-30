@@ -1,4 +1,3 @@
-import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import EmptyState from '@/components/ui/EmptyState';
@@ -42,15 +41,11 @@ const JOB_STATUS_ICON: Record<JobStatus, LucideIcon> = {
   retry: Clock,
 };
 
-export default function AgentPage({ environment }: AgentPageProps) {
+export default function AgentSection({ environment }: AgentPageProps) {
   const jobs = useProspectingJobs(environment);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col space-y-4 overflow-y-auto pb-2">
-      <PageHeader
-        title="Agente de Prospecção IA"
-        subtitle="O motor que descobre, pesquisa, qualifica e aborda prospects — com transparência total no CRM."
-      />
 
       {/* Status do motor */}
       <Card padding="md" className="flex flex-wrap items-center gap-4">
