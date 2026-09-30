@@ -1,10 +1,10 @@
-/* ─── Prospecção IA — domínio (migration 067) ─── */
+/* ─── Prospecção IA — domínio (migration 067) ───
+   Jobs (tipos/estados) e abstrações de IA ficam documentados na
+   própria migration e em docs/ARQUITETURA.md — entram no código na F2. */
 
 export type ProspectingEnvironment = 'sharks_company' | 'estrategos';
 
-/* Status da campanha */
 export type CampaignStatus = 'draft' | 'running' | 'paused' | 'completed' | 'failed';
-export const CAMPAIGN_STATUSES: CampaignStatus[] = ['draft', 'running', 'paused', 'completed', 'failed'];
 export const CAMPAIGN_STATUS_META: Record<CampaignStatus, { label: string; badgeClass: string }> = {
   draft:     { label: 'Rascunho',    badgeClass: 'bg-gray-100 text-gray-600' },
   running:   { label: 'Em execução', badgeClass: 'bg-emerald-100 text-emerald-700' },
@@ -12,23 +12,6 @@ export const CAMPAIGN_STATUS_META: Record<CampaignStatus, { label: string; badge
   completed: { label: 'Concluída',   badgeClass: 'bg-sky-100 text-sky-700' },
   failed:    { label: 'Falhou',      badgeClass: 'bg-red-100 text-red-600' },
 };
-
-/* Tipos e estados de job (fila do Prospecting Engine) */
-export type JobType =
-  | 'discover_companies'
-  | 'enrich_company'
-  | 'analyze_company'
-  | 'score_company'
-  | 'generate_message'
-  | 'send_message'
-  | 'follow_up';
-export const JOB_TYPES: JobType[] = [
-  'discover_companies', 'enrich_company', 'analyze_company', 'score_company',
-  'generate_message', 'send_message', 'follow_up',
-];
-
-export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'retry';
-export const JOB_STATUSES: JobStatus[] = ['pending', 'processing', 'completed', 'failed', 'retry'];
 
 /* Estado de prospecção — separado do estágio comercial (crm_leads.stage) */
 export type ProspectingStatus =
@@ -41,33 +24,16 @@ export type ProspectingStatus =
   | 'replied'
   | 'interested'
   | 'converted_to_pipeline';
-export const PROSPECTING_STATUSES: ProspectingStatus[] = [
-  'discovered', 'researching', 'qualified', 'discarded', 'queued',
-  'contacted', 'replied', 'interested', 'converted_to_pipeline',
-];
-export const PROSPECTING_STATUS_META: Record<ProspectingStatus, { label: string }> = {
-  discovered:            { label: 'Descoberto' },
-  researching:           { label: 'Em pesquisa' },
-  qualified:             { label: 'Qualificado' },
-  discarded:             { label: 'Descartado' },
-  queued:                { label: 'Na fila' },
-  contacted:             { label: 'Contatado' },
-  replied:               { label: 'Respondeu' },
-  interested:            { label: 'Interessado' },
-  converted_to_pipeline: { label: 'No pipeline' },
-};
 
-/* Canais de abordagem (preparados para e-mail, WhatsApp, Instagram e voz) */
 export const PROSPECTING_CHANNELS = ['email', 'whatsapp', 'instagram', 'voice'] as const;
-export type ProspectingChannel = typeof PROSPECTING_CHANNELS[number];
 export const CHANNEL_META: Record<ProspectingChannel, { label: string }> = {
   email:     { label: 'E-mail' },
   whatsapp:  { label: 'WhatsApp' },
   instagram: { label: 'Instagram' },
   voice:     { label: 'Voz' },
 };
+export type ProspectingChannel = typeof PROSPECTING_CHANNELS[number];
 
-/* Nível de automação (o MVP nunca executa abordagens reais automaticamente) */
 export const AUTOMATION_LEVELS = ['assisted', 'semi_auto', 'auto'] as const;
 export type AutomationLevel = typeof AUTOMATION_LEVELS[number];
 export const AUTOMATION_META: Record<AutomationLevel, { label: string }> = {
@@ -78,7 +44,6 @@ export const AUTOMATION_META: Record<AutomationLevel, { label: string }> = {
 
 export const COMPANY_SIZES = ['Micro', 'Pequeno', 'Médio', 'Grande'] as const;
 
-/* ─── Entidades ─── */
 export interface ProspectingCampaign {
   id: string;
   environment: ProspectingEnvironment;
@@ -97,24 +62,6 @@ export interface ProspectingCampaign {
   updated_at: string;
   products: Array<{ product: { id: string; name: string } }> | null;
   assigned_to_user?: { id: string; full_name: string; avatar_url: string | null } | null;
-}
-
-export interface ProspectingJob {
-  id: string;
-  campaign_id: string;
-  lead_id: string | null;
-  type: JobType;
-  status: JobStatus;
-  input: Record<string, unknown>;
-  output: Record<string, unknown> | null;
-  error: string | null;
-  attempts: number;
-  dedupe_key: string | null;
-  scheduled_at: string;
-  started_at: string | null;
-  completed_at: string | null;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface CampaignPayload {
