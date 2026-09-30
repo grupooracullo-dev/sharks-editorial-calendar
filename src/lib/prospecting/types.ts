@@ -25,6 +25,53 @@ export type ProspectingStatus =
   | 'interested'
   | 'converted_to_pipeline';
 
+/* ─── Jobs do Prospecting Engine (migration 067) ─── */
+export type JobType =
+  | 'discover_companies'
+  | 'enrich_company'
+  | 'analyze_company'
+  | 'score_company'
+  | 'generate_message'
+  | 'send_message'
+  | 'follow_up';
+export const JOB_TYPE_META: Record<JobType, { label: string }> = {
+  discover_companies: { label: 'Descobrir empresas' },
+  enrich_company:     { label: 'Enriquecer empresa' },
+  analyze_company:    { label: 'Analisar empresa' },
+  score_company:      { label: 'Pontuar empresa' },
+  generate_message:   { label: 'Gerar mensagem' },
+  send_message:       { label: 'Enviar mensagem' },
+  follow_up:          { label: 'Follow-up' },
+};
+
+export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'retry';
+export const JOB_STATUS_META: Record<JobStatus, { label: string; badgeClass: string }> = {
+  pending:    { label: 'Pendente',     badgeClass: 'bg-gray-100 text-gray-600' },
+  processing: { label: 'Processando',  badgeClass: 'bg-sky-100 text-sky-700' },
+  completed:  { label: 'Concluído',    badgeClass: 'bg-emerald-100 text-emerald-700' },
+  failed:     { label: 'Falhou',       badgeClass: 'bg-red-100 text-red-600' },
+  retry:      { label: 'Reagendado',   badgeClass: 'bg-amber-100 text-amber-700' },
+};
+
+export interface ProspectingJob {
+  id: string;
+  campaign_id: string;
+  lead_id: string | null;
+  type: JobType;
+  status: JobStatus;
+  input: Record<string, unknown>;
+  output: Record<string, unknown> | null;
+  error: string | null;
+  attempts: number;
+  dedupe_key: string | null;
+  scheduled_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  campaign?: { id: string; name: string } | null;
+}
+
 export const PROSPECTING_CHANNELS = ['email', 'whatsapp', 'instagram', 'voice'] as const;
 export const CHANNEL_META: Record<ProspectingChannel, { label: string }> = {
   email:     { label: 'E-mail' },

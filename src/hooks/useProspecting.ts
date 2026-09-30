@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type {
-  CampaignPayload, CampaignStatus, ProspectingCampaign, ProspectingEnvironment, ProspectingStatus,
+  CampaignPayload, CampaignStatus, ProspectingCampaign, ProspectingEnvironment, ProspectingJob, ProspectingStatus,
 } from '@/lib/prospecting/types';
 
 const CAMPAIGN_SELECT =
@@ -96,6 +96,50 @@ export function useProspectingCampaigns(environment: ProspectingEnvironment | nu
   };
 
   return { campaigns, loading, createCampaign, updateCampaign, deleteCampaign, setStatus };
+}
+
+/* ─── Atividade do agente: jobs recentes do ambiente ─── */
+export function useProspectingJobs(environment: ProspectingEnvironment | null) {
+  const [jobs, setJobs] = useState<ProspectingJob[]>([]);
+
+  useEffect(() => {
+    if (!environment) {
+      setJobs([]);
+      return;
+    }
+    let active = true;
+    const load = async () => {
+      const { data, error } = await supabase
+        .from('prospecting_jobs')
+        .select('*, campaign:prospecting_campaigns!inner(id, name)')
+        .eq('campaign.environment', environment)
+        .order('created_at', { ascending: false })
+        .limit(30);
+      if (!active) return;
+      if (error) {
+        console.error('[prospecting] jobs error:', error.message);
+        return;
+      }
+      setJobs(((data ?? []) as unknown) as ProspectingJob[]);
+    };
+
+    load();
+
+    const channel = supabase
+      .channel(`prospecting-jobs-${environment}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'prospecting_jobs' },
+        () => { load(); },
+      )
+      .subscribe();
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, [environment]);
+
+  return jobs;
 }
 
 /* ─── Métricas: leads vindos do agente (origin + prospecting_status) ─── */

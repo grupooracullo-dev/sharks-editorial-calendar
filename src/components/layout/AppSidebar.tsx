@@ -11,6 +11,7 @@ import {
   CLIENT_NAV,
   ESTRATEGOS_NAV,
   ORACULLO_NAV,
+  type NavSection,
 } from '@/components/layout/navItems';
 import {
   LogOut,
@@ -90,14 +91,17 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
     return () => { supabase.removeChannel(channel); };
   }, [canSeeRequestsBadge]);
 
-  const baseItems =
-    env === 'estrategos' ? ESTRATEGOS_NAV.filter(i => !i.adminOnly || isEstrategosAdmin)
+  const filterSections = (sections: NavSection[], isAdminUser: boolean): NavSection[] =>
+    sections
+      .map(s => ({ ...s, items: s.items.filter(i => !i.adminOnly || isAdminUser) }))
+      .filter(s => s.items.length > 0);
+
+  const navSections =
+    env === 'estrategos' ? filterSections(ESTRATEGOS_NAV, isEstrategosAdmin)
     : env === 'oracullo' ? ORACULLO_NAV
     : env === 'client' ? CLIENT_NAV
-    : isSharks ? SHARKS_NAV.filter(i => !i.adminOnly || isAdmin)
+    : isSharks ? filterSections(SHARKS_NAV, isAdmin)
     : CLIENT_NAV;
-
-  const navItems = baseItems;
 
   const brandTitle =
     env === 'estrategos' ? 'Estrategos'
@@ -239,40 +243,51 @@ export default function AppSidebar({ open, onClose }: AppSidebarProps) {
         <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
           {/* Navigation */}
           <nav className="flex-1 py-4 px-2">
-            <ul className="space-y-1">
-              {navItems.map((item) => (
-                <li key={item.path}>
-                  <NavLink
-                    to={item.path}
-                    end={item.path === '/sharks' || item.path === '/client' || item.path === '/estrategos' || item.path === '/oracullo'}
-                    onClick={onClose}
-                    className={({ isActive }) =>
-                      cn(
-                        'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
-                        isActive
-                          ? 'bg-primary-50 text-primary-600 before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:rounded-r-full before:bg-primary-600 before:content-[""]'
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
-                        collapsed && 'justify-center px-2'
-                      )
-                    }
-                  >
-                    <item.icon className="w-5 h-5 flex-shrink-0" />
-                    {!collapsed && <span>{item.label}</span>}
-                    {item.path.endsWith('/access-requests') && pendingRequests > 0 && (
-                      <span
-                        className={cn(
-                          'ml-auto min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold',
-                          collapsed && 'absolute -top-0.5 -right-0.5 ml-0 w-5 px-0'
-                        )}
+            {navSections.map((section, si) => (
+              <div key={section.label ?? `sec-${si}`} className={cn(si > 0 && 'mt-4')}>
+                {!collapsed && section.label && (
+                  <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                    {section.label}
+                  </p>
+                )}
+                {collapsed && si > 0 && <div className="mx-2 my-2 border-t border-gray-100" />}
+                <ul className="space-y-1">
+                  {section.items.map((item) => (
+                    <li key={item.path}>
+                      <NavLink
+                        to={item.path}
+                        end={item.path === '/sharks' || item.path === '/client' || item.path === '/estrategos' || item.path === '/oracullo'}
+                        onClick={onClose}
+                        title={collapsed ? item.label : undefined}
+                        className={({ isActive }) =>
+                          cn(
+                            'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
+                            isActive
+                              ? 'bg-primary-50 text-primary-600 before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:rounded-r-full before:bg-primary-600 before:content-[""]'
+                              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                            collapsed && 'justify-center px-2'
+                          )
+                        }
                       >
-                        {pendingRequests > 9 ? '9+' : pendingRequests}
-                      </span>
-                    )}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
+                        <item.icon className="w-5 h-5 flex-shrink-0" />
+                        {!collapsed && <span>{item.label}</span>}
+                        {item.path.endsWith('/access-requests') && pendingRequests > 0 && (
+                          <span
+                            className={cn(
+                              'ml-auto min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold',
+                              collapsed && 'absolute -top-0.5 -right-0.5 ml-0 w-5 px-0'
+                            )}
+                          >
+                            {pendingRequests > 9 ? '9+' : pendingRequests}
+                          </span>
+                        )}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </nav>
 
           {/* Footer */}

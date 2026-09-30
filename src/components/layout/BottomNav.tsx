@@ -11,6 +11,7 @@ import {
   ESTRATEGOS_BOTTOM_PATHS,
   ORACULLO_BOTTOM_PATHS,
   ROOT_PATHS,
+  flattenNav,
   type NavItem,
 } from '@/components/layout/navItems';
 
@@ -24,11 +25,11 @@ export default function BottomNav() {
   const { isSharks } = useAuth();
 
   const navItems =
-    location.pathname.startsWith('/estrategos') ? itemsFor(ESTRATEGOS_BOTTOM_PATHS, ESTRATEGOS_NAV)
-    : location.pathname.startsWith('/oracullo') ? itemsFor(ORACULLO_BOTTOM_PATHS, ORACULLO_NAV)
-    : location.pathname.startsWith('/client') ? itemsFor(CLIENT_BOTTOM_PATHS, CLIENT_NAV)
-    : isSharks ? itemsFor(SHARKS_BOTTOM_PATHS, SHARKS_NAV)
-    : itemsFor(CLIENT_BOTTOM_PATHS, CLIENT_NAV);
+    location.pathname.startsWith('/estrategos') ? itemsFor(ESTRATEGOS_BOTTOM_PATHS, flattenNav(ESTRATEGOS_NAV))
+    : location.pathname.startsWith('/oracullo') ? itemsFor(ORACULLO_BOTTOM_PATHS, flattenNav(ORACULLO_NAV))
+    : location.pathname.startsWith('/client') ? itemsFor(CLIENT_BOTTOM_PATHS, flattenNav(CLIENT_NAV))
+    : isSharks ? itemsFor(SHARKS_BOTTOM_PATHS, flattenNav(SHARKS_NAV))
+    : itemsFor(CLIENT_BOTTOM_PATHS, flattenNav(CLIENT_NAV));
 
   const isActive = (path: string) => {
     if (ROOT_PATHS.includes(path)) {
