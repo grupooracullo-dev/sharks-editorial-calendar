@@ -275,6 +275,46 @@ export function useApproaches(environment: ProspectingEnvironment | null) {
   return items;
 }
 
+/* ─── Status dos canais de integração (Edge prospecting-status) ─── */
+export interface ChannelStatus {
+  decision_ai: boolean;
+  generative_ai: boolean;
+  google_places: boolean;
+  meta: boolean;
+  n8n: boolean;
+}
+
+const EMPTY_CHANNELS: ChannelStatus = {
+  decision_ai: false, generative_ai: false, google_places: false, meta: false, n8n: false,
+};
+
+export function useChannelStatus(enabled: boolean) {
+  const [channels, setChannels] = useState<ChannelStatus>(EMPTY_CHANNELS);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let active = true;
+    (async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        if (!token) return;
+        const res = await fetch('https://cyumczehpiiarwqrpgnu.supabase.co/functions/v1/prospecting-status', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const body = (await res.json()) as { channels: ChannelStatus };
+        if (active) setChannels(body.channels);
+      } catch (e) {
+        console.error('[prospecting] canais status:', e);
+      }
+    })();
+    return () => { active = false; };
+  }, [enabled]);
+
+  return channels;
+}
+
 /* ─── Métricas: leads vindos do agente (origin + prospecting_status) ─── */
 export interface ProspectingMetrics {
   found: number;

@@ -1,6 +1,6 @@
 import type { DragEvent } from 'react';
 import { cn } from '@/lib/utils';
-import { Building2, Sparkles } from 'lucide-react';
+import { Building2, Sparkles, Bot } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
 import { ACTIVITY_TYPE_META, formatBRL, formatRelativeTime } from '@/lib/crmStages';
 import type { Lead, LeadActivitySummary } from '@/hooks/useLeads';
@@ -45,9 +45,19 @@ export default function LeadCard({
         dragging && 'opacity-40',
       )}
     >
-      {/* Nome + ambiente */}
+      {/* Nome + ambiente + flag do agente */}
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-semibold text-gray-900 leading-snug break-words flex-1">{lead.name}</p>
+        <div className="flex items-start gap-1.5 min-w-0 flex-1">
+          {lead.origin === 'prospecting_agent' && (
+            <span
+              className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-1 py-0.5 rounded shrink-0 mt-0.5"
+              title="Lead captado pelo Agente de Prospecção IA"
+            >
+              <Bot className="w-2.5 h-2.5" /> IA
+            </span>
+          )}
+          <p className="text-sm font-semibold text-gray-900 leading-snug break-words flex-1">{lead.name}</p>
+        </div>
         {showEnv && (
           <span className="text-xs shrink-0 mt-0.5" title={ENVIRONMENT_META[lead.environment].label}>
             {ENVIRONMENT_META[lead.environment].emoji}
@@ -93,7 +103,7 @@ export default function LeadCard({
         </span>
       )}
 
-      {/* Responsável + tempo relativo */}
+      {/* Responsável + vendedores + tempo relativo */}
       <div className="flex items-center gap-1.5 mt-2 min-w-0">
         {lead.owner ? (
           <Avatar name={lead.owner.full_name} src={lead.owner.avatar_url} size="xs" />
@@ -103,6 +113,17 @@ export default function LeadCard({
         <span className="text-xs text-gray-500 truncate">
           {lead.owner?.full_name ?? 'Sem responsável'} · {formatRelativeTime(lead.updated_at)}
         </span>
+        {(lead.team?.length ?? 0) > 0 && (
+          <span className="flex -space-x-1.5 ml-auto shrink-0" title={lead.team!.map(x => x.user?.full_name).filter(Boolean).join(', ')}>
+            {lead.team!.slice(0, 3).map(x => (
+              x.user && (
+                <span key={x.user.id} className="rounded-full ring-1 ring-white">
+                  <Avatar name={x.user.full_name} src={x.user.avatar_url} size="xs" />
+                </span>
+              )
+            ))}
+          </span>
+        )}
       </div>
 
       {/* Última atividade */}

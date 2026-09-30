@@ -21,12 +21,13 @@ export interface LeadFormValues {
   owner_id: string;
   notes: string;
   product_ids: string[];
+  team_ids: string[];
 }
 
 const EMPTY_FORM: LeadFormValues = {
   name: '', contact_name: '', contact_email: '', contact_phone: '',
   source: '', segment: '', value: '', monthly_value: '',
-  expected_close_date: '', owner_id: '', notes: '', product_ids: [],
+  expected_close_date: '', owner_id: '', notes: '', product_ids: [], team_ids: [],
 };
 
 interface LeadFormModalProps {
@@ -61,6 +62,7 @@ export default function LeadFormModal({ isOpen, onClose, lead, environment, owne
           owner_id: lead.owner_id ?? '',
           notes: lead.notes ?? '',
           product_ids: (lead.products ?? []).map(x => x.product?.id).filter((v): v is string => !!v),
+          team_ids: (lead.team ?? []).map(x => x.user?.id).filter((v): v is string => !!v),
         }
       : EMPTY_FORM);
   }, [isOpen, lead]);
@@ -132,6 +134,22 @@ export default function LeadFormModal({ isOpen, onClose, lead, environment, owne
             emptyMessage="Nenhum produto cadastrado — cadastre na página Produtos"
           />
         )}
+        <ChipMultiSelect
+          label="Vendedores do lead (opcional)"
+          options={owners.map(o => ({ id: o.value, name: o.label }))}
+          values={form.team_ids}
+          onChange={(ids) => setForm(f => ({ ...f, team_ids: ids }))}
+          placeholder="Vincular vendedores do time..."
+          emptyMessage="Nenhum membro do time neste ambiente"
+        />
+        <ChipMultiSelect
+          label="Vendedores do lead (opcional)"
+          options={owners.map(o => ({ id: o.value, name: o.label }))}
+          values={form.team_ids}
+          onChange={(ids) => setForm(f => ({ ...f, team_ids: ids }))}
+          placeholder="Vincular vendedores do time..."
+          emptyMessage="Nenhum membro do time neste ambiente"
+        />
       </div>
 
       <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100">

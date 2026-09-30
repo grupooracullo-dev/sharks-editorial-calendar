@@ -1,0 +1,35 @@
+// ==========================================
+// prospecting-status — status dos canais de integração do agente
+// Auth: JWT de staff (Authorization: Bearer). Sem segredos na resposta.
+// ==========================================
+
+import { corsHeaders } from '../_shared/google.ts';
+
+const CORS: Record<string, string> = {};
+function json(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
+}
+
+Deno.serve(async req => {
+  Object.assign(CORS, corsHeaders(req));
+  try {
+    if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+    if (req.method !== 'GET') return json(405, { error: 'Use GET' });
+
+    // Apenas staff autenticado consulta (não expõe valores, só presença)
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) return json(401, { error: 'Token ausente' });
+
+    const channels = {
+      decision_ai: !!Deno.env.get('TYPESAFE_API_KEY'),
+      generative_ai: !!Deno.env.get('GLM_API_KEY'),
+      google_places: !!Deno.env.get('GOOGLE_PLACES_API_KEY'),
+      meta: !!Deno.env.get('META_APP_SECRET') && !!Deno.env.get('META_PAGE_TOKEN'),
+      n8n: !!Deno.env.get('N8N_WEBHOOK_URL'),
+    };
+
+    return json(200, { channels });
+  } catch (e) {
+    return json(500, { error: `Erro interno: ${(e as Error)?.message || String(e)}` });
+  }
+});

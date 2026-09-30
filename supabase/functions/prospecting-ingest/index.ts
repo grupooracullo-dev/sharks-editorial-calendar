@@ -1,23 +1,18 @@
 // ==========================================
-// prospecting-ingest — captura de leads inbound
+// prospecting-ingest — captura de leads inbound + interações Meta + conversa
 //
-// 1) Meta Lead Ads (webhook):
-//    GET  → verificação hub.challenge (META_VERIFY_TOKEN)
-//    POST → X-Hub-Signature-256 (META_APP_SECRET) → Graph API
-//           busca os dados do lead (META_PAGE_TOKEN)
-// 2) Genérico assinado (Google Apps Script/n8n futuro):
-//    POST com x-worker-secret e payload normalizado
-//
-// Ambiente e campanha via query string: ?env=sharks_company&campaign=<uuid>
-// Dedup: e-mail/telefone no ambiente — existente ganha
-// atividade de reengajamento em vez de lead duplicado.
+// 1) Verificação de webhook Meta: GET hub.challenge (META_VERIFY_TOKEN)
+// 2) POST com assinatura Meta (X-Hub-Signature-256 + META_APP_SECRET):
+//    - leadgen   → Graph API → lead no CRM (dedup por contato)
+//    - comments  → dedup por @handle → lead descoberto + PRIVATE REPLY
+//    - messages  → atividade reply_received no lead (por @handle)
+// 3) POST genérico assinado (x-worker-secret):
+//    - { source, environment, name/email/phone, message } → lead inbound
+//    - { event: outreach_sent|reply_received, environment, lead_ref, content }
+//      → atividade no lead + transição de prospecting_status
 // ==========================================
 
 import { serviceClient, corsHeaders } from '../_shared/google.ts';
-import {
-  mapMetaLeadFields, extractMetaLeadIds, findExistingLead,
-  createInboundLead, registerReengagement, normalizeEmail, normalizePhone,
-} from '../_shared/prospecting/ingest.ts';
 
 const CORS: Record<string, string> = {};
 function json(status: number, body: unknown) {
@@ -26,7 +21,7 @@ function json(status: number, body: unknown) {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VALID_ENVS = ['sharks_company', 'estrategos'];
-const VALID_SOURCES = ['meta_ads', 'google', 'website', 'api'];
+const VALID_SOURCES = ['meta_ads', 'meta_interaction', 'google', 'website', 'api'];
 const GRAPH_VERSION = 'v21.0';
 
 async function verifyMetaSignature(raw: string, signature: string, appSecret: string): Promise<boolean> {
@@ -34,6 +29,189 @@ async function verifyMetaSignature(raw: string, signature: string, appSecret: st
   const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(raw));
   const expected = Array.from(new Uint8Array(mac)).map(b => b.toString(16).padStart(2, '0')).join('');
   return signature === `sha256=${expected}`;
+}
+
+function normalizeEmail(email: string | null | undefined): string | null {
+  const v = (email ?? '').trim().toLowerCase();
+  return v.includes('@') ? v : null;
+}
+
+function normalizePhone(phone: string | null | undefined): string | null {
+  const digits = (phone ?? '').replace(/\D/g, '');
+  return digits.length >= 8 ? digits : null;
+}
+
+interface Contact {
+  name: string;
+  email: string | null;
+  phone: string | null;
+  social_instagram: string | null;
+}
+
+function cleanHandle(raw: string | null | undefined): string | null {
+  const v = (raw ?? '').trim().replace(/^@/, '');
+  return /^[A-Za-z0-9._]{2,30}$/.test(v) ? v : null;
+}
+
+async function findLead(
+  admin: ReturnType<typeof serviceClient>,
+  environment: string,
+  ref: { email?: string | null; phone?: string | null; social_instagram?: string | null },
+) {
+  const filters: string[] = [];
+  if (ref.email) filters.push(`contact_email.eq.${ref.email}`);
+  if (ref.phone) filters.push(`contact_phone.eq.${ref.phone}`);
+  if (ref.social_instagram) filters.push(`social_instagram.eq.${ref.social_instagram}`);
+  if (filters.length === 0) return null;
+  const { data } = await admin
+    .from('crm_leads')
+    .select('id, name, prospecting_status')
+    .eq('environment', environment)
+    .or(filters.join(','))
+    .limit(1)
+    .maybeSingle();
+  return (data as unknown as { id: string; name: string; prospecting_status: string | null }) ?? null;
+}
+
+async function createLead(
+  admin: ReturnType<typeof serviceClient>,
+  environment: string,
+  source: string,
+  contact: Contact,
+  campaignId: string | null,
+  message: string | null,
+): Promise<{ leadId: string }> {
+  const { data: lead, error } = await admin
+    .from('crm_leads')
+    .insert({
+      environment,
+      name: contact.name || (contact.social_instagram ? `@${contact.social_instagram}` : 'Lead inbound'),
+      contact_name: contact.name || null,
+      contact_email: contact.email,
+      contact_phone: contact.phone,
+      social_instagram: contact.social_instagram,
+      source,
+      origin: 'inbound',
+      prospecting_status: 'discovered',
+      notes: message || null,
+      ...(campaignId ? { prospecting_campaign_id: campaignId } : {}),
+    })
+    .select('id')
+    .single();
+  if (error) throw new Error(`Criar lead: ${error.message}`);
+  await admin.from('crm_lead_activities').insert({
+    lead_id: lead.id,
+    type: 'system',
+    content: `Lead captado via ${source}.`,
+  });
+  return { leadId: lead.id as string };
+}
+
+async function logActivity(admin: ReturnType<typeof serviceClient>, leadId: string, type: string, content: string) {
+  const { error } = await admin.from('crm_lead_activities').insert({ lead_id: leadId, type, content });
+  if (error) console.error('[ingest] atividade falhou:', error.message);
+}
+
+async function registerReengagement(admin: ReturnType<typeof serviceClient>, leadId: string, src: string, message: string | null) {
+  await logActivity(admin, leadId, 'system', `Reengajou via ${src}.${message ? ` Mensagem: ${message}` : ''}`);
+}
+
+async function handleMeta(
+  admin: ReturnType<typeof serviceClient>,
+  payload: Record<string, unknown>,
+  environment: string,
+  campaignId: string | null,
+): Promise<Response> {
+  const pageToken = Deno.env.get('META_PAGE_TOKEN');
+  if (!pageToken) return json(500, { error: 'META_PAGE_TOKEN nao configurado' });
+
+  const entries = (payload?.entry ?? []) as Array<Record<string, unknown>>;
+  const results: Array<{ kind: string; lead_id?: string; created?: boolean; skipped?: string }> = [];
+
+  for (const entry of entries) {
+    const changes = (entry?.changes ?? []) as Array<Record<string, unknown>>;
+    for (const change of changes) {
+      const field = String(change?.field ?? '');
+      const value = (change?.value ?? {}) as Record<string, unknown>;
+
+      // ── Lead Ads ──
+      if (field === 'leadgen' && value?.lead_id) {
+        const leadId = String(value.lead_id);
+        const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${leadId}?access_token=${encodeURIComponent(pageToken)}`);
+        if (!res.ok) { console.error('[ingest] Graph leadgen:', res.status); continue; }
+        const leadData = (await res.json()) as { field_data?: Array<{ name?: string; values?: string[] }> };
+        const get = (k: string) => (leadData.field_data ?? []).find(f => (f.name ?? '').toLowerCase() === k)?.values?.[0] ?? '';
+        const contact: Contact = {
+          name: (get('full_name') || [get('first_name'), get('last_name')].filter(Boolean).join(' ')).trim(),
+          email: normalizeEmail(get('email')),
+          phone: normalizePhone(get('phone_number') || get('phone')),
+          social_instagram: null,
+        };
+        const existing = await findLead(admin, environment, contact);
+        if (existing) {
+          await logActivity(admin, existing.id, 'system', `Reengajou via Meta Lead Ads.`);
+          results.push({ kind: 'leadgen', lead_id: existing.id, created: false });
+          continue;
+        }
+        const { leadId: newId } = await createLead(admin, environment, 'meta_ads', contact, campaignId, null);
+        results.push({ kind: 'leadgen', lead_id: newId, created: true });
+        continue;
+      }
+
+      // ── Comentário → private reply + lead por @handle ──
+      if (field === 'comments' && value?.comment_id) {
+        const username = cleanHandle(String(value?.from?.username ?? ''));
+        const commentId = String(value.comment_id);
+        const text = String(value.text ?? '');
+        if (!username) continue;
+        const contact: Contact = { name: `@${username}`, email: null, phone: null, social_instagram: username };
+        const existing = await findLead(admin, environment, { social_instagram: username });
+        let leadId: string;
+        let created: boolean;
+        if (existing) {
+          leadId = existing.id;
+          created = false;
+        } else {
+          const r = await createLead(admin, environment, 'meta_interaction', contact, campaignId, text);
+          leadId = r.leadId;
+          created = true;
+        }
+        const pr = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${commentId}/private_replies`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: 'Obrigado pelo comentário! Acabei de te enviar uma mensagem aqui no direct 👋', access_token: pageToken }),
+        });
+        if (!pr.ok) console.error('[ingest] private reply falhou:', pr.status);
+        await logActivity(admin, leadId, 'system', `Comentou no post — private reply ${pr.ok ? 'enviada' : 'falhou'}: "${text.slice(0, 120)}"`);
+        results.push({ kind: 'comment', lead_id: leadId, created });
+        continue;
+      }
+
+      // ── DM recebida ──
+      if (field === 'messages') {
+        const message = ((value?.message ?? {}) as Record<string, unknown>);
+        const text = String(message?.text ?? '').slice(0, 500);
+        const handle = cleanHandle(String((value?.from as Record<string, unknown>)?.username ?? ''));
+        if (!handle) continue;
+        const existing = await findLead(admin, environment, { social_instagram: handle });
+        if (!existing) { results.push({ kind: 'message', skipped: 'lead nao encontrado' }); continue; }
+        await logActivity(admin, existing.id, 'reply_received', `DM recebida: ${text || '(midia)'}`);
+        if (existing.prospecting_status === 'contacted' || existing.prospecting_status === 'queued' || existing.prospecting_status === 'discovered') {
+          await admin.from('crm_leads').update({ prospecting_status: 'replied' }).eq('id', existing.id);
+        }
+        if (campaignId) {
+          await admin.from('prospecting_jobs').insert({
+            campaign_id: campaignId,
+            lead_id: existing.id,
+            type: 'generate_message',
+            input: { lead_id: existing.id, context: 'Resposta do prospect no Instagram: ' + text },
+          });
+        }
+        results.push({ kind: 'message', lead_id: existing.id });
+      }
+    }
+  }
+  return json(200, { ok: true, results });
 }
 
 Deno.serve(async req => {
@@ -74,7 +252,30 @@ Deno.serve(async req => {
       payload = JSON.parse(raw);
     }
 
-    // ── Ambiente/campanha (query string) ──
+    // ── Payload de conversa do n8n (outreach/reply) ──
+    const eventType = String(payload?.event ?? '');
+    if (eventType === 'outreach_sent' || eventType === 'reply_received') {
+      const environment = String(payload?.environment ?? '');
+      if (!VALID_ENVS.includes(environment)) return json(400, { error: `env invalido. Use: ${VALID_ENVS.join(', ')}` });
+      const ref = (payload?.lead_ref ?? {}) as { email?: string; phone?: string; social_instagram?: string };
+      const lead = await findLead(admin, environment, {
+        email: normalizeEmail(ref.email),
+        phone: normalizePhone(ref.phone),
+        social_instagram: cleanHandle(ref.social_instagram),
+      });
+      if (!lead) return json(404, { error: 'Lead nao encontrado para o ref informado' });
+      const content = String(payload?.content ?? '').slice(0, 800);
+      await logActivity(admin, lead.id, eventType, content || (eventType === 'outreach_sent' ? 'Abordagem enviada.' : 'Resposta recebida.'));
+      if (eventType === 'outreach_sent' && ['discovered', 'qualified', 'queued'].includes(lead.prospecting_status ?? '')) {
+        await admin.from('crm_leads').update({ prospecting_status: 'contacted' }).eq('id', lead.id);
+      }
+      if (eventType === 'reply_received' && ['contacted', 'queued', 'discovered'].includes(lead.prospecting_status ?? '')) {
+        await admin.from('crm_leads').update({ prospecting_status: 'replied' }).eq('id', lead.id);
+      }
+      return json(200, { ok: true, lead_id: lead.id, event: eventType });
+    }
+
+    // ── Ambiente/campanha (Meta + genérico) ──
     const environment = url.searchParams.get('env') ?? '';
     if (!VALID_ENVS.includes(environment)) {
       return json(400, { error: `env invalido. Use: ${VALID_ENVS.join(', ')} (ex.: ?env=sharks_company)` });
@@ -82,62 +283,27 @@ Deno.serve(async req => {
     const campaignId = url.searchParams.get('campaign');
     if (campaignId && !UUID_RE.test(campaignId)) return json(400, { error: 'campaign invalido' });
 
-    const admin = serviceClient();
+    if (isMeta) return await handleMeta(admin, payload, environment, campaignId);
 
-    // ── Caminho Meta: webhook → Graph API → contatos normalizados ──
-    const contacts: Array<{ contact: { name: string; email: string | null; phone: string | null }; message: string | null }> = [];
-    if (isMeta) {
-      const pageToken = Deno.env.get('META_PAGE_TOKEN');
-      if (!pageToken) return json(500, { error: 'META_PAGE_TOKEN nao configurado' });
-      const leadRefs = extractMetaLeadIds(payload);
-      if (leadRefs.length === 0) return json(200, { ok: true, ignored: true, reason: 'Nenhum leadgen no payload' });
-
-      for (const ref of leadRefs) {
-        const res = await fetch(
-          `https://graph.facebook.com/${GRAPH_VERSION}/${ref.leadId}?access_token=${encodeURIComponent(pageToken)}`,
-        );
-        if (!res.ok) {
-          console.error('[ingest] Graph API falhou:', res.status, (await res.text()).slice(0, 200));
-          continue;
-        }
-        const leadData = (await res.json()) as { field_data?: Array<{ name?: string; values?: string[] }> };
-        const contact = mapMetaLeadFields(leadData.field_data ?? []);
-        if (contact.email || contact.phone) contacts.push({ contact, message: null });
-      }
-    } else {
-      // ── Caminho genérico assinado ──
-      const source = String(payload?.source ?? '');
-      if (!VALID_SOURCES.includes(source)) return json(400, { error: `source invalido. Use: ${VALID_SOURCES.join(', ')}` });
-      const contact = {
-        name: String(payload?.name ?? '').trim(),
-        email: normalizeEmail(payload?.email as string),
-        phone: normalizePhone(payload?.phone as string),
-      };
-      if (!contact.email && !contact.phone) return json(400, { error: 'Informe email ou phone' });
-      contacts.push({ contact, message: payload?.message ? String(payload.message) : null });
+    // ── Genérico assinado (lead direto) ──
+    const source = String(payload?.source ?? '');
+    if (!VALID_SOURCES.includes(source)) return json(400, { error: `source invalido. Use: ${VALID_SOURCES.join(', ')}` });
+    const contact: Contact = {
+      name: String(payload?.name ?? '').trim(),
+      email: normalizeEmail(payload?.email as string),
+      phone: normalizePhone(payload?.phone as string),
+      social_instagram: cleanHandle(payload?.instagram as string),
+    };
+    if (!contact.email && !contact.phone && !contact.social_instagram) {
+      return json(400, { error: 'Informe email, phone ou instagram' });
     }
-
-    // ── Dedup + criação ──
-    const results: Array<{ lead_id: string; created: boolean }> = [];
-    for (const item of contacts) {
-      const existing = await findExistingLead(admin, environment, item.contact);
-      if (existing) {
-        await registerReengagement(admin, existing.id, isMeta ? 'meta_ads' : String(payload?.source ?? 'api'), item.message);
-        results.push({ lead_id: existing.id, created: false });
-        continue;
-      }
-      const { leadId } = await createInboundLead(admin, {
-        environment,
-        source: isMeta ? 'meta_ads' : String(payload?.source ?? 'api'),
-        campaign_id: campaignId,
-        contact: item.contact,
-        company: isMeta ? null : payload?.company ? String(payload.company) : null,
-        message: item.message,
-      });
-      results.push({ lead_id: leadId, created: true });
+    const existing = await findLead(admin, environment, contact);
+    if (existing) {
+      await registerReengagement(admin, existing.id, source, payload?.message ? String(payload.message) : null);
+      return json(200, { ok: true, created: false, lead_id: existing.id });
     }
-
-    return json(200, { ok: true, environment, ingested: results.length, created: results.filter(r => r.created).length, results });
+    const { leadId } = await createLead(admin, environment, source, contact, campaignId, payload?.message ? String(payload.message) : null);
+    return json(200, { ok: true, created: true, lead_id: leadId });
   } catch (e) {
     console.error('[prospecting-ingest] uncaught:', (e as Error)?.stack || e);
     return json(500, { error: `Erro interno: ${(e as Error)?.message || String(e)}` });

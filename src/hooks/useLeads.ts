@@ -27,10 +27,14 @@ export interface Lead {
   updated_at: string;
   origin?: 'manual' | 'inbound' | 'prospecting_agent' | 'import' | null;
   social_instagram?: string | null;
+  prospecting_status?: string | null;
+  prospecting_campaign_id?: string | null;
   owner: { id: string; full_name: string; avatar_url: string | null } | null;
   workspace: { id: string; name: string } | null;
   /** Produtos de interesse (N:N com o catálogo do ambiente) */
   products?: Array<{ product: { id: string; name: string } }> | null;
+  /** Vendedores vinculados (N:N, opcional) */
+  team?: Array<{ user: { id: string; full_name: string; avatar_url: string | null } }> | null;
   /** Análise do agente (preenchida por prospecting-run) */
   ai_fit?: number | null;
   ai_priority?: 'alta' | 'media' | 'baixa' | null;
@@ -49,10 +53,10 @@ export interface LeadActivity {
   author: { id: string; full_name: string } | null;
 }
 
-type LeadPayload = Partial<Lead> & { name: string; product_ids?: string[] };
+type LeadPayload = Partial<Lead> & { name: string; product_ids?: string[]; team_ids?: string[] };
 
 /* FKs nomeadas desambiguam os dois vínculos com users (owner_id, created_by) */
-const LEAD_SELECT = '*, owner:crm_leads_owner_id_fkey(id, full_name, avatar_url), workspace:workspaces(id, name), products:crm_lead_products(product:environment_products(id, name))';
+const LEAD_SELECT = '*, owner:crm_leads_owner_id_fkey(id, full_name, avatar_url), workspace:workspaces(id, name), products:crm_lead_products(product:environment_products(id, name)), team:crm_lead_team(user:users!crm_lead_team_user_id_fkey(id, full_name, avatar_url))';
 
 /** Substitui a junção lead ↔ produtos do catálogo do ambiente. */
 async function syncLeadProducts(leadId: string, productIds: string[]): Promise<void> {
@@ -62,6 +66,18 @@ async function syncLeadProducts(leadId: string, productIds: string[]): Promise<v
     const { error: insErr } = await supabase
       .from('crm_lead_products')
       .insert(productIds.map(pid => ({ lead_id: leadId, product_id: pid })));
+    if (insErr) throw new Error(insErr.message);
+  }
+}
+
+/** Substitui a junção lead ↔ vendedores do time. */
+async function syncLeadTeam(leadId: string, userIds: string[]): Promise<void> {
+  const { error: delErr } = await supabase.from('crm_lead_team').delete().eq('lead_id', leadId);
+  if (delErr) throw new Error(delErr.message);
+  if (userIds.length > 0) {
+    const { error: insErr } = await supabase
+      .from('crm_lead_team')
+      .insert(userIds.map(uid => ({ lead_id: leadId, user_id: uid })));
     if (insErr) throw new Error(insErr.message);
   }
 }
@@ -111,7 +127,7 @@ export function useLeads(environment: CrmEnvironment | null) {
 
   const createLead = async (payload: LeadPayload): Promise<Lead> => {
     const { data: auth } = await supabase.auth.getUser();
-    const { product_ids, ...insert } = payload;
+    const { product_ids, team_ids, ...insert } = payload;
     const { data, error } = await supabase
       .from('crm_leads')
       .insert({
@@ -124,8 +140,10 @@ export function useLeads(environment: CrmEnvironment | null) {
     if (error) throw new Error(error.message);
     const lead = data as unknown as Lead;
 
-    if (Array.isArray(product_ids)) {
-      await syncLeadProducts(lead.id, product_ids);
+    if (Array.isArray(product_ids)) await syncLeadProducts(lead.id, product_ids);
+    if (Array.isArray(team_ids)) await syncLeadTeam(lead.id, team_ids);
+
+    if (Array.isArray(product_ids) || Array.isArray(team_ids)) {
       const { data: fresh, error: err2 } = await supabase
         .from('crm_leads')
         .select(LEAD_SELECT)
@@ -141,8 +159,8 @@ export function useLeads(environment: CrmEnvironment | null) {
     return lead;
   };
 
-  const updateLead = async (id: string, patch: Partial<Lead> & { product_ids?: string[] }): Promise<Lead> => {
-    const { product_ids, ...update } = patch;
+  const updateLead = async (id: string, patch: Partial<Lead> & { product_ids?: string[]; team_ids?: string[] }): Promise<Lead> => {
+    const { product_ids, team_ids, ...update } = patch;
     const { data, error } = await supabase
       .from('crm_leads')
       .update(update)
@@ -152,8 +170,10 @@ export function useLeads(environment: CrmEnvironment | null) {
     if (error) throw new Error(error.message);
     let lead = data as unknown as Lead;
 
-    if (Array.isArray(product_ids)) {
-      await syncLeadProducts(id, product_ids);
+    if (Array.isArray(product_ids)) await syncLeadProducts(id, product_ids);
+    if (Array.isArray(team_ids)) await syncLeadTeam(id, team_ids);
+
+    if (Array.isArray(product_ids) || Array.isArray(team_ids)) {
       const { data: fresh, error: err2 } = await supabase
         .from('crm_leads')
         .select(LEAD_SELECT)

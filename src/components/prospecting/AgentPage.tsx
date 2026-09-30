@@ -14,7 +14,7 @@ import {
   Radar, Loader2, Bot, ShieldCheck, Cpu, Clock, Settings, Save,
 } from 'lucide-react';
 import {
-  useProspectingJobs, useAgentSettings, type AgentSettings,
+  useProspectingJobs, useAgentSettings, useChannelStatus, type AgentSettings,
 } from '@/hooks/useProspecting';
 import { JOB_TYPE_META, JOB_STATUS_META, type JobStatus, type ProspectingEnvironment } from '@/lib/prospecting/types';
 import type { LucideIcon } from 'lucide-react';
@@ -54,6 +54,15 @@ const JOB_STATUS_ICON: Record<JobStatus, LucideIcon> = {
 export default function AgentSection({ environment, editable = false }: AgentPageProps) {
   const jobs = useProspectingJobs(environment);
   const { user } = useAuth();
+  const channels = useChannelStatus(true);
+  const channelItems = [
+    { key: 'meta' as const, label: 'Meta (Lead Ads/Interações)' },
+    { key: 'google_places' as const, label: 'Google Places (Discovery)' },
+    { key: 'n8n' as const, label: 'n8n (Orquestração)' },
+    { key: 'decision_ai' as const, label: 'JEV — decisão' },
+    { key: 'generative_ai' as const, label: 'GLM — geração' },
+  ];
+  const activeChannels = channelItems.filter(c => channels[c.key]).length;
   const { settings, loading: settingsLoading, saveSettings } = useAgentSettings(environment);
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsForm, setSettingsForm] = useState<AgentSettings | null>(null);
@@ -144,6 +153,22 @@ export default function AgentSection({ environment, editable = false }: AgentPag
           <li>· Campanhas Sharks e Estrategos são isoladas por ambiente (RLS).</li>
           <li>· Integrações externas (e-mail, WhatsApp) passam obrigatoriamente pela validação do backend.</li>
         </ul>
+      </Card>
+
+      {/* Canais de integração */}
+      <Card padding="md">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-900">Canais de integração</h3>
+          <span className="text-[11px] text-gray-400">{activeChannels}/{channelItems.length} ativos</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-2">
+          {channelItems.map(c => (
+            <div key={c.key} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100">
+              <span className={cn('w-2 h-2 rounded-full shrink-0', channels[c.key] ? 'bg-emerald-500' : 'bg-gray-300')} />
+              <span className={cn('text-xs truncate', channels[c.key] ? 'text-gray-700 font-medium' : 'text-gray-400')}>{c.label}</span>
+            </div>
+          ))}
+        </div>
       </Card>
 
       {/* Personalidade & Parâmetros */}

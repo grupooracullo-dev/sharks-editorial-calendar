@@ -1,4 +1,4 @@
-import { Building2 } from 'lucide-react';
+import { Building2, Bot } from 'lucide-react';
 import EmptyState from '@/components/ui/EmptyState';
 import Avatar from '@/components/ui/Avatar';
 import { formatBRL, formatRelativeTime } from '@/lib/crmStages';
@@ -59,7 +59,14 @@ export default function ClientsTab({ leads, showEnv, onOpenLead }: ClientsTabPro
                 <Building2 className="w-4 h-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-gray-900 truncate">{lead.workspace?.name}</p>
+                <div className="flex items-center gap-1.5">
+                  {lead.origin === 'prospecting_agent' && (
+                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-1 py-0.5 rounded shrink-0" title="Lead captado pelo Agente de Prospecção IA">
+                      <Bot className="w-2.5 h-2.5" /> IA
+                    </span>
+                  )}
+                  <p className="text-sm font-semibold text-gray-900 truncate">{lead.workspace?.name}</p>
+                </div>
                 <p className="text-xs text-gray-400 truncate">
                   lead: {lead.name}
                   {showEnv && ` · ${ENVIRONMENT_META[lead.environment].emoji}`}
