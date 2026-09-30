@@ -1,14 +1,17 @@
 // ==========================================
 // prospecting-run — worker do Prospecting Engine
 //
-// Chamado pelo pg_cron (a cada 5 min) com x-worker-secret
-// (mesmo padrão do google-sync). Executa jobs de DECISÃO
-// (IA) e encaminha jobs de I/O externo (n8n, F4).
-// Auth: apenas x-worker-secret. Nunca chamado pelo client.
+// Chamado pelo pg_cron (a cada 5 min) com x-worker-secret.
+// Executa por tipo de job, sempre lendo os parâmetros do agente
+// (prospecting_agent_settings) do ambiente da campanha:
+//   discover_companies → Google Places (Edge direto, sem n8n)
+//   analyze_company / score_company → JEV (decisão) + qualificação automática
+//   generate_message → GLM (geração, gate híbrido por fit)
+//   enrich_company / send_message / follow_up → despacha ao n8n (F4)
 // ==========================================
 
 import { serviceClient, corsHeaders } from '../_shared/google.ts';
-import { getAIProvider, hasRealAI } from '../_shared/prospecting/ai.ts';
+import { getDecisionAI, getGenerativeAI, hasRealAI, type CompanyProfile, type AgentPersonality } from '../_shared/prospecting/ai.ts';
 
 const CORS: Record<string, string> = {};
 function json(status: number, body: unknown) {
@@ -24,6 +27,44 @@ interface JobRow {
   input: Record<string, unknown>;
 }
 
+interface AgentSettings {
+  personality: AgentPersonality;
+  params: {
+    fit_draft_threshold: number;
+    fit_discard_threshold: number;
+    confidence_auto: number;
+    confidence_review: number;
+    max_companies_per_run: number;
+    max_messages_per_day: number;
+    glm_temperature: number;
+    follow_up_days: number;
+  };
+}
+
+const DEFAULT_PARAMS: AgentSettings['params'] = {
+  fit_draft_threshold: 0.75,
+  fit_discard_threshold: 0.5,
+  confidence_auto: 0.7,
+  confidence_review: 0.4,
+  max_companies_per_run: 20,
+  max_messages_per_day: 50,
+  glm_temperature: 0.7,
+  follow_up_days: 3,
+};
+
+async function loadSettings(admin: ReturnType<typeof serviceClient>, environment: string): Promise<AgentSettings> {
+  const { data } = await admin
+    .from('prospecting_agent_settings')
+    .select('personality, params')
+    .eq('environment', environment)
+    .maybeSingle();
+  const row = (data ?? {}) as { personality?: Partial<AgentPersonality>; params?: Partial<AgentSettings['params']> };
+  return {
+    personality: { ...(row.personality ?? {}) },
+    params: { ...DEFAULT_PARAMS, ...(row.params ?? {}) },
+  };
+}
+
 async function failJob(admin: ReturnType<typeof serviceClient>, jobId: string, error: string) {
   await admin.from('prospecting_jobs').update({ status: 'failed', error, completed_at: new Date().toISOString() }).eq('id', jobId);
 }
@@ -32,8 +73,13 @@ async function completeJob(admin: ReturnType<typeof serviceClient>, jobId: strin
   await admin.from('prospecting_jobs').update({ status: 'completed', output, error: null, completed_at: new Date().toISOString() }).eq('id', jobId);
 }
 
-/** Job de decisão: analisa o lead com o AIProvider e grava ai_* + timeline. */
-async function processAnalysis(admin: ReturnType<typeof serviceClient>, job: JobRow) {
+async function logActivity(admin: ReturnType<typeof serviceClient>, leadId: string, type: string, content: string) {
+  const { error } = await admin.from('crm_lead_activities').insert({ lead_id: leadId, type, content });
+  if (error) console.error('[prospecting-run] atividade falhou:', error.message);
+}
+
+/* ─── DECISÃO: analisa o lead com JEV e qualifica automaticamente ─── */
+async function processAnalysis(admin: ReturnType<typeof serviceClient>, job: JobRow, settings: AgentSettings, environment: string) {
   const leadId = job.lead_id ?? (typeof job.input?.lead_id === 'string' ? job.input.lead_id : null);
   if (!leadId) throw new Error('Job de análise sem lead_id');
 
@@ -51,18 +97,19 @@ async function processAnalysis(admin: ReturnType<typeof serviceClient>, job: Job
     .eq('campaign_id', job.campaign_id);
   const products = ((prodRows ?? []) as Array<{ product?: { name?: string } }>).map(r => r.product?.name).filter((n): n is string => !!n);
 
-  const analysis = await getAIProvider().analyzeCompany(
-    {
-      name: lead.name,
-      segment: lead.segment,
-      location: lead.location,
-      company_size: lead.company_size,
-      signals: (Array.isArray(job.input?.signals) ? job.input.signals : []) as string[],
-      notes: lead.notes,
-    },
-    products,
-  );
+  const company: CompanyProfile = {
+    name: lead.name,
+    segment: lead.segment,
+    location: lead.location,
+    company_size: lead.company_size,
+    signals: (Array.isArray(job.input?.signals) ? job.input.signals : []) as string[],
+    notes: lead.notes,
+  };
 
+  const analysis = await getDecisionAI().analyzeCompany(company, products);
+
+  // Qualificação automática conforme parâmetros do ambiente
+  const nextStatus = analysis.icpFit >= settings.params.fit_discard_threshold ? 'qualified' : 'discarded';
   const { error: upErr } = await admin
     .from('crm_leads')
     .update({
@@ -73,25 +120,149 @@ async function processAnalysis(admin: ReturnType<typeof serviceClient>, job: Job
         confidence: analysis.confidence,
         product_scores: analysis.productScores,
         rationale: analysis.rationale ?? null,
-        provider: getAIProvider().name,
+        provider: getDecisionAI().name,
       },
       ai_analyzed_at: new Date().toISOString(),
+      prospecting_status: nextStatus,
+      ...(nextStatus === 'discarded' ? { lost_reason: `IA: sem encaixe (fit ${(analysis.icpFit * 100).toFixed(0)}%)` } : {}),
     })
     .eq('id', leadId);
   if (upErr) throw new Error(`Atualizar ai_*: ${upErr.message}`);
 
-  await admin.from('crm_lead_activities').insert({
-    lead_id: leadId,
-    type: 'system',
-    content: `Score calculado pela IA — fit ${(analysis.icpFit * 100).toFixed(0)}%, prioridade ${analysis.priority}, próximo passo: ${analysis.nextAction.replace('_', ' ')}.`,
-  });
+  await logActivity(
+    admin,
+    leadId,
+    'system',
+    `Score calculado pela IA — fit ${(analysis.icpFit * 100).toFixed(0)}%, prioridade ${analysis.priority}, próximo passo: ${analysis.nextAction.replace(/_/g, ' ')}. Lead ${nextStatus === 'qualified' ? 'qualificado' : 'descartado'}.`,
+  );
+
+  // Gate híbrido: fit alto + IA generativa real → rascunho automático
+  if (analysis.icpFit >= settings.params.fit_draft_threshold && analysis.nextAction !== 'descartar') {
+    await admin.from('prospecting_jobs').insert({
+      campaign_id: job.campaign_id,
+      lead_id: leadId,
+      type: 'generate_message',
+      dedupe_key: `draft-${leadId}`,
+      input: { icp_fit: analysis.icpFit },
+    });
+  }
 
   await completeJob(admin, job.id, {
     icp_fit: analysis.icpFit,
     priority: analysis.priority,
     next_action: analysis.nextAction,
     product_scores: analysis.productScores,
+    lead_status: nextStatus,
   });
+}
+
+/* ─── GERAÇÃO: rascunho de abordagem com GLM + personalidade ─── */
+async function processGeneration(admin: ReturnType<typeof serviceClient>, job: JobRow, settings: AgentSettings) {
+  const leadId = job.lead_id ?? (typeof job.input?.lead_id === 'string' ? job.input.lead_id : null);
+  if (!leadId) throw new Error('Job de geração sem lead_id');
+
+  const { data: lead, error: leadErr } = await admin
+    .from('crm_leads')
+    .select('id, name, segment, location, company_size, notes, ai_fit')
+    .eq('id', leadId)
+    .maybeSingle();
+  if (leadErr) throw new Error(`Buscar lead: ${leadErr.message}`);
+  if (!lead) throw new Error('Lead não encontrado para geração');
+
+  const { data: prodRows } = await admin
+    .from('prospecting_campaign_products')
+    .select('product:environment_products(name)')
+    .eq('campaign_id', job.campaign_id);
+  const products = ((prodRows ?? []) as Array<{ product?: { name?: string } }>).map(r => r.product?.name).filter((n): n is string => !!n);
+
+  const { data: camp } = await admin.from('prospecting_campaigns').select('name').eq('id', job.campaign_id).maybeSingle();
+
+  const draft = await getGenerativeAI().generateApproach({
+    lead: { name: lead.name, segment: lead.segment, location: lead.location, company_size: lead.company_size, notes: lead.notes },
+    campaignName: (camp as { name?: string } | null)?.name,
+    products,
+    personality: settings.personality,
+  });
+
+  await logActivity(admin, leadId, 'outreach_draft', `${draft.subject ? `Assunto: ${draft.subject}\n\n` : ''}${draft.message}`);
+  await completeJob(admin, job.id, { subject: draft.subject, message: draft.message });
+}
+
+/* ─── DESCOBERTA: Google Places direto do Edge (sem n8n) ─── */
+async function processDiscovery(admin: ReturnType<typeof serviceClient>, job: JobRow, settings: AgentSettings, environment: string) {
+  const apiKey = Deno.env.get('GOOGLE_PLACES_API_KEY');
+  if (!apiKey) throw new Error('GOOGLE_PLACES_API_KEY não configurada (defina no Edge para o discovery funcionar)');
+
+  const input = (job.input ?? {}) as { query?: string; segment?: string; location?: string };
+  const textQuery = input.query || [input.segment, input.location].filter(Boolean).join(' em ') || 'empresas';
+  const max = Math.min(settings.params.max_companies_per_run, 20);
+
+  const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: {
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ textQuery, pageSize: max, languageCode: 'pt-BR' }),
+  });
+  if (!res.ok) throw new Error(`Places falhou (${res.status}): ${(await res.text()).slice(0, 200)}`);
+  const body = (await res.json()) as {
+    places?: Array<{ id: string; displayName?: { text?: string }; formattedAddress?: string; nationalPhoneNumber?: string; websiteUri?: string }>;
+  };
+  const places = (body.places ?? []).slice(0, settings.params.max_companies_per_run);
+
+  let created = 0;
+  let skipped = 0;
+  const details: Array<{ name: string; phone: string | null; website: string | null }> = [];
+
+  for (const p of places) {
+    const name = p.displayName?.text?.trim();
+    if (!name) { skipped++; continue; }
+    const phone = (p.nationalPhoneNumber ?? '').replace(/\D/g, '') || null;
+
+    // Dedup por telefone OU nome exato dentro do ambiente
+    const filters: string[] = [];
+    if (phone) filters.push(`contact_phone.eq.${phone}`);
+    filters.push(`name.eq.${name.replace(/'/g, "''")}`);
+    const { data: existing } = await admin
+      .from('crm_leads')
+      .select('id')
+      .eq('environment', environment)
+      .or(filters.join(','))
+      .limit(1)
+      .maybeSingle();
+    if (existing) { skipped++; continue; }
+
+    const { data: nl, error: insErr } = await admin
+      .from('crm_leads')
+      .insert({
+        environment,
+        name,
+        contact_phone: phone,
+        source: 'google_places',
+        origin: 'prospecting_agent',
+        prospecting_status: 'discovered',
+        prospecting_campaign_id: job.campaign_id,
+        notes: p.formattedAddress ?? null,
+      })
+      .select('id')
+      .single();
+    if (insErr) { console.error('[prospecting-run] criar lead descoberto:', insErr.message); skipped++; continue; }
+
+    await logActivity(admin, nl.id as string, 'system', `Lead descoberto pelo agente via Google Places (campanha).`);
+    await admin.from('prospecting_jobs').insert({
+      campaign_id: job.campaign_id,
+      lead_id: nl.id as string,
+      type: 'score_company',
+      dedupe_key: nl.id as string,
+      input: { lead_id: nl.id },
+    });
+    details.push({ name, phone, website: p.websiteUri ?? null });
+    created++;
+  }
+
+  await completeJob(admin, job.id, { query: textQuery, found: places.length, created, skipped, details });
 }
 
 Deno.serve(async req => {
@@ -120,21 +291,42 @@ Deno.serve(async req => {
     if (claimErr) throw new Error(`Claim: ${claimErr.message}`);
 
     let analyzed = 0;
+    let generated = 0;
+    let discovered = 0;
     let dispatched = 0;
     let failed = 0;
 
     for (const job of ((jobs ?? []) as unknown as JobRow[])) {
       try {
+        const { data: camp } = await admin
+          .from('prospecting_campaigns')
+          .select('environment')
+          .eq('id', job.campaign_id)
+          .maybeSingle();
+        const environment = (camp as { environment?: string } | null)?.environment ?? 'sharks_company';
+        const settings = await loadSettings(admin, environment);
+
         if (job.type === 'analyze_company' || job.type === 'score_company') {
           if (!hasRealAI()) {
-            await failJob(admin, job.id, 'IA real não configurada (defina TYPESAFE_API_KEY e AI_PROVIDER=jev)');
+            await failJob(admin, job.id, 'IA de decisão não configurada (defina TYPESAFE_API_KEY e AI_PROVIDER=jev)');
             failed++;
             continue;
           }
-          await processAnalysis(admin, job);
+          await processAnalysis(admin, job, settings, environment);
           analyzed++;
+        } else if (job.type === 'generate_message') {
+          if (!Deno.env.get('GLM_API_KEY')) {
+            await failJob(admin, job.id, 'IA generativa não configurada (defina GLM_API_KEY)');
+            failed++;
+            continue;
+          }
+          await processGeneration(admin, job, settings);
+          generated++;
+        } else if (job.type === 'discover_companies') {
+          await processDiscovery(admin, job, settings, environment);
+          discovered++;
         } else {
-          // I/O externo (discovery/enrich/message/send/follow-up) → n8n (F4)
+          // I/O externo (enrich/send_message/follow_up) → n8n (F4)
           const n8nUrl = Deno.env.get('N8N_WEBHOOK_URL');
           if (!n8nUrl) {
             await failJob(admin, job.id, 'Integrador externo (n8n) não configurado — defina N8N_WEBHOOK_URL');
@@ -155,7 +347,7 @@ Deno.serve(async req => {
       }
     }
 
-    return json(200, { ok: true, claimed: jobs?.length ?? 0, analyzed, dispatched, failed });
+    return json(200, { ok: true, claimed: jobs?.length ?? 0, analyzed, generated, discovered, dispatched, failed });
   } catch (e) {
     console.error('[prospecting-run] uncaught:', (e as Error)?.stack || e);
     return json(500, { error: `Erro interno: ${(e as Error)?.message || String(e)}` });

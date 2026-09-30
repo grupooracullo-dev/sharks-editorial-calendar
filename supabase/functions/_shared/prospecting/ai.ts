@@ -1,8 +1,8 @@
 /* ─── AIProvider do Prospecting Engine ───
-   - MockAIProvider: determinístico (dev/testes), zero custo
-   - JevProvider: decisões tipadas (Score/Choice/Noul) via TypeSafe AI
-   Contrato estável: consumidores não conhecem o fornecedor.
-   (getAIProvider lê env apenas em Deno; em node/testes use as classes.) */
+   Duas camadas, com custo otimizado (§12/§31):
+   - DECISÃO (Jev/Mock): score, classificação, próximo passo — ~$0,0001, todo lead
+   - GERAÇÃO (GLM/Mock): rascunhos personalizados — só para leads qualificados
+   Contrato estável: consumidores não conhecem o fornecedor. */
 
 export interface CompanyProfile {
   name: string;
@@ -31,6 +31,36 @@ export interface AIProvider {
   analyzeCompany(company: CompanyProfile, campaignProducts: string[]): Promise<CompanyAnalysis>;
 }
 
+/* ─── Camada generativa ─── */
+export interface AgentPersonality {
+  agent_name?: string;
+  tone?: string;
+  language?: string;
+  persona?: string;
+  brand_voice_rules?: string;
+  signature?: string;
+  greeting_style?: string;
+}
+
+export interface ApproachInput {
+  lead: { name: string; segment?: string | null; location?: string | null; company_size?: string | null; notes?: string | null };
+  campaignName?: string;
+  products: string[];
+  personality: AgentPersonality;
+  research?: string | null;
+}
+
+export interface ApproachDraft {
+  subject: string | null;
+  message: string;
+}
+
+export interface GenerativeAI {
+  readonly name: string;
+  generateApproach(input: ApproachInput): Promise<ApproachDraft>;
+}
+
+/* ─── Mock de decisão (determinístico) ─── */
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 function stableHash(input: string): number {
@@ -65,10 +95,10 @@ export class MockAIProvider implements AIProvider {
   }
 }
 
+/* ─── JEV — decisões tipadas (TypeSafe AI) ─── */
 const JEV_URL = 'https://api.typesafe.ai/v1/systemone';
 const JEV_MODEL = 'jev-latest';
 
-/** Monta as perguntas atômicas para o JEV (1 chamada, N perguntas em paralelo). */
 export function buildJevQuestions(products: string[]): Record<string, unknown> {
   const questions: Record<string, unknown> = {
     icp_fit: {
@@ -113,13 +143,12 @@ export function buildJevState(company: CompanyProfile): string {
   ].filter(Boolean).join('\n');
 }
 
-/** Converte a resposta do JEV no CompanyAnalysis do contrato. */
 export function mapJevAnswers(
   answers: Record<string, Record<string, unknown>>,
   products: string[],
 ): CompanyAnalysis {
   const fit = Number((answers.icp_fit as { score?: number })?.score ?? 0);
-  const icpFit = round2(fit / 4); // rubrica 0–4 → 0–1
+  const icpFit = round2(fit / 4);
   const priorityRaw = String((answers.priority as { choice?: string })?.choice ?? 'baixa');
   const nextRaw = String((answers.next_action as { choice?: string })?.choice ?? 'pesquisar_mais');
 
@@ -169,16 +198,122 @@ export class JevProvider implements AIProvider {
   }
 }
 
-/** Factory — nunca acopla consumidores a um fornecedor. */
-export function getAIProvider(): AIProvider {
-  const env = (globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno;
-  const key = env?.env.get('TYPESAFE_API_KEY');
-  if (env?.env.get('AI_PROVIDER') === 'jev' && key) return new JevProvider(key);
+/* ─── GLM — camada generativa (Zhipu, API OpenAI-compatible) ─── */
+const GLM_DEFAULT_BASE = 'https://open.bigmodel.cn/api/paas/v4';
+const GLM_DEFAULT_MODEL = 'glm-4.5-flash';
+
+export function buildGlmSystemPrompt(personality: AgentPersonality, campaignName?: string): string {
+  const tone = personality.tone === 'formal'
+    ? 'Tom formal e profissional'
+    : personality.tone === 'direto'
+    ? 'Tom direto e objetivo'
+    : 'Tom amigável e próximo';
+  return [
+    `Você é ${personality.agent_name ?? 'um agente comercial'}, ${tone}, escrevendo em ${personality.language ?? 'pt-BR'}.`,
+    personality.persona ? `Persona: ${personality.persona}` : '',
+    `Contexto: primeira abordagem B2B para a campanha "${campaignName ?? 'prospecção'}".`,
+    personality.greeting_style ? `Abertura: ${personality.greeting_style}.` : '',
+    personality.brand_voice_rules ? `Regras de voz: ${personality.brand_voice_rules}` : '',
+    'Formato obrigatório da resposta: primeira linha "Assunto: <assunto curto>", depois uma linha em branco e a mensagem (máximo 120 palavras). Não use placeholders entre colchetes.',
+    personality.signature ? `Finalize com a assinatura: ${personality.signature}` : '',
+  ].filter(Boolean).join('\n');
+}
+
+export function parseGlmDraft(text: string): ApproachDraft {
+  const clean = text.trim();
+  const m = clean.match(/^Assunto:\s*(.+)\r?\n\s*\r?\n?([\s\S]*)$/i);
+  if (m) return { subject: m[1].trim(), message: m[2].trim() };
+  return { subject: null, message: clean };
+}
+
+export class GlmProvider implements GenerativeAI {
+  readonly name = 'glm';
+  private apiKey: string;
+  private model: string;
+  private baseUrl: string;
+
+  constructor(apiKey: string, model?: string, baseUrl?: string) {
+    this.apiKey = apiKey;
+    this.model = model || GLM_DEFAULT_MODEL;
+    this.baseUrl = (baseUrl || GLM_DEFAULT_BASE).replace(/\/$/, '');
+  }
+
+  async generateApproach(input: ApproachInput): Promise<ApproachDraft> {
+    const products = input.products.length > 0 ? input.products.join(', ') : 'nossos serviços';
+    const userPrompt = [
+      `Lead: ${input.lead.name}`,
+      input.lead.segment ? `Segmento: ${input.lead.segment}` : '',
+      input.lead.location ? `Localização: ${input.lead.location}` : '',
+      input.lead.company_size ? `Porte: ${input.lead.company_size}` : '',
+      input.research ? `Pesquisa: ${input.research.slice(0, 600)}` : '',
+      `Produtos relevantes: ${products}`,
+      '',
+      'Escreva a primeira mensagem de abordagem.',
+    ].filter(Boolean).join('\n');
+
+    const res = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: this.model,
+        temperature: 0.7,
+        max_tokens: 400,
+        messages: [
+          { role: 'system', content: buildGlmSystemPrompt(input.personality, input.campaignName) },
+          { role: 'user', content: userPrompt },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`GLM falhou (${res.status}): ${(await res.text()).slice(0, 200)}`);
+    }
+    const body = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const text = body.choices?.[0]?.message?.content?.trim() ?? '';
+    if (!text) throw new Error('GLM respondeu vazio');
+    return parseGlmDraft(text);
+  }
+}
+
+export class MockGenerativeAI implements GenerativeAI {
+  readonly name = 'mock';
+
+  async generateApproach(input: ApproachInput): Promise<ApproachDraft> {
+    const p = input.products[0] ?? 'nossos serviços';
+    return {
+      subject: `${input.lead.name}: uma ideia para ${p}`,
+      message: `Olá${input.lead.name ? `, equipe ${input.lead.name}` : ''}!\n\nAcompanho o trabalho de vocês no segmento de ${input.lead.segment ?? 'mercado'} e acredito que ${p} pode gerar resultado rápido.\n\nTopa uma conversa de 15 minutos?${input.personality.signature ? `\n\n${input.personality.signature}` : ''}\n\n[rascunho mock — configure GLM_API_KEY para personalização real]`,
+    };
+  }
+}
+
+/* ─── Factories (Deno env; guard para testes em node) ─── */
+function env(k: string): string | undefined {
+  const d = (globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno;
+  return d?.env.get(k);
+}
+
+export function getDecisionAI(): AIProvider {
+  const key = env('TYPESAFE_API_KEY');
+  if (env('AI_PROVIDER') === 'jev' && key) return new JevProvider(key);
   return new MockAIProvider();
 }
 
-/** JEV real só quando há key configurada. */
 export function hasRealAI(): boolean {
-  const env = (globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno;
-  return !!env?.env.get('TYPESAFE_API_KEY');
+  return !!env('TYPESAFE_API_KEY');
 }
+
+export function getGenerativeAI(): GenerativeAI {
+  const key = env('GLM_API_KEY');
+  if (key) return new GlmProvider(key, env('GLM_MODEL'), env('GLM_BASE_URL'));
+  return new MockGenerativeAI();
+}
+
+export function hasRealGenerative(): boolean {
+  return !!env('GLM_API_KEY');
+}
+
+/** Compat: decisão (renomeado) */
+export const getAIProvider = getDecisionAI;

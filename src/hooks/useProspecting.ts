@@ -145,6 +145,80 @@ export function useProspectingJobs(environment: ProspectingEnvironment | null) {
   return jobs;
 }
 
+/* ─── Personalidade & Parâmetros do agente (por ambiente) ─── */
+export interface AgentSettings {
+  personality: {
+    agent_name: string;
+    tone: string;
+    language: string;
+    persona: string;
+    brand_voice_rules: string;
+    signature: string;
+    greeting_style: string;
+  };
+  params: {
+    fit_draft_threshold: number;
+    fit_discard_threshold: number;
+    confidence_auto: number;
+    confidence_review: number;
+    max_companies_per_run: number;
+    max_messages_per_day: number;
+    glm_temperature: number;
+    follow_up_days: number;
+  };
+}
+
+const DEFAULT_SETTINGS: AgentSettings = {
+  personality: {
+    agent_name: 'Agente', tone: 'amigavel', language: 'pt-BR', persona: '',
+    brand_voice_rules: '', signature: '', greeting_style: 'curto, com pergunta aberta',
+  },
+  params: {
+    fit_draft_threshold: 0.75, fit_discard_threshold: 0.5, confidence_auto: 0.7,
+    confidence_review: 0.4, max_companies_per_run: 20, max_messages_per_day: 50,
+    glm_temperature: 0.7, follow_up_days: 3,
+  },
+};
+
+export function useAgentSettings(environment: ProspectingEnvironment | null) {
+  const [settings, setSettings] = useState<AgentSettings>(DEFAULT_SETTINGS);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!environment) { setSettings(DEFAULT_SETTINGS); setLoading(false); return; }
+    let active = true;
+    (async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('prospecting_agent_settings')
+        .select('personality, params')
+        .eq('environment', environment)
+        .maybeSingle();
+      if (!active) return;
+      if (error) console.error('[prospecting] settings error:', error.message);
+      const row = (data ?? {}) as { personality?: Partial<AgentSettings['personality']>; params?: Partial<AgentSettings['params']> };
+      setSettings({
+        personality: { ...DEFAULT_SETTINGS.personality, ...(row.personality ?? {}) },
+        params: { ...DEFAULT_SETTINGS.params, ...(row.params ?? {}) },
+      });
+      setLoading(false);
+    })();
+    return () => { active = false; };
+  }, [environment]);
+
+  const saveSettings = async (next: AgentSettings, userId: string | null): Promise<void> => {
+    if (!environment) throw new Error('Ambiente não definido');
+    const { error } = await supabase
+      .from('prospecting_agent_settings')
+      .update({ personality: next.personality, params: next.params, updated_by: userId })
+      .eq('environment', environment);
+    if (error) throw new Error(error.message);
+    setSettings(next);
+  };
+
+  return { settings, loading, saveSettings };
+}
+
 /* ─── Abordagens em tempo real (atividades de outreach do agente) ─── */
 export interface ApproachFeedItem {
   id: string;
