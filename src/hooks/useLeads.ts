@@ -29,6 +29,11 @@ export interface Lead {
   workspace: { id: string; name: string } | null;
   /** Produtos de interesse (N:N com o catálogo do ambiente) */
   products?: Array<{ product: { id: string; name: string } }> | null;
+  /** Análise do agente (preenchida por prospecting-run) */
+  ai_fit?: number | null;
+  ai_priority?: 'alta' | 'media' | 'baixa' | null;
+  ai_next_step?: string | null;
+  ai_analyzed_at?: string | null;
 }
 
 export interface LeadActivity {

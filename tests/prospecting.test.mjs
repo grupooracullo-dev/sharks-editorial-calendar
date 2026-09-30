@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { stripTypeScriptTypes } from 'node:module';
+
+async function load(path) {
+  const source = await readFile(new URL(path, import.meta.url), 'utf8');
+  const outputText = stripTypeScriptTypes(source);
+  return import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
+}
+
+const ingest = await load('../supabase/functions/_shared/prospecting/ingest.ts');
+const ai = await load('../supabase/functions/_shared/prospecting/ai.ts');
 
 test('9 estados de prospecção separados do estágio comercial', async () => {
   const types = await readFile(new URL('../src/lib/prospecting/types.ts', import.meta.url), 'utf8');
@@ -40,4 +50,61 @@ test('rotas e menu da Prospecção IA em Sharks e Estrategos (não no Cliente)',
   assert.ok(createFn.includes("'prospecting'"));
   const approveFn = await readFile(new URL('../supabase/functions/admin-approve-access-request/index.ts', import.meta.url), 'utf8');
   assert.ok(approveFn.includes("'prospecting'"));
+});
+
+/* ─── F2: ingest e JEV (funções puras das Edge Functions) ─── */
+
+test('normalize de contato e extração de leadgen do webhook Meta', () => {
+  assert.equal(ingest.normalizeEmail('  Maria@Empresa.COM '), 'maria@empresa.com');
+  assert.equal(ingest.normalizeEmail('invalido'), null);
+  assert.equal(ingest.normalizePhone('(11) 99999-8888'), '11999998888');
+  assert.equal(ingest.normalizePhone('123'), null);
+
+  const contact = ingest.mapMetaLeadFields([
+    { name: 'full_name', values: ['Maria Silva'] },
+    { name: 'email', values: ['MARIA@Teste.com'] },
+    { name: 'phone_number', values: ['(11) 98888-7777'] },
+  ]);
+  assert.equal(contact.name, 'Maria Silva');
+  assert.equal(contact.email, 'maria@teste.com');
+  assert.equal(contact.phone, '11988887777');
+
+  const refs = ingest.extractMetaLeadIds({
+    entry: [{ id: 'page1', changes: [{ field: 'leadgen', value: { lead_id: 'L1' } }] }],
+  });
+  assert.equal(refs.length, 1);
+  assert.equal(refs[0].leadId, 'L1');
+  assert.deepEqual(ingest.extractMetaLeadIds({ entry: [] }), []);
+});
+
+test('Jev: perguntas atômicas e mapeamento de respostas para o contrato', () => {
+  const q = ai.buildJevQuestions(['Tráfego pago', 'CRM']);
+  assert.ok(q.icp_fit && q.priority && q.next_action);
+  assert.ok(q.prod_0 && q.prod_1);
+  assert.equal(q.prod_1.instructions.includes('CRM'), true);
+
+  const analysis = ai.mapJevAnswers(
+    {
+      icp_fit: { score: 3, confidence: 0.82 },
+      priority: { choice: 'alta' },
+      next_action: { choice: 'qualificar' },
+      prod_0: { noul: 0.9 },
+      prod_1: { noul: 0.4 },
+    },
+    ['Tráfego pago', 'CRM'],
+  );
+  assert.equal(analysis.icpFit, 0.75);
+  assert.equal(analysis.confidence, 0.82);
+  assert.equal(analysis.priority, 'alta');
+  assert.equal(analysis.nextAction, 'qualificar');
+  assert.equal(analysis.productScores[0].score, 0.9);
+  assert.equal(analysis.productScores[1].score, 0.4);
+});
+
+test('mock do provider (fallback sem key) continua determinístico', async () => {
+  const provider = new ai.MockAIProvider();
+  const a = await provider.analyzeCompany({ name: 'X', segment: 'S' }, ['P1']);
+  const b = await provider.analyzeCompany({ name: 'X', segment: 'S' }, ['P1']);
+  assert.equal(a.icpFit, b.icpFit);
+  assert.ok(a.icpFit >= 0 && a.icpFit <= 1);
 });
