@@ -1,6 +1,6 @@
 import {
   Calendar, Megaphone, BookOpen, LayoutTemplate, History,
-  MessageSquare, Target, Briefcase, Link2, UserCog,
+  MessageSquare, Target, Briefcase, Link2, UserCog, Telescope,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -28,6 +28,7 @@ export const PERMISSION_META: Record<string, { label: string; icon: LucideIcon; 
   history:      { label: 'Histórico',       icon: History,        description: 'Visualizar histórico de ações' },
   chat:         { label: 'Chat',            icon: MessageSquare,  description: 'Enviar e receber mensagens' },
   crm:          { label: 'CRM',             icon: Target,         description: 'Gerenciar leads e conversão em clientes' },
+  prospecting:  { label: 'Prospecção IA',   icon: Telescope,      description: 'Campanhas de prospecção com agentes de IA' },
   clients:      { label: 'Clientes',        icon: Briefcase,      description: 'Gerenciar clientes e configurações' },
   integrations: { label: 'Integrações',     icon: Link2,          description: 'Gerenciar integrações (Google Calendar)' },
   team:         { label: 'Time',            icon: UserCog,        description: 'Gerenciar membros da equipe' },
@@ -43,7 +44,7 @@ export function defaultPermissions(): Permission[] {
     can_create: !['history', 'clients', 'integrations', 'team'].includes(p),
     can_read: true,
     can_update: !['history', 'clients', 'integrations', 'team'].includes(p),
-    can_delete: !['history', 'clients', 'integrations', 'team', 'chat', 'crm'].includes(p),
+    can_delete: !['history', 'clients', 'integrations', 'team', 'chat', 'crm', 'prospecting'].includes(p),
   }));
 }
 
