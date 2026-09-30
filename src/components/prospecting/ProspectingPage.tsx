@@ -14,7 +14,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import {
-  useProspectingCampaigns, useProspectingMetrics, useCampaignCounts,
+  useProspectingCampaigns, useProspectingMetrics,
 } from '@/hooks/useProspecting';
 import { useEnvStaff } from '@/hooks/useLeads';
 import {
@@ -33,7 +33,6 @@ export default function ProspectingPage({ environment, canDelete = false }: Pros
   const { campaigns, loading, createCampaign, updateCampaign, deleteCampaign, setStatus } =
     useProspectingCampaigns(environment);
   const metrics = useProspectingMetrics(environment);
-  const counts = useCampaignCounts(campaigns, metrics);
   const owners = useEnvStaff(environment);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -146,7 +145,7 @@ export default function ProspectingPage({ environment, canDelete = false }: Pros
         <div className="space-y-2">
           {campaigns.map(c => {
             const status = CAMPAIGN_STATUS_META[c.status];
-            const cCount = counts.get(c.id) ?? { found: 0, qualified: 0 };
+            const cCount = metrics.byCampaign[c.id] ?? { found: 0, qualified: 0 };
             return (
               <Card key={c.id} className="p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">

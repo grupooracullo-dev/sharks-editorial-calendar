@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type {
   CampaignPayload, CampaignStatus, ProspectingCampaign, ProspectingEnvironment, ProspectingStatus,
 } from '@/lib/prospecting/types';
 
-/* FK nomeada desambigua os dois vínculos com users (created_by / assigned_to) */
 const CAMPAIGN_SELECT =
   '*, products:prospecting_campaign_products(product:environment_products(id, name)), assigned_to_user:prospecting_campaigns_assigned_to_fkey(id, full_name, avatar_url)';
 
@@ -58,7 +57,7 @@ export function useProspectingCampaigns(environment: ProspectingEnvironment | nu
     environment: ProspectingEnvironment,
     payload: CampaignPayload,
     userId: string | null,
-  ): Promise<ProspectingCampaign> => {
+  ): Promise<void> => {
     const { product_ids, ...rest } = payload;
     const { data, error } = await supabase
       .from('prospecting_campaigns')
@@ -68,52 +67,22 @@ export function useProspectingCampaigns(environment: ProspectingEnvironment | nu
         created_by: userId,
         assigned_to: payload.assigned_to ?? userId,
       })
-      .select(CAMPAIGN_SELECT)
+      .select('id')
       .single();
     if (error) throw new Error(error.message);
-    const campaign = data as unknown as ProspectingCampaign;
-
-    if (Array.isArray(product_ids)) {
-      await syncCampaignProducts(campaign.id, product_ids);
-      const { data: fresh, error: err2 } = await supabase
-        .from('prospecting_campaigns')
-        .select(CAMPAIGN_SELECT)
-        .eq('id', campaign.id)
-        .single();
-      if (err2) throw new Error(err2.message);
-      const final = fresh as unknown as ProspectingCampaign;
-      setCampaigns(prev => [final, ...prev]);
-      return final;
-    }
-
-    setCampaigns(prev => [campaign, ...prev]);
-    return campaign;
+    if (Array.isArray(product_ids)) await syncCampaignProducts(data.id, product_ids);
+    await load();
   };
 
-  const updateCampaign = async (id: string, patch: Partial<CampaignPayload>): Promise<ProspectingCampaign> => {
+  const updateCampaign = async (id: string, patch: Partial<CampaignPayload>): Promise<void> => {
     const { product_ids, ...update } = patch;
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('prospecting_campaigns')
       .update(update)
-      .eq('id', id)
-      .select(CAMPAIGN_SELECT)
-      .single();
+      .eq('id', id);
     if (error) throw new Error(error.message);
-    let campaign = data as unknown as ProspectingCampaign;
-
-    if (Array.isArray(product_ids)) {
-      await syncCampaignProducts(id, product_ids);
-      const { data: fresh, error: err2 } = await supabase
-        .from('prospecting_campaigns')
-        .select(CAMPAIGN_SELECT)
-        .eq('id', id)
-        .single();
-      if (err2) throw new Error(err2.message);
-      campaign = fresh as unknown as ProspectingCampaign;
-    }
-
-    setCampaigns(prev => prev.map(c => (c.id === id ? campaign : c)));
-    return campaign;
+    if (Array.isArray(product_ids)) await syncCampaignProducts(id, product_ids);
+    await load();
   };
 
   const deleteCampaign = async (id: string): Promise<void> => {
@@ -126,9 +95,10 @@ export function useProspectingCampaigns(environment: ProspectingEnvironment | nu
     await updateCampaign(id, { status });
   };
 
-  return { campaigns, loading, load, createCampaign, updateCampaign, deleteCampaign, setStatus };
+  return { campaigns, loading, createCampaign, updateCampaign, deleteCampaign, setStatus };
 }
 
+/* ─── Métricas: leads vindos do agente (origin + prospecting_status) ─── */
 export interface ProspectingMetrics {
   found: number;
   qualified: number;
@@ -143,7 +113,6 @@ const EMPTY_METRICS: ProspectingMetrics = {
   found: 0, qualified: 0, approach: 0, interested: 0, meetings: 0, byCampaign: {},
 };
 
-/* ─── Métricas: leads vindos do agente (origin + prospecting_status) ─── */
 export function useProspectingMetrics(environment: ProspectingEnvironment | null) {
   const [metrics, setMetrics] = useState<ProspectingMetrics>(EMPTY_METRICS);
 
@@ -193,7 +162,7 @@ export function useProspectingMetrics(environment: ProspectingEnvironment | null
       .channel(`prospecting-leads-${environment}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'crm_leads', filter: `origin=eq.prospecting_agent` },
+        { event: '*', schema: 'public', table: 'crm_leads', filter: 'origin=eq.prospecting_agent' },
         () => { load(); },
       )
       .subscribe();
@@ -204,15 +173,4 @@ export function useProspectingMetrics(environment: ProspectingEnvironment | null
   }, [environment]);
 
   return metrics;
-}
-
-/* ─── Resumo por campanha (para a lista) ─── */
-export function useCampaignCounts(campaigns: ProspectingCampaign[], metrics: ProspectingMetrics) {
-  return useMemo(() => {
-    const map = new Map<string, { found: number; qualified: number }>();
-    for (const c of campaigns) {
-      map.set(c.id, metrics.byCampaign[c.id] ?? { found: 0, qualified: 0 });
-    }
-    return map;
-  }, [campaigns, metrics]);
 }
