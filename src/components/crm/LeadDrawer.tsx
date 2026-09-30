@@ -3,11 +3,12 @@ import Drawer from '@/components/ui/Drawer';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import Button from '@/components/ui/Button';
+import Avatar from '@/components/ui/Avatar';
 import Badge from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
 import {
   Building2, Calendar, Mail, Phone, StickyNote, ArrowRight, Info,
-  Trash2, Pencil, TrendingUp, Send, MessageSquare, Loader2, Bot, Reply,
+  Trash2, Pencil, TrendingUp, Send, MessageSquare, Loader2, Bot, Reply, Users,
 } from 'lucide-react';
 import {
   LEAD_STAGES, STAGE_META, ACTIVITY_TYPE_META, formatBRL, type LeadStage,
@@ -65,7 +66,18 @@ export default function LeadDrawer({
   return (
     <Drawer isOpen={!!lead} onClose={onClose} title={lead.name} width="lg">
       <div className="space-y-5">
-        {/* Etapa */}
+        {/* Banner do agente */}
+      {lead.origin === 'prospecting_agent' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center gap-2">
+          <Bot className="w-4 h-4 text-amber-600 shrink-0" />
+          <p className="text-xs font-semibold text-amber-700">
+            Lead captado pelo Agente de Prospecção IA
+            {lead.prospecting_status ? ` — ${lead.prospecting_status.replace(/_/g, ' ')}` : ''}
+          </p>
+        </div>
+      )}
+
+      {/* Etapa */}
         <div className="flex items-center gap-2">
           <span className={cn('inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium', stageMeta.badgeClass)}>
             <span className={cn('w-1.5 h-1.5 rounded-full', stageMeta.dotClass)} />
@@ -138,6 +150,25 @@ export default function LeadDrawer({
                 x.product && (
                   <span key={x.product.id} className="text-xs font-medium text-gray-700 bg-gray-100 border border-gray-200 px-2 py-1 rounded-full">
                     {x.product.name}
+                  </span>
+                )
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Vendedores vinculados */}
+        {(lead.team?.length ?? 0) > 0 && (
+          <div>
+            <p className="text-xs text-gray-400 mb-1.5 flex items-center gap-1">
+              <Users className="w-3.5 h-3.5" /> Vendedores vinculados
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {lead.team!.map(x => (
+                x.user && (
+                  <span key={x.user.id} className="inline-flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full pl-0.5 pr-2.5 py-0.5">
+                    <Avatar name={x.user.full_name} src={x.user.avatar_url} size="xs" />
+                    <span className="text-xs text-gray-700">{x.user.full_name}</span>
                   </span>
                 )
               ))}

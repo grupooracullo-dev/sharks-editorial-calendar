@@ -114,6 +114,8 @@ export default function CrmBoard({ environment, canDelete = false, showEnv = fal
         expected_close_date: values.expected_close_date || null,
         owner_id: values.owner_id || null,
         notes: values.notes.trim() || null,
+        product_ids: values.product_ids,
+        team_ids: values.team_ids,
       };
       if (editingLead) {
         await updateLead(editingLead.id, payload);
