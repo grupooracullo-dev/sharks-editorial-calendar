@@ -61,7 +61,6 @@ const SharksCalendarPage = lazyPage(() => import('@/pages/sharks/SharksCalendar'
 const SharksClients = lazyPage(() => import('@/pages/sharks/SharksClients'));
 const SharksCampaigns = lazyPage(() => import('@/pages/sharks/SharksCampaigns'));
 const SharksEditorial = lazyPage(() => import('@/pages/sharks/SharksEditorial'));
-const SharksTemplates = lazyPage(() => import('@/pages/sharks/SharksTemplates'));
 const SharksHistory = lazyPage(() => import('@/pages/sharks/SharksHistory'));
 const SharksChat = lazyPage(() => import('@/pages/sharks/SharksChat'));
 const SharksIntegrations = lazyPage(() => import('@/pages/sharks/SharksIntegrations'));
@@ -73,6 +72,7 @@ const SharksAccessRequests = lazyPage(() => import('@/pages/sharks/SharksAccessR
 const SharksCRM = lazyPage(() => import('@/pages/sharks/SharksCRM'));
 const SharksProspecting = lazyPage(() => import('@/pages/sharks/SharksProspecting'));
 const SharksAgent = lazyPage(() => import('@/pages/sharks/SharksAgent'));
+const SharksApproaches = lazyPage(() => import('@/pages/sharks/SharksApproaches'));
 
 const ClientDashboard = lazyPage(() => import('@/pages/client/ClientDashboard'));
 const ClientCalendar = lazyPage(() => import('@/pages/client/ClientCalendar'));
@@ -93,6 +93,7 @@ const EstrategosImplementations = lazyPage(() => import('@/pages/estrategos/Estr
 const EstrategosCRM = lazyPage(() => import('@/pages/estrategos/EstrategosCRM'));
 const EstrategosProspecting = lazyPage(() => import('@/pages/estrategos/EstrategosProspecting'));
 const EstrategosAgent = lazyPage(() => import('@/pages/estrategos/EstrategosAgent'));
+const EstrategosApproaches = lazyPage(() => import('@/pages/estrategos/EstrategosApproaches'));
 const EstrategosProducts = lazyPage(() => import('@/pages/estrategos/EstrategosProducts'));
 
 function PageFallback() {
@@ -195,11 +196,11 @@ function AppRoutes() {
         <Route path="/sharks/clients" element={<SharksLayout><SharksClients /></SharksLayout>} />
         <Route path="/sharks/campaigns" element={<SharksLayout><SharksCampaigns /></SharksLayout>} />
         <Route path="/sharks/editorial" element={<SharksLayout><SharksEditorial /></SharksLayout>} />
-        <Route path="/sharks/templates" element={<SharksLayout><SharksTemplates /></SharksLayout>} />
         <Route path="/sharks/history" element={<SharksLayout><SharksHistory /></SharksLayout>} />
         <Route path="/sharks/crm" element={<SharksLayout><SharksCRM /></SharksLayout>} />
         <Route path="/sharks/prospeccao" element={<SharksLayout><SharksProspecting /></SharksLayout>} />
         <Route path="/sharks/prospeccao/agente" element={<SharksLayout><SharksAgent /></SharksLayout>} />
+        <Route path="/sharks/abordagens" element={<SharksLayout><SharksApproaches /></SharksLayout>} />
         <Route path="/sharks/chat" element={<SharksLayout><SharksChat /></SharksLayout>} />
         <Route path="/sharks/integrations" element={<SharksLayout><SharksIntegrations /></SharksLayout>} />
         <Route path="/sharks/team" element={<SharksLayout><SharksTeam /></SharksLayout>} />
@@ -229,6 +230,7 @@ function AppRoutes() {
         <Route path="/estrategos/crm" element={<EstrategosLayout><EstrategosCRM /></EstrategosLayout>} />
         <Route path="/estrategos/prospeccao" element={<EstrategosLayout><EstrategosProspecting /></EstrategosLayout>} />
         <Route path="/estrategos/prospeccao/agente" element={<EstrategosLayout><EstrategosAgent /></EstrategosLayout>} />
+        <Route path="/estrategos/abordagens" element={<EstrategosLayout><EstrategosApproaches /></EstrategosLayout>} />
         <Route path="/estrategos/products" element={<EstrategosLayout><EstrategosProducts /></EstrategosLayout>} />
 
         {/* Legal (público, exigência OAuth Google) */}

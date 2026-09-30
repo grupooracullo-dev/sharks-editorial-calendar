@@ -13,12 +13,15 @@ export const STAGE_META: Record<LeadStage, { label: string; dotClass: string; ba
 };
 
 export const ACTIVITY_TYPE_META: Record<string, { label: string }> = {
-  note:         { label: 'Nota' },
-  call:         { label: 'Ligação' },
-  meeting:      { label: 'Reunião' },
-  email:        { label: 'E-mail' },
-  stage_change: { label: 'Etapa' },
-  system:       { label: 'Sistema' },
+  note:            { label: 'Nota' },
+  call:            { label: 'Ligação' },
+  meeting:         { label: 'Reunião' },
+  email:           { label: 'E-mail' },
+  stage_change:    { label: 'Etapa' },
+  system:          { label: 'Sistema' },
+  outreach_draft:  { label: 'Rascunho de abordagem' },
+  outreach_sent:   { label: 'Abordagem enviada' },
+  reply_received:  { label: 'Resposta recebida' },
 };
 
 export function formatBRL(value: number | string | null | undefined): string {

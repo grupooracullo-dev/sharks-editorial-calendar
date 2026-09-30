@@ -25,6 +25,8 @@ export interface Lead {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  origin?: 'manual' | 'inbound' | 'prospecting_agent' | 'import' | null;
+  social_instagram?: string | null;
   owner: { id: string; full_name: string; avatar_url: string | null } | null;
   workspace: { id: string; name: string } | null;
   /** Produtos de interesse (N:N com o catálogo do ambiente) */
@@ -40,7 +42,8 @@ export interface LeadActivity {
   id: string;
   lead_id: string;
   user_id: string | null;
-  type: 'note' | 'call' | 'meeting' | 'email' | 'stage_change' | 'system';
+  type: 'note' | 'call' | 'meeting' | 'email' | 'stage_change' | 'system'
+    | 'outreach_draft' | 'outreach_sent' | 'reply_received';
   content: string;
   created_at: string;
   author: { id: string; full_name: string } | null;

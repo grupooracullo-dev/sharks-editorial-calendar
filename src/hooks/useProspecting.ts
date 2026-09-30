@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type {
-  CampaignPayload, CampaignStatus, ProspectingCampaign, ProspectingEnvironment, ProspectingJob, ProspectingStatus,
+  CampaignPayload, CampaignStatus, ProspectingCampaign, ProspectingEnvironment,
+  ProspectingJob, ProspectingStatus,
 } from '@/lib/prospecting/types';
+
+export type { ProspectingEnvironment };
 
 const CAMPAIGN_SELECT =
   '*, products:prospecting_campaign_products(product:environment_products(id, name)), assigned_to_user:prospecting_campaigns_assigned_to_fkey(id, full_name, avatar_url)';
@@ -140,6 +143,62 @@ export function useProspectingJobs(environment: ProspectingEnvironment | null) {
   }, [environment]);
 
   return jobs;
+}
+
+/* ─── Abordagens em tempo real (atividades de outreach do agente) ─── */
+export interface ApproachFeedItem {
+  id: string;
+  lead_id: string;
+  type: 'outreach_draft' | 'outreach_sent' | 'reply_received';
+  content: string;
+  created_at: string;
+  lead: { id: string; name: string; social_instagram: string | null } | null;
+}
+
+const APPROACH_TYPES = "('outreach_draft','outreach_sent','reply_received')";
+
+export function useApproaches(environment: ProspectingEnvironment | null) {
+  const [items, setItems] = useState<ApproachFeedItem[]>([]);
+
+  useEffect(() => {
+    if (!environment) {
+      setItems([]);
+      return;
+    }
+    let active = true;
+    const load = async () => {
+      const { data, error } = await supabase
+        .from('crm_lead_activities')
+        .select('id, lead_id, type, content, created_at, lead:crm_lead_activities_lead_id_fkey!inner(id, name, environment, social_instagram)')
+        .eq('lead.environment', environment)
+        .in('type', ['outreach_draft', 'outreach_sent', 'reply_received'])
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (!active) return;
+      if (error) {
+        console.error('[prospecting] approaches error:', error.message);
+        return;
+      }
+      setItems(((data ?? []) as unknown) as ApproachFeedItem[]);
+    };
+
+    load();
+
+    const channel = supabase
+      .channel(`crm-outreach-${environment}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'crm_lead_activities' },
+        () => { load(); },
+      )
+      .subscribe();
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, [environment]);
+
+  return items;
 }
 
 /* ─── Métricas: leads vindos do agente (origin + prospecting_status) ─── */

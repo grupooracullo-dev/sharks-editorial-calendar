@@ -42,6 +42,7 @@ export default function LeadKanban({ leads, activitySummaries, showEnv, isMobile
         const meta = STAGE_META[stage];
         const columnLeads = leads.filter(l => l.stage === stage);
         const columnValue = columnLeads.reduce((acc, l) => acc + (Number(l.value) || 0), 0);
+        const noValue = columnLeads.filter(l => l.value == null).length;
         const pct = totalPipeline > 0 ? Math.round((columnValue / totalPipeline) * 100) : 0;
         const isOver = overStage === stage && !!draggingId;
 
@@ -100,15 +101,19 @@ export default function LeadKanban({ leads, activitySummaries, showEnv, isMobile
               )}
             </div>
 
-            {/* Rodapé com totais (padrão pipeline) */}
-            <div className="px-3 py-2 border-t border-gray-200/70 bg-white/60 rounded-b-xl shrink-0">
+            {/* Rodapé: valor estimado da etapa */}
+            <div
+              className="px-3 py-2 border-t border-gray-200/70 bg-white/60 rounded-b-xl shrink-0"
+              title="Soma dos valores estimados dos leads nesta etapa"
+            >
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-500">Total</span>
+                <span className="text-gray-500">Valor estimado</span>
                 <span className="font-semibold text-gray-800 tabular-nums">{formatBRL(columnValue)}</span>
               </div>
               <p className="text-[11px] text-gray-400 mt-0.5">
                 {columnLeads.length} {columnLeads.length === 1 ? 'lead' : 'leads'}
-                {stage !== 'won' && stage !== 'lost' && columnValue > 0 && <> · {pct}% do pipeline</>}
+                {stage !== 'won' && stage !== 'lost' && columnValue > 0 && <> · {pct}% do funil</>}
+                {noValue > 0 && <> · {noValue} sem valor</>}
               </p>
             </div>
           </div>

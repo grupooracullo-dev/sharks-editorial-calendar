@@ -1,10 +1,23 @@
 import type { DragEvent } from 'react';
 import { cn } from '@/lib/utils';
-import { Building2 } from 'lucide-react';
+import { Building2, Sparkles } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
 import { ACTIVITY_TYPE_META, formatBRL, formatRelativeTime } from '@/lib/crmStages';
 import type { Lead, LeadActivitySummary } from '@/hooks/useLeads';
 import { ENVIRONMENT_META } from '@/types';
+
+const NEXT_STEP_LABELS: Record<string, string> = {
+  pesquisar_mais: 'Pesquisar mais',
+  qualificar: 'Qualificar',
+  descartar: 'Descartar',
+  abordar: 'Abordar',
+};
+
+const ORIGIN_LABELS: Record<string, string> = {
+  prospecting_agent: 'Prospecção',
+  inbound: 'Inbound',
+  import: 'Importado',
+};
 
 interface LeadCardProps {
   lead: Lead;
@@ -53,6 +66,24 @@ export default function LeadCard({
           </span>
         )}
       </div>
+
+      {/* Próximo passo da IA + origem */}
+      {(lead.ai_next_step || (lead.origin && lead.origin !== 'manual')) && (
+        <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+          {lead.ai_next_step && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary-700 bg-primary-50 border border-primary-100 px-1.5 py-0.5 rounded-full">
+              <Sparkles className="w-3 h-3 shrink-0" />
+              {NEXT_STEP_LABELS[lead.ai_next_step] ?? lead.ai_next_step}
+            </span>
+          )}
+          {lead.origin && lead.origin !== 'manual' && (
+            <span className="text-[11px] text-gray-400">
+              {ORIGIN_LABELS[lead.origin] ?? lead.origin}
+              {lead.source ? ` · ${lead.source}` : ''}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Cliente convertido */}
       {lead.workspace && (

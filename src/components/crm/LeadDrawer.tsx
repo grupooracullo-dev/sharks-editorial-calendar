@@ -7,7 +7,7 @@ import Badge from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
 import {
   Building2, Calendar, Mail, Phone, StickyNote, ArrowRight, Info,
-  Trash2, Pencil, TrendingUp, Send, MessageSquare, Loader2, Bot,
+  Trash2, Pencil, TrendingUp, Send, MessageSquare, Loader2, Bot, Reply,
 } from 'lucide-react';
 import {
   LEAD_STAGES, STAGE_META, ACTIVITY_TYPE_META, formatBRL, type LeadStage,
@@ -22,6 +22,9 @@ const ACTIVITY_ICONS: Record<LeadActivity['type'], typeof StickyNote> = {
   email: Mail,
   stage_change: ArrowRight,
   system: Info,
+  outreach_draft: Pencil,
+  outreach_sent: Send,
+  reply_received: Reply,
 };
 
 interface LeadDrawerProps {
