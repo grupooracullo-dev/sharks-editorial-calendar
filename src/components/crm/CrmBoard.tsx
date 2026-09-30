@@ -2,13 +2,11 @@ import { useCallback, useMemo, useState } from 'react';
 import PageHeader from '@/components/ui/PageHeader';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import Card from '@/components/ui/Card';
 import Tabs from '@/components/ui/Tabs';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
-import EmptyState from '@/components/ui/EmptyState';
 import { toast } from 'sonner';
-import { Plus, Target, Search, Loader2 } from 'lucide-react';
+import { Plus, Search, Loader2 } from 'lucide-react';
 import LeadKanban from './LeadKanban';
 import LeadFormModal, { type LeadFormValues } from './LeadFormModal';
 import LeadDrawer from './LeadDrawer';
@@ -248,32 +246,14 @@ export default function CrmBoard({ environment, canDelete = false, showEnv = fal
             </span>
           </div>
 
-          {leads.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center">
-              <Card padding="md">
-                <EmptyState
-                  icon={Target}
-                  title="Nenhum lead ainda"
-                  description="Crie o primeiro lead para começar a acompanhar a jornada até a conversão."
-                />
-                <div className="flex justify-center pb-2 -mt-2">
-                  <Button onClick={() => { setEditingLead(null); setFormOpen(true); }}>
-                    <Plus className="w-4 h-4" />
-                    Novo lead
-                  </Button>
-                </div>
-              </Card>
-            </div>
-          ) : (
-            <LeadKanban
-              leads={filteredLeads}
-              activitySummaries={activitySummaries}
-              showEnv={showEnv}
-              isMobile={isMobile}
-              onOpenLead={(lead) => setDrawerLead(lead)}
-              onMoveStage={handleMoveStage}
-            />
-          )}
+          <LeadKanban
+            leads={filteredLeads}
+            activitySummaries={activitySummaries}
+            showEnv={showEnv}
+            isMobile={isMobile}
+            onOpenLead={(lead) => setDrawerLead(lead)}
+            onMoveStage={handleMoveStage}
+          />
         </>
       ) : (
         <ClientsTab
