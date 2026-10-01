@@ -38,7 +38,9 @@ export function useProspectingCampaigns(environment: ProspectingEnvironment | nu
 
     const { data, error } = await query;
     if (error) console.error('[prospecting] campaigns load error:', error.message);
-    setCampaigns(((data ?? []) as unknown) as ProspectingCampaign[]);
+    const rows = ((data ?? []) as unknown) as ProspectingCampaign[];
+    const seen = new Set<string>();
+    setCampaigns(rows.filter(x => !seen.has(x.id) && seen.add(x.id)));
     setLoading(false);
   }, [environment]);
 

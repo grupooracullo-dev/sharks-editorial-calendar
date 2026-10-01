@@ -260,7 +260,10 @@ export class GlmProvider implements GenerativeAI {
       body: JSON.stringify({
         model: this.model,
         temperature: 0.7,
-        max_tokens: 400,
+        max_tokens: 1024,
+        // rascunhos são curtos e objetivos — sem raciocínio longo
+        // (modelos glm-4.5+ gastam o budget de tokens em reasoning_content)
+        thinking: { type: 'disabled' },
         messages: [
           { role: 'system', content: buildGlmSystemPrompt(input.personality, input.campaignName) },
           { role: 'user', content: userPrompt },

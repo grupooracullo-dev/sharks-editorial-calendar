@@ -3,7 +3,7 @@
 // Auth: JWT de staff (Authorization: Bearer). Sem segredos na resposta.
 // ==========================================
 
-import { corsHeaders } from '../_shared/google.ts';
+import { serviceClient, corsHeaders } from '../_shared/google.ts';
 
 const CORS: Record<string, string> = {};
 function json(status: number, body: unknown) {
@@ -16,9 +16,13 @@ Deno.serve(async req => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
     if (req.method !== 'GET') return json(405, { error: 'Use GET' });
 
-    // Apenas staff autenticado consulta (não expõe valores, só presença)
+    // Valida o JWT de verdade (só staff autenticado consulta;
+    // a resposta nunca expõe valores, só presença dos secrets)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) return json(401, { error: 'Token ausente' });
+    const admin = serviceClient();
+    const { data: userData } = await admin.auth.getUser(authHeader.replace(/^Bearer /i, ''));
+    if (!userData?.user) return json(401, { error: 'Token invalido' });
 
     const channels = {
       decision_ai: !!Deno.env.get('TYPESAFE_API_KEY'),
