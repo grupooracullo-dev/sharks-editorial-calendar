@@ -107,7 +107,10 @@ export function useLeads(environment: CrmEnvironment | null) {
 
     const { data, error } = await query;
     if (error) console.error('[crm] load error:', error.message);
-    setLeads(((data ?? []) as unknown) as Lead[]);
+    // Dedup defensivo: evento realtime + append manual podem correr em paralelo
+    const rows = ((data ?? []) as unknown) as Lead[];
+    const seen = new Set<string>();
+    setLeads(rows.filter(l => !seen.has(l.id) && seen.add(l.id)));
     setLoading(false);
   }, [environment]);
 
@@ -151,11 +154,12 @@ export function useLeads(environment: CrmEnvironment | null) {
         .single();
       if (err2) throw new Error(err2.message);
       const final = fresh as unknown as Lead;
-      setLeads(prev => [final, ...prev]);
+      setLeads(prev => prev.some(x => x.id === final.id) ? prev.map(x => (x.id === final.id ? final : x)) : [final, ...prev]);
       return final;
     }
 
-    setLeads(prev => [lead, ...prev]);
+    // Append com guarda: o realtime pode já ter recarregado a lista com este lead
+    setLeads(prev => prev.some(x => x.id === lead.id) ? prev : [lead, ...prev]);
     return lead;
   };
 
