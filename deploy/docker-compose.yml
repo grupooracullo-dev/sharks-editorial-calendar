@@ -1,0 +1,103 @@
+# Stack Oracullo Automação — VPS único
+# n8n (orquestração) + Evolution API (WhatsApp) + PostgreSQL + Cloudflare Tunnel
+#
+# Subir:     docker compose up -d
+# Logs:      docker compose logs -f n8n evolution
+# Requisito: VPS com 4GB RAM (Hetzner CP11 ~€4/mês, Contabo $5/mês)
+#
+# Isto substitui o trial n8n Cloud (14 dias) com a mesma arquitetura:
+# workflows exportados do Cloud importam 1:1 aqui (Workflows → Import from File).
+
+name: oracullo-stack
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: oracullo
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: '5432'
+      DB_POSTGRESDB_DATABASE: oracullo
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      GENERIC_TIMEZONE: America/Sao_Paulo
+      N8N_HOST: ${N8N_HOST}
+      N8N_PROTOCOL: https
+      WEBHOOK_URL: https://${N8N_HOST}/
+      N8N_BASIC_AUTH_ACTIVE: 'false'
+      # Public API (necessária para o agente externo gerenciar workflows)
+      N8N_PUBLIC_API_ENABLED: 'true'
+    volumes:
+      - n8ndata:/home/node/.n8n
+    ports:
+      - '127.0.0.1:5678:5678'
+
+  evolution:
+    image: evoapicloud/evolution-api:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Autenticação da API (o n8n usa este token no header apikey)
+      AUTHENTICATION_API_TYPE: apikey
+      AUTHENTICATION_GLOBAL_AUTH_TOKEN: ${EVOLUTION_API_KEY}
+      DATABASE_ENABLED: 'true'
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/oracullo
+      CACHE_REDIS_ENABLED: 'true'
+      CACHE_REDIS_URI: redis://redis:6379/1
+      CACHE_LOCAL_ENABLED: 'true'
+      # Webhook de mensagens → Oracullo Conversation (n8n)
+      # (também configurável por instância na UI do n8n)
+      WEBHOOK_GLOBAL_ENABLED: 'false'
+    volumes:
+      - evoinstances:/evolution/instances
+    ports:
+      - '127.0.0.1:8080:8080'
+
+  # Túneis públicos com SSL (Cloudflare Tunnel — sem abrir portas no VPS)
+  cloudflared-n8n:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel run --token ${CF_TUNNEL_TOKEN_N8N}
+    depends_on:
+      - n8n
+
+  cloudflared-evo:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel run --token ${CF_TUNNEL_TOKEN_EVO}
+    depends_on:
+      - evolution
+
+volumes:
+  pgdata:
+  redisdata:
+  n8ndata:
+  evoinstances:
