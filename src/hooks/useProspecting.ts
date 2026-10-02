@@ -148,6 +148,11 @@ export function useProspectingJobs(environment: ProspectingEnvironment | null) {
 }
 
 /* ─── Personalidade & Parâmetros do agente (por ambiente) ─── */
+export interface AgentVoiceSettings {
+  mode: 'text' | 'audio' | 'both';
+  voice_id: string;
+}
+
 export interface AgentSettings {
   personality: {
     agent_name: string;
@@ -157,6 +162,7 @@ export interface AgentSettings {
     brand_voice_rules: string;
     signature: string;
     greeting_style: string;
+    voice: AgentVoiceSettings;
   };
   params: {
     fit_draft_threshold: number;
@@ -174,6 +180,7 @@ const DEFAULT_SETTINGS: AgentSettings = {
   personality: {
     agent_name: 'Agente', tone: 'amigavel', language: 'pt-BR', persona: '',
     brand_voice_rules: '', signature: '', greeting_style: 'curto, com pergunta aberta',
+    voice: { mode: 'text', voice_id: '' },
   },
   params: {
     fit_draft_threshold: 0.75, fit_discard_threshold: 0.5, confidence_auto: 0.7,
@@ -200,7 +207,11 @@ export function useAgentSettings(environment: ProspectingEnvironment | null) {
       if (error) console.error('[prospecting] settings error:', error.message);
       const row = (data ?? {}) as { personality?: Partial<AgentSettings['personality']>; params?: Partial<AgentSettings['params']> };
       setSettings({
-        personality: { ...DEFAULT_SETTINGS.personality, ...(row.personality ?? {}) },
+        personality: {
+          ...DEFAULT_SETTINGS.personality,
+          ...(row.personality ?? {}),
+          voice: { ...DEFAULT_SETTINGS.personality.voice, ...(row.personality?.voice ?? {}) },
+        },
         params: { ...DEFAULT_SETTINGS.params, ...(row.params ?? {}) },
       });
       setLoading(false);
@@ -227,6 +238,7 @@ export interface ApproachFeedItem {
   lead_id: string;
   type: 'outreach_draft' | 'outreach_sent' | 'reply_received';
   content: string;
+  metadata: { audio_url?: string; audio_provider?: string } | null;
   created_at: string;
   lead: { id: string; name: string; social_instagram: string | null } | null;
 }
@@ -245,7 +257,7 @@ export function useApproaches(environment: ProspectingEnvironment | null) {
     const load = async () => {
       const { data, error } = await supabase
         .from('crm_lead_activities')
-        .select('id, lead_id, type, content, created_at, lead:crm_lead_activities_lead_id_fkey!inner(id, name, environment, social_instagram)')
+        .select('id, lead_id, type, content, metadata, created_at, lead:crm_lead_activities_lead_id_fkey!inner(id, name, environment, social_instagram)')
         .eq('lead.environment', environment)
         .in('type', ['outreach_draft', 'outreach_sent', 'reply_received'])
         .order('created_at', { ascending: false })
@@ -284,10 +296,11 @@ export interface ChannelStatus {
   google_places: boolean;
   meta: boolean;
   n8n: boolean;
+  speech: boolean;
 }
 
 const EMPTY_CHANNELS: ChannelStatus = {
-  decision_ai: false, generative_ai: false, google_places: false, meta: false, n8n: false,
+  decision_ai: false, generative_ai: false, google_places: false, meta: false, n8n: false, speech: false,
 };
 
 export function useChannelStatus(enabled: boolean) {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
+import Textarea from '@/components/ui/Textarea';
 import Button from '@/components/ui/Button';
 import ChipMultiSelect from '@/components/ui/ChipMultiSelect';
 import { useEnvProducts } from '@/hooks/useEnvProducts';
@@ -17,6 +18,7 @@ export interface CampaignFormValues {
   segment: string;
   location: string;
   company_size: string;
+  icp_description: string;
   target_count: string;
   channels: string[];
   automation_level: AutomationLevel;
@@ -27,7 +29,7 @@ export interface CampaignFormValues {
 
 const EMPTY: CampaignFormValues = {
   name: '', objective: '', segment: '', location: '', company_size: '',
-  target_count: '100', channels: ['email'], automation_level: 'assisted',
+  icp_description: '', target_count: '100', channels: ['email'], automation_level: 'assisted',
   assigned_to: '', product_ids: [], status: 'draft',
 };
 
@@ -56,6 +58,7 @@ export default function CampaignFormModal({
           segment: campaign.segment ?? '',
           location: campaign.location ?? '',
           company_size: campaign.company_size ?? '',
+          icp_description: campaign.icp_description ?? '',
           target_count: String(campaign.target_count ?? 100),
           channels: campaign.channels ?? [],
           automation_level: campaign.automation_level,
@@ -113,6 +116,15 @@ export default function CampaignFormModal({
             onChange={set('target_count')}
           />
         </div>
+
+        <Textarea
+          label="Público-alvo (ICP)"
+          value={form.icp_description}
+          onChange={(e) => setForm(f => ({ ...f, icp_description: e.target.value }))}
+          placeholder="Descreva o cliente ideal: ex.: distribuidores de alimentos de médio porte em SP que vendem por atacado e já usam delivery próprio."
+          rows={3}
+        />
+        <p className="text-[11px] text-gray-400 -mt-2">O agente usa esta descrição para descobrir empresas e medir o fit de cada lead contra este perfil.</p>
 
         <ChipMultiSelect
           label="Produtos ofertados"
@@ -173,6 +185,7 @@ export function payloadFromValues(values: CampaignFormValues, environment: Prosp
     segment: values.segment.trim() || null,
     location: values.location.trim() || null,
     company_size: values.company_size || null,
+    icp_description: values.icp_description.trim() || null,
     target_count: Math.max(1, Math.min(100000, parseInt(values.target_count, 10) || 100)),
     channels: values.channels,
     automation_level: values.automation_level,

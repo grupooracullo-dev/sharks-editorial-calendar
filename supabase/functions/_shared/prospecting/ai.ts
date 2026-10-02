@@ -26,12 +26,27 @@ export interface CompanyAnalysis {
   rationale?: string;
 }
 
+/** ICP da campanha — o score mede contra o público-alvo, não contra a agência genérica */
+export interface CampaignICP {
+  campaign_name?: string | null;
+  segment?: string | null;
+  location?: string | null;
+  company_size?: string | null;
+  icp_description?: string | null;
+}
+
 export interface AIProvider {
   readonly name: string;
-  analyzeCompany(company: CompanyProfile, campaignProducts: string[]): Promise<CompanyAnalysis>;
+  analyzeCompany(company: CompanyProfile, campaignProducts: string[], icp?: CampaignICP): Promise<CompanyAnalysis>;
 }
 
 /* ─── Camada generativa ─── */
+export interface AgentVoice {
+  /** 'text' (default) · 'audio' · 'both' */
+  mode?: 'text' | 'audio' | 'both';
+  voice_id?: string;
+}
+
 export interface AgentPersonality {
   agent_name?: string;
   tone?: string;
@@ -40,6 +55,7 @@ export interface AgentPersonality {
   brand_voice_rules?: string;
   signature?: string;
   greeting_style?: string;
+  voice?: AgentVoice;
 }
 
 export interface ApproachInput {
@@ -48,6 +64,7 @@ export interface ApproachInput {
   products: string[];
   personality: AgentPersonality;
   research?: string | null;
+  icpDescription?: string | null;
 }
 
 export interface ApproachDraft {
@@ -72,8 +89,8 @@ function stableHash(input: string): number {
 export class MockAIProvider implements AIProvider {
   readonly name = 'mock';
 
-  async analyzeCompany(company: CompanyProfile, campaignProducts: string[]): Promise<CompanyAnalysis> {
-    const key = [company.name, company.segment ?? '', company.location ?? '', company.company_size ?? ''].join('|');
+  async analyzeCompany(company: CompanyProfile, campaignProducts: string[], icp?: CampaignICP): Promise<CompanyAnalysis> {
+    const key = [company.name, company.segment ?? '', company.location ?? '', company.company_size ?? '', icp?.icp_description ?? ''].join('|');
     const seed = stableHash(key);
     const signalBoost = Math.min(company.signals?.length ?? 0, 3) * 0.03;
 
@@ -99,11 +116,14 @@ export class MockAIProvider implements AIProvider {
 const JEV_URL = 'https://api.typesafe.ai/v1/systemone';
 const JEV_MODEL = 'jev-latest';
 
-export function buildJevQuestions(products: string[]): Record<string, unknown> {
+export function buildJevQuestions(products: string[], icp?: CampaignICP): Record<string, unknown> {
+  const icpTarget = icp
+    ? 'do público-alvo desta campanha (segmento, porte, localização e descrição de ICP informados no contexto)'
+    : 'da agência';
   const questions: Record<string, unknown> = {
     icp_fit: {
       type: 'score',
-      instructions: 'Aderência desta empresa ao perfil de cliente ideal da agência',
+      instructions: `Aderência desta empresa ao perfil de cliente ideal ${icpTarget}`,
       criteria: ['Nenhum encaixe', 'Encaixe fraco', 'Encaixe razoável', 'Bom encaixe', 'Encaixe ideal'],
     },
     priority: {
@@ -131,7 +151,7 @@ export function buildJevQuestions(products: string[]): Record<string, unknown> {
   return questions;
 }
 
-export function buildJevState(company: CompanyProfile): string {
+export function buildJevState(company: CompanyProfile, icp?: CampaignICP): string {
   return [
     `Empresa: ${company.name}`,
     company.segment ? `Segmento: ${company.segment}` : '',
@@ -140,6 +160,11 @@ export function buildJevState(company: CompanyProfile): string {
     company.signals?.length ? `Sinais: ${company.signals.join('; ')}` : '',
     company.website_summary ? `Resumo do site: ${company.website_summary}` : '',
     company.notes ? `Notas: ${company.notes}` : '',
+    icp ? `--- Público-alvo da campanha${icp.campaign_name ? ` "${icp.campaign_name}"` : ''} ---` : '',
+    icp?.segment ? `Segmento alvo: ${icp.segment}` : '',
+    icp?.location ? `Localização alvo: ${icp.location}` : '',
+    icp?.company_size ? `Porte alvo: ${icp.company_size}` : '',
+    icp?.icp_description ? `Descrição do ICP: ${icp.icp_description}` : '',
   ].filter(Boolean).join('\n');
 }
 
@@ -177,7 +202,7 @@ export class JevProvider implements AIProvider {
     this.apiKey = apiKey;
   }
 
-  async analyzeCompany(company: CompanyProfile, campaignProducts: string[]): Promise<CompanyAnalysis> {
+  async analyzeCompany(company: CompanyProfile, campaignProducts: string[], icp?: CampaignICP): Promise<CompanyAnalysis> {
     const res = await fetch(JEV_URL, {
       method: 'POST',
       headers: {
@@ -185,9 +210,9 @@ export class JevProvider implements AIProvider {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        state: buildJevState(company),
+        state: buildJevState(company, icp),
         model: JEV_MODEL,
-        questions: buildJevQuestions(campaignProducts),
+        questions: buildJevQuestions(campaignProducts, icp),
       }),
     });
     if (!res.ok) {
@@ -247,6 +272,7 @@ export class GlmProvider implements GenerativeAI {
       input.lead.company_size ? `Porte: ${input.lead.company_size}` : '',
       input.research ? `Pesquisa: ${input.research.slice(0, 600)}` : '',
       `Produtos relevantes: ${products}`,
+      input.icpDescription ? `Público-alvo da campanha: ${input.icpDescription.slice(0, 400)}` : '',
       '',
       'Escreva a primeira mensagem de abordagem.',
     ].filter(Boolean).join('\n');

@@ -140,3 +140,85 @@ test('GLM: system prompt carrega personalidade e parse de rascunho', () => {
   assert.equal(fallback.subject, null);
   assert.equal(fallback.message, 'Mensagem direta sem assunto');
 });
+
+/* ---- Fim-a-fim: ICP + voz + auto-loop (migration 073) ---- */
+
+test('migration 073: ICP da campanha, metadata de atividades e bucket de voz', async () => {
+  const m = await readFile(new URL('../supabase/migrations/073_agent_icp_voice.sql', import.meta.url), 'utf8');
+  assert.ok(m.includes('ADD COLUMN IF NOT EXISTS icp_description'));
+  assert.ok(m.includes('ADD COLUMN IF NOT EXISTS metadata'));
+  assert.ok(m.includes("('agent-voice', 'agent-voice', true)"));
+  assert.ok(m.includes('bucket_id = '));
+});
+
+test('score ICP-aware: estado e perguntas do JEV carregam o publico-alvo da campanha', () => {
+  const icp = {
+    campaign_name: 'PILOTO Distribuidores SP',
+    segment: 'Distribuidores de alimentos',
+    location: 'Sao Paulo - SP',
+    company_size: 'Medio',
+    icp_description: 'Atacado com delivery proprio',
+  };
+  const state = ai.buildJevState({ name: 'Padaria X' }, icp);
+  assert.ok(state.includes('Público-alvo da campanha'));
+  assert.ok(state.includes('PILOTO Distribuidores SP'));
+  assert.ok(state.includes('Segmento alvo: Distribuidores de alimentos'));
+  assert.ok(state.includes('Descrição do ICP: Atacado com delivery proprio'));
+
+  const q = ai.buildJevQuestions(['Tráfego pago'], icp);
+  assert.ok(q.icp_fit.instructions.includes('desta campanha'));
+  const q2 = ai.buildJevQuestions(['Tráfego pago']);
+  assert.ok(q2.icp_fit.instructions.includes('da agencia') || q2.icp_fit.instructions.includes('da agência'));
+
+  const stateNoIcp = ai.buildJevState({ name: 'Padaria X' });
+  assert.ok(!stateNoIcp.includes('Público-alvo'));
+});
+
+test('SpeechProvider: contrato, ElevenLabs e fallback mock sem key', async () => {
+  const speech = await load('../supabase/functions/_shared/prospecting/speech.ts');
+  const mock = new speech.MockSpeechProvider();
+  assert.equal(await mock.synthesize('qualquer texto'), null);
+  assert.equal(speech.hasRealSpeech(), false);
+  const factory = speech.getSpeechProvider();
+  assert.equal(factory.name, 'mock');
+  assert.equal(await factory.synthesize('teste'), null);
+  assert.ok(speech.ELEVEN_DEFAULT_VOICE.length > 0);
+});
+
+test('worker: auto-loop de discovery, ICP na analise e voz na geracao', async () => {
+  const worker = await readFile(new URL('../supabase/functions/prospecting-run/index.ts', import.meta.url), 'utf8');
+  // auto-loop: campanhas running abaixo da meta enfileiram discovery sozinhos
+  assert.ok(worker.includes("eq('status', 'running')"));
+  assert.ok(worker.includes('auto-discover-'));
+  assert.ok(worker.includes('max_companies_per_run'));
+  assert.ok(worker.includes('GOOGLE_PLACES_API_KEY'));
+  // ICP-aware
+  assert.ok(worker.includes('loadCampaignIcp'));
+  assert.ok(worker.includes('analyzeCompany(company, products, icp)'));
+  // voz
+  assert.ok(worker.includes('getSpeechProvider()'));
+  assert.ok(worker.includes('agent-voice'));
+  assert.ok(worker.includes('audio_url'));
+});
+
+test('UI: ICP no formulario, voz na personalidade e player no feed', async () => {
+  const form = await readFile(new URL('../src/components/prospecting/CampaignFormModal.tsx', import.meta.url), 'utf8');
+  assert.ok(form.includes('icp_description'));
+  assert.ok(form.includes('Público-alvo (ICP)'));
+
+  const agent = await readFile(new URL('../src/components/prospecting/AgentPage.tsx', import.meta.url), 'utf8');
+  assert.ok(agent.includes("setVoice('mode'"));
+  assert.ok(agent.includes("value: 'audio'"));
+  assert.ok(agent.includes("key: 'speech'"));
+
+  const feed = await readFile(new URL('../src/components/prospecting/ApproachesPage.tsx', import.meta.url), 'utf8');
+  assert.ok(feed.includes('<audio controls'));
+  assert.ok(feed.includes('metadata?.audio_url'));
+
+  const drawer = await readFile(new URL('../src/components/crm/LeadDrawer.tsx', import.meta.url), 'utf8');
+  assert.ok(drawer.includes('a.metadata?.audio_url'));
+
+  const page = await readFile(new URL('../src/components/prospecting/ProspectingPage.tsx', import.meta.url), 'utf8');
+  assert.ok(page.includes('Progresso da meta'));
+  assert.ok(page.includes('c.icp_description'));
+});
