@@ -9,13 +9,16 @@ import Button from '@/components/ui/Button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { IG_CONNECT_EDGE } from '@/lib/prospecting/instagram';
 import {
   Search, FileSearch, Target, Send, MessageSquare, CalendarCheck,
   Radar, Loader2, Bot, ShieldCheck, Cpu, Clock, Settings, Save,
 } from 'lucide-react';
 import {
-  useProspectingJobs, useAgentSettings, useChannelStatus, type AgentSettings,
+  useProspectingJobs, useAgentSettings, useChannelStatus, useInstagramConnection, type AgentSettings,
 } from '@/hooks/useProspecting';
+import { buildInstagramOAuthUrl } from '@/lib/prospecting/instagram';
 import { JOB_TYPE_META, JOB_STATUS_META, type JobStatus, type ProspectingEnvironment } from '@/lib/prospecting/types';
 import type { LucideIcon } from 'lucide-react';
 
@@ -53,6 +56,7 @@ const JOB_STATUS_ICON: Record<JobStatus, LucideIcon> = {
 
 export default function AgentSection({ environment, editable = false }: AgentPageProps) {
   const jobs = useProspectingJobs(environment);
+  const ig = useInstagramConnection(environment);
   const { user } = useAuth();
   const channels = useChannelStatus(true);
   const channelItems = [
@@ -81,6 +85,28 @@ export default function AgentSection({ environment, editable = false }: AgentPag
       ...f,
       personality: { ...f.personality, voice: { ...f.personality.voice, [key]: value } as AgentSettings['personality']['voice'] },
     } : f));
+
+  const [igDisconnecting, setIgDisconnecting] = useState(false);
+  const handleDisconnectInstagram = async () => {
+    setIgDisconnecting(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error('Sessão expirada');
+      const res = await fetch(IG_CONNECT_EDGE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'disconnect', environment }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(body.error ?? `Falha (${res.status})`);
+      toast.success('Instagram desconectado');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao desconectar');
+    } finally {
+      setIgDisconnecting(false);
+    }
+  };
 
   const handleSaveSettings = async () => {
     if (!settingsForm) return;
@@ -174,6 +200,36 @@ export default function AgentSection({ environment, editable = false }: AgentPag
               <span className={cn('text-xs truncate', channels[c.key] ? 'text-gray-700 font-medium' : 'text-gray-400')}>{c.label}</span>
             </div>
           ))}
+        </div>
+
+        {/* Instagram do ambiente — conectar/desconectar in-app */}
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
+          {ig.connection ? (
+            <>
+              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-700">
+                📷 Instagram conectado: @{ig.connection.username ?? ig.connection.ig_user_id}
+              </span>
+              {editable && (
+                <Button size="sm" variant="ghost" loading={igDisconnecting} onClick={handleDisconnectInstagram}>
+                  Desconectar
+                </Button>
+              )}
+            </>
+          ) : (
+            editable && (
+              <Button
+                size="sm"
+                onClick={() => { window.location.href = buildInstagramOAuthUrl(environment); }}
+              >
+                📷 Conectar Instagram
+              </Button>
+            )
+          )}
+          <p className="text-[11px] text-gray-400">
+            {ig.connection
+              ? `Página: ${ig.connection.page_name ?? '—'} · comentários, DMs e Lead Ads entram no CRM automaticamente.`
+              : 'Conta IG profissional dedicada com Página do Facebook vinculada.'}
+          </p>
         </div>
       </Card>
 

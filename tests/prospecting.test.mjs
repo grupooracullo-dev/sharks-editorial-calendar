@@ -222,3 +222,55 @@ test('UI: ICP no formulario, voz na personalidade e player no feed', async () =>
   assert.ok(page.includes('Progresso da meta'));
   assert.ok(page.includes('c.icp_description'));
 });
+/* ---- Instagram in-app (migration 074 + oauth + dm) ---- */
+
+test('migration 074: conexão do Instagram com RLS de admin e token protegido', async () => {
+  const m = await readFile(new URL('../supabase/migrations/074_instagram_connection.sql', import.meta.url), 'utf8');
+  assert.ok(m.includes('CREATE TABLE IF NOT EXISTS public.instagram_connections'));
+  assert.ok(m.includes('uq_instagram_conn_env'));
+  assert.ok(m.includes('is_env_staff((select auth.uid()), environment)'));
+  assert.ok(m.includes('is_env_admin((select auth.uid()), environment)'));
+  assert.ok(m.includes('REVOKE ALL ON public.instagram_connections FROM authenticated'));
+  assert.ok(m.includes('GRANT SELECT (id, environment, ig_user_id, username'));
+  assert.ok(m.includes('access_token text NOT NULL'));
+});
+
+test('edges de Instagram: OAuth in-app, DM com janela e ingest com token da conexão', async () => {
+  const connectFn = await readFile(new URL('../supabase/functions/instagram-connect/index.ts', import.meta.url), 'utf8');
+  assert.ok(connectFn.includes('fb_exchange_token'));
+  assert.ok(connectFn.includes("body.action === 'disconnect'"));
+  assert.ok(connectFn.includes('instagram_business_account'));
+  assert.ok(connectFn.includes('isEnvAdmin'));
+
+  const dm = await readFile(new URL('../supabase/functions/instagram-send-dm/index.ts', import.meta.url), 'utf8');
+  assert.ok(dm.includes('ig_sid'));
+  assert.ok(dm.includes('json(409'));
+  assert.ok(dm.includes('ig.me/m/'));
+  assert.ok(dm.includes('outreach_sent'));
+
+  const ingest = await readFile(new URL('../supabase/functions/prospecting-ingest/index.ts', import.meta.url), 'utf8');
+  assert.ok(ingest.includes('loadPageToken'));
+  assert.ok(ingest.includes('instagram_connections'));
+});
+
+test('UI: callback OAuth, botão no canais e DM no drawer', async () => {
+  const lib = await readFile(new URL('../src/lib/prospecting/instagram.ts', import.meta.url), 'utf8');
+  assert.ok(lib.includes('1421077150132280'));
+  assert.ok(lib.includes('instagram/callback'));
+  assert.ok(lib.includes('validateInstagramState'));
+
+  const cb = await readFile(new URL('../src/pages/instagram/InstagramCallback.tsx', import.meta.url), 'utf8');
+  assert.ok(cb.includes('IG_CONNECT_EDGE'));
+  assert.ok(cb.includes('validateInstagramState'));
+
+  const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  assert.ok(app.includes('"/instagram/callback"'));
+
+  const agent = await readFile(new URL('../src/components/prospecting/AgentPage.tsx', import.meta.url), 'utf8');
+  assert.ok(agent.includes('Conectar Instagram'));
+  assert.ok(agent.includes('useInstagramConnection'));
+
+  const drawer = await readFile(new URL('../src/components/crm/LeadDrawer.tsx', import.meta.url), 'utf8');
+  assert.ok(drawer.includes('IG_SEND_DM_EDGE'));
+  assert.ok(drawer.includes('Enviar DM'));
+});

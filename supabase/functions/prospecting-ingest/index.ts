@@ -14,6 +14,18 @@
 
 import { serviceClient, corsHeaders } from '../_shared/google.ts';
 
+/** Token do canal Instagram: conexão in-app (074) tem prioridade; fallback: segredo META_PAGE_TOKEN */
+async function loadPageToken(admin: ReturnType<typeof serviceClient>, environment: string): Promise<string | null> {
+  const { data: conn } = await admin
+    .from('instagram_connections')
+    .select('access_token')
+    .eq('environment', environment)
+    .eq('status', 'connected')
+    .maybeSingle();
+  const dbTok = (conn as { access_token?: string } | null)?.access_token;
+  return dbTok || Deno.env.get('META_PAGE_TOKEN') || null;
+}
+
 const CORS: Record<string, string> = {};
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
@@ -122,8 +134,8 @@ async function handleMeta(
   environment: string,
   campaignId: string | null,
 ): Promise<Response> {
-  const pageToken = Deno.env.get('META_PAGE_TOKEN');
-  if (!pageToken) return json(500, { error: 'META_PAGE_TOKEN nao configurado' });
+  const pageToken = await loadPageToken(admin, environment);
+  if (!pageToken) return json(400, { error: 'Instagram/Página não conectada neste ambiente (conecte na aba Agente IA > Canais)' });
 
   const entries = (payload?.entry ?? []) as Array<Record<string, unknown>>;
   const results: Array<{ kind: string; lead_id?: string; created?: boolean; skipped?: string }> = [];
@@ -191,10 +203,17 @@ async function handleMeta(
       if (field === 'messages') {
         const message = ((value?.message ?? {}) as Record<string, unknown>);
         const text = String(message?.text ?? '').slice(0, 500);
+        const senderSid = String((value?.sender as Record<string, unknown>)?.id ?? '') || String((value?.from as Record<string, unknown>)?.id ?? '');
         const handle = cleanHandle(String((value?.from as Record<string, unknown>)?.username ?? ''));
         if (!handle) continue;
         const existing = await findLead(admin, environment, { social_instagram: handle });
         if (!existing) { results.push({ kind: 'message', skipped: 'lead nao encontrado' }); continue; }
+        // guarda o IGSID do prospect — habilita DM futura (instagram-send-dm)
+        if (senderSid) {
+          const { data: cur } = await admin.from('crm_leads').select('ai_data').eq('id', existing.id).maybeSingle();
+          const merged = { ...(((cur as { ai_data?: object } | null)?.ai_data ?? {}) as object), ig_sid: senderSid };
+          await admin.from('crm_leads').update({ ai_data: merged }).eq('id', existing.id);
+        }
         await logActivity(admin, existing.id, 'reply_received', `DM recebida: ${text || '(midia)'}`);
         if (existing.prospecting_status === 'contacted' || existing.prospecting_status === 'queued' || existing.prospecting_status === 'discovered') {
           await admin.from('crm_leads').update({ prospecting_status: 'replied' }).eq('id', existing.id);

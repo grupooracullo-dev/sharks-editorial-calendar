@@ -90,6 +90,7 @@ const EstrategosImplementations = lazyPage(() => import('@/pages/estrategos/Estr
 const EstrategosCRM = lazyPage(() => import('@/pages/estrategos/EstrategosCRM'));
 const EstrategosProspecting = lazyPage(() => import('@/pages/estrategos/EstrategosProspecting'));
 const EstrategosProducts = lazyPage(() => import('@/pages/estrategos/EstrategosProducts'));
+const InstagramCallback = lazyPage(() => import('@/pages/instagram/InstagramCallback'));
 
 function PageFallback() {
   return (
@@ -175,6 +176,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/login" element={<Navigate to={homePath} replace />} />
         <Route path="/select-environment" element={<EnvironmentSelector />} />
+        <Route path="/instagram/callback" element={<InstagramCallback />} />
 
         {/* Oracullo (governança multi-ambiente) */}
         <Route path="/oracullo" element={<OraculloLayout><OraculloDashboard /></OraculloLayout>} />
