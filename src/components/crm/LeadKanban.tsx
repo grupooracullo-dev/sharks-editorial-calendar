@@ -1,11 +1,14 @@
 import { useState, type DragEvent } from 'react';
 import { cn } from '@/lib/utils';
 import { LEAD_STAGES, STAGE_META, formatBRL, type LeadStage } from '@/lib/crmStages';
-import type { Lead, LeadActivitySummary } from '@/hooks/useLeads';
+import type { Lead, LeadActivitySummary, CrmClient } from '@/hooks/useLeads';
 import LeadCard from './LeadCard';
+import { Building2 } from 'lucide-react';
+import { ENVIRONMENT_META } from '@/types';
 
 interface LeadKanbanProps {
   leads: Lead[];
+  clients: CrmClient[];
   activitySummaries: Map<string, LeadActivitySummary>;
   showEnv?: boolean;
   isMobile?: boolean;
@@ -13,7 +16,7 @@ interface LeadKanbanProps {
   onMoveStage: (lead: Lead, stage: LeadStage) => void;
 }
 
-export default function LeadKanban({ leads, activitySummaries, showEnv, isMobile, onOpenLead, onMoveStage }: LeadKanbanProps) {
+export default function LeadKanban({ leads, clients, activitySummaries, showEnv, isMobile, onOpenLead, onMoveStage }: LeadKanbanProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overStage, setOverStage] = useState<LeadStage | null>(null);
 
@@ -37,7 +40,8 @@ export default function LeadKanban({ leads, activitySummaries, showEnv, isMobile
   };
 
   return (
-    <div className="flex-1 min-h-0 flex gap-3 overflow-x-auto pb-1 xl:grid xl:grid-cols-6 xl:overflow-visible">
+    <div className="flex-1 min-h-0 flex gap-3 overflow-x-auto pb-1 xl:grid xl:grid-cols-7 xl:overflow-visible">
+      {/* Colunas do funil */}
       {LEAD_STAGES.map(stage => {
         const meta = STAGE_META[stage];
         const columnLeads = leads.filter(l => l.stage === stage);
@@ -119,6 +123,44 @@ export default function LeadKanban({ leads, activitySummaries, showEnv, isMobile
           </div>
         );
       })}
+
+      {/* Coluna CLIENTES ATIVOS — clientes cadastrados na agenda */}
+      <div className="w-[240px] shrink-0 xl:w-auto flex flex-col rounded-xl border border-emerald-200/70 bg-emerald-50/40 min-h-0">
+        <div className="px-3 py-2.5 border-b border-emerald-200/60 shrink-0">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 uppercase tracking-wide min-w-0">
+            <Building2 className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Clientes ativos</span>
+            <span className="text-emerald-400">{clients.length}</span>
+          </span>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
+          {clients.map(c => (
+            <div
+              key={c.id}
+              className="bg-white border border-gray-200 rounded-lg p-3"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold text-gray-900 truncate flex-1">{c.name}</p>
+                {c.environment && (
+                  <span className="text-xs shrink-0">{ENVIRONMENT_META[c.environment as keyof typeof ENVIRONMENT_META]?.emoji ?? ''}</span>
+                )}
+              </div>
+              {c.segment && <p className="text-xs text-gray-500 truncate mt-0.5">{c.segment}</p>}
+              <p className="text-[10px] font-medium text-emerald-600 mt-1.5">✓ cliente da agenda</p>
+            </div>
+          ))}
+          {clients.length === 0 && (
+            <div className="rounded-lg border border-dashed border-emerald-200 py-8 text-center text-xs text-emerald-300">
+              Nenhum cliente ainda
+            </div>
+          )}
+        </div>
+        <div className="px-3 py-2 border-t border-emerald-200/60 bg-white/60 rounded-b-xl shrink-0">
+          <p className="text-[11px] text-gray-400">
+            {clients.length} {clients.length === 1 ? 'cliente' : 'clientes'} ativos na agenda
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

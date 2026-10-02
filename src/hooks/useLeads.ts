@@ -294,6 +294,54 @@ export function useLeadActivities(leadId: string | null) {
   return { activities, loading, addActivity };
 }
 
+/* ─── Clientes ativos da agenda (workspaces) para o CRM ─── */
+export interface CrmClient {
+  id: string;
+  name: string;
+  segment: string | null;
+  environment: string | null;
+}
+
+export function useCrmClients(environment: CrmEnvironment | null) {
+  const [clients, setClients] = useState<CrmClient[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      const [wsRes, mapRes] = await Promise.all([
+        supabase.from('workspaces').select('id, name, segment').eq('is_active', true).order('name'),
+        supabase.rpc('ws_env_map'),
+      ]);
+      if (!active) return;
+      if (wsRes.error) console.error('[crm] clients error:', wsRes.error.message);
+      const envByWs = new Map<string, string>(
+        ((mapRes.data ?? []) as unknown as Array<{ id: string; environment: string }>).map(r => [r.id, r.environment]),
+      );
+      const list = (((wsRes.data ?? []) as unknown) as Array<{ id: string; name: string; segment: string | null }>)
+        .filter(w => (environment ? envByWs.get(w.id) === environment : true))
+        .map(w => ({ ...w, environment: envByWs.get(w.id) ?? null }));
+      setClients(list);
+    };
+
+    load();
+
+    const channel = supabase
+      .channel('crm-clients')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'workspaces' },
+        () => { load(); },
+      )
+      .subscribe();
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, [environment]);
+
+  return clients;
+}
+
 /* ─── Última atividade de cada lead (resumo para o card do pipeline) ─── */
 export interface LeadActivitySummary {
   type: LeadActivity['type'];

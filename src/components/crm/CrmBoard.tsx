@@ -14,7 +14,7 @@ import ConvertLeadModal from './ConvertLeadModal';
 import ClientsTab from './ClientsTab';
 import { formatBRL, type LeadStage } from '@/lib/crmStages';
 import {
-  useLeads, useEnvStaff, useLeadActivitySummaries, type CrmEnvironment, type Lead,
+  useLeads, useEnvStaff, useLeadActivitySummaries, useCrmClients, type CrmEnvironment, type Lead,
 } from '@/hooks/useLeads';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 
@@ -33,6 +33,7 @@ export default function CrmBoard({ environment, canDelete = false, showEnv = fal
   const { leads, loading, createLead, updateLead, deleteLead, moveStage, convertLead } = useLeads(environment);
   const owners = useEnvStaff(environment);
   const activitySummaries = useLeadActivitySummaries(environment);
+  const agendaClients = useCrmClients(environment);
 
   const [tab, setTab] = useState<CrmTab>('pipeline');
   const [search, setSearch] = useState('');
@@ -250,6 +251,7 @@ export default function CrmBoard({ environment, canDelete = false, showEnv = fal
 
           <LeadKanban
             leads={filteredLeads}
+            clients={agendaClients}
             activitySummaries={activitySummaries}
             showEnv={showEnv}
             isMobile={isMobile}
@@ -260,6 +262,7 @@ export default function CrmBoard({ environment, canDelete = false, showEnv = fal
       ) : (
         <ClientsTab
           leads={filteredLeads}
+          agendaClients={agendaClients}
           showEnv={showEnv}
           onOpenLead={(lead) => setDrawerLead(lead)}
         />

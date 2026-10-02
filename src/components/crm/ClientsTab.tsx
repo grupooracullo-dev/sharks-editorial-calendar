@@ -2,28 +2,29 @@ import { Building2, Bot } from 'lucide-react';
 import EmptyState from '@/components/ui/EmptyState';
 import Avatar from '@/components/ui/Avatar';
 import { formatBRL, formatRelativeTime } from '@/lib/crmStages';
-import type { Lead } from '@/hooks/useLeads';
+import type { CrmClient, Lead } from '@/hooks/useLeads';
 import { ENVIRONMENT_META } from '@/types';
 
 interface ClientsTabProps {
   leads: Lead[];
+  agendaClients: CrmClient[];
   showEnv?: boolean;
   onOpenLead: (lead: Lead) => void;
 }
 
-export default function ClientsTab({ leads, showEnv, onOpenLead }: ClientsTabProps) {
-  const clients = leads.filter(l => l.stage === 'won' && l.workspace_id && l.workspace);
-  const totalMonthly = clients.reduce((acc, l) => acc + (Number(l.monthly_value) || 0), 0);
-  const totalWon = clients.reduce((acc, l) => acc + (Number(l.value) || 0), 0);
+export default function ClientsTab({ leads, agendaClients, showEnv, onOpenLead }: ClientsTabProps) {
+  const converted = leads.filter(l => l.stage === 'won' && l.workspace_id && l.workspace);
+  const totalMonthly = converted.reduce((acc, l) => acc + (Number(l.monthly_value) || 0), 0);
+  const totalWon = converted.reduce((acc, l) => acc + (Number(l.value) || 0), 0);
 
-  if (clients.length === 0) {
+  if (agendaClients.length === 0 && converted.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="w-full max-w-md">
           <EmptyState
             icon={Building2}
-            title="Nenhum cliente convertido ainda"
-            description="Quando um lead for convertido, ele aparece aqui com a recorrência mensal."
+            title="Nenhum cliente ainda"
+            description="Os clientes cadastrados na agenda e os leads convertidos aparecem aqui."
           />
         </div>
       </div>
@@ -35,20 +36,39 @@ export default function ClientsTab({ leads, showEnv, onOpenLead }: ClientsTabPro
       {/* Resumo */}
       <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
         <span className="text-gray-500">
-          <strong className="text-gray-900">{clients.length}</strong>{' '}
-          {clients.length === 1 ? 'cliente' : 'clientes'} via CRM
+          <strong className="text-gray-900">{agendaClients.length}</strong>{' '}
+          {agendaClients.length === 1 ? 'cliente' : 'clientes'} da agenda
         </span>
         <span className="text-gray-500">
-          Contratos: <strong className="text-gray-900 tabular-nums">{formatBRL(totalWon)}</strong>
+          Contratos via CRM: <strong className="text-gray-900 tabular-nums">{formatBRL(totalWon)}</strong>
         </span>
         <span className="text-gray-500">
           Recorrência mensal: <strong className="text-emerald-600 tabular-nums">{formatBRL(totalMonthly)}</strong>
         </span>
       </div>
 
-      {/* Grid de clientes */}
+      {/* Todos os clientes da agenda */}
       <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 content-start p-1">
-        {clients.map(lead => (
+        {agendaClients.map(c => (
+          <div key={`agenda-${c.id}`} className="bg-white border border-emerald-100 rounded-lg p-3">
+            <div className="flex items-start gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <Building2 className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
+                <p className="text-xs text-gray-400 truncate">
+                  {c.segment ?? 'cliente'}
+                  {c.environment && ` · ${ENVIRONMENT_META[c.environment as keyof typeof ENVIRONMENT_META]?.emoji ?? ''}`}
+                </p>
+              </div>
+            </div>
+            <p className="text-[11px] font-medium text-emerald-600 mt-2">✓ ativo na agenda</p>
+          </div>
+        ))}
+
+        {/* Leads convertidos (via CRM) */}
+        {converted.map(lead => (
           <button
             key={lead.id}
             onClick={() => onOpenLead(lead)}
