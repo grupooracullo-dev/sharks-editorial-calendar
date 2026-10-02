@@ -14,7 +14,12 @@ import {
   LEAD_STAGES, STAGE_META, ACTIVITY_TYPE_META, formatBRL, type LeadStage,
 } from '@/lib/crmStages';
 import { useLeadActivities, type Lead, type LeadActivity } from '@/hooks/useLeads';
+import { toast } from 'sonner';
+import { useInstagramConnection } from '@/hooks/useProspecting';
+import { IG_SEND_DM_EDGE } from '@/lib/prospecting/instagram';
 import { ENVIRONMENT_META } from '@/types';
+import { supabase } from '@/lib/supabase';
+import Modal from '@/components/ui/Modal';
 
 const ACTIVITY_ICONS: Record<LeadActivity['type'], typeof StickyNote> = {
   note: StickyNote,
@@ -47,6 +52,44 @@ export default function LeadDrawer({
   const [activityText, setActivityText] = useState('');
   const [sendingActivity, setSendingActivity] = useState(false);
 
+  const ig = useInstagramConnection(lead?.environment ?? null);
+  const [dmOpen, setDmOpen] = useState(false);
+  const [dmText, setDmText] = useState('');
+  const [sendingDm, setSendingDm] = useState(false);
+
+  const handleSendDm = async () => {
+    if (!lead || !dmText.trim()) return;
+    setSendingDm(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error('Sessão expirada — faça login novamente');
+      const res = await fetch(IG_SEND_DM_EDGE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ lead_id: lead.id, message: dmText.trim() }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string; profile_url?: string | null; sent_to?: string };
+      if (res.ok && (body as { ok?: boolean }).ok) {
+        toast.success(`DM enviada ${body.sent_to ?? ''}`);
+        setDmOpen(false);
+        setDmText('');
+      } else if (res.status === 409) {
+        toast.error(body.message ?? body.error ?? 'Sem janela de conversa', {
+          description: 'O prospect precisa ter interagido nas últimas 24h (regra do Instagram).',
+          action: body.profile_url ? { label: 'Abrir no Instagram', onClick: () => window.open(body.profile_url as string, '_blank') } : undefined,
+          duration: 10000,
+        });
+      } else {
+        throw new Error(body.error ?? `Falha (${res.status})`);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao enviar DM');
+    } finally {
+      setSendingDm(false);
+    }
+  };
+
   if (!lead) return null;
 
   const stageMeta = STAGE_META[lead.stage];
@@ -77,7 +120,7 @@ export default function LeadDrawer({
         </div>
       )}
 
-      {/* Etapa */}
+        {/* Etapa */}
         <div className="flex items-center gap-2">
           <span className={cn('inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium', stageMeta.badgeClass)}>
             <span className={cn('w-1.5 h-1.5 rounded-full', stageMeta.dotClass)} />
@@ -91,6 +134,24 @@ export default function LeadDrawer({
           onChange={(e) => onStageChange(lead, e.target.value as LeadStage)}
           options={LEAD_STAGES.map(s => ({ value: s, label: STAGE_META[s].label }))}
         />
+
+        {/* DM do Instagram — exige conexão do ambiente */}
+        {lead.social_instagram && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex flex-wrap items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-gray-700">📷 Instagram do lead: @{lead.social_instagram}</p>
+              <p className="text-[11px] text-gray-400 truncate">
+                {ig.connection ? `Conectado via @${ig.connection.username ?? ig.connection.ig_user_id}` : 'Ambiente sem Instagram conectado'}
+              </p>
+            </div>
+            {ig.connection && (
+              <Button size="sm" onClick={() => setDmOpen(true)}>
+                <Send className="w-3.5 h-3.5" />
+                Enviar DM
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* Cliente convertido */}
         {lead.workspace && (
@@ -300,6 +361,29 @@ export default function LeadDrawer({
           </div>
         </div>
       </div>
+
+      {/* Modal: DM do Instagram */}
+      <Modal isOpen={dmOpen} onClose={() => setDmOpen(false)} title={`DM para @${lead.social_instagram ?? ''}`} size="md">
+        <div className="space-y-3">
+          <p className="text-xs text-gray-500">
+            Mensagem enviada pelo Instagram do ambiente (regra do Instagram: só dentro da janela de 24h após interação do prospect).
+          </p>
+          <Textarea
+            label="Mensagem"
+            value={dmText}
+            onChange={(e) => setDmText(e.target.value)}
+            placeholder="Olá! Vi o interesse de vocês em..."
+            rows={5}
+          />
+        </div>
+        <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-gray-100">
+          <Button variant="ghost" onClick={() => setDmOpen(false)}>Cancelar</Button>
+          <Button onClick={handleSendDm} loading={sendingDm} disabled={!dmText.trim()}>
+            <Send className="w-3.5 h-3.5" />
+            Enviar
+          </Button>
+        </div>
+      </Modal>
     </Drawer>
   );
 }

@@ -289,8 +289,53 @@ export function useApproaches(environment: ProspectingEnvironment | null) {
   return items;
 }
 
-/* ─── Status dos canais de integração (Edge prospecting-status) ─── */
-export interface ChannelStatus {
+/* ─── Conexão do Instagram do ambiente (migration 074) ─── */
+export interface InstagramConnection {
+  id: string;
+  ig_user_id: string;
+  username: string | null;
+  page_id: string | null;
+  page_name: string | null;
+  status: string;
+  created_at: string;
+}
+
+const IG_COLUMNS = 'id, ig_user_id, username, page_id, page_name, status, created_at';
+
+export function useInstagramConnection(environment: ProspectingEnvironment | null) {
+  const [connection, setConnection] = useState<InstagramConnection | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!environment) { setConnection(null); setLoading(false); return; }
+    let active = true;
+    const load = async () => {
+      const { data, error } = await supabase
+        .from('instagram_connections')
+        .select(IG_COLUMNS)
+        .eq('environment', environment)
+        .eq('status', 'connected')
+        .maybeSingle();
+      if (!active) return;
+      if (error) console.error('[prospecting] instagram conn:', error.message);
+      setConnection(((data ?? null) as unknown) as InstagramConnection | null);
+      setLoading(false);
+    };
+    load();
+    const channel = supabase
+      .channel(`ig-conn-${environment}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'instagram_connections' }, () => { load(); })
+      .subscribe();
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, [environment]);
+
+  return { connection, loading };
+}
+
+/* ─── Status dos canais de integração (Edge prospecting-status) ─── */export interface ChannelStatus {
   decision_ai: boolean;
   generative_ai: boolean;
   google_places: boolean;
