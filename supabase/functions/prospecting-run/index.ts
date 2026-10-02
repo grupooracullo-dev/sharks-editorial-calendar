@@ -355,7 +355,7 @@ Deno.serve(async req => {
           .select('id', { count: 'exact', head: true })
           .eq('prospecting_campaign_id', camp.id);
         if ((found ?? 0) >= camp.target_count) continue;
-        // job ativo ou discovery recente (throttle 15 min)?
+        // job ativo ou discovery recente (throttle 15 min — concluído OU falho)?
         const { count: active } = await admin
           .from('prospecting_jobs')
           .select('id', { count: 'exact', head: true })
@@ -368,7 +368,7 @@ Deno.serve(async req => {
           .select('id', { count: 'exact', head: true })
           .eq('campaign_id', camp.id)
           .eq('type', 'discover_companies')
-          .eq('status', 'completed')
+          .in('status', ['completed', 'failed'])
           .gte('completed_at', throttleAt);
         if ((recent ?? 0) > 0) continue;
         const { error: enqErr } = await admin.from('prospecting_jobs').insert({
