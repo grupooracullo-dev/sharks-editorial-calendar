@@ -49,6 +49,7 @@ export interface LeadActivity {
   type: 'note' | 'call' | 'meeting' | 'email' | 'stage_change' | 'system'
     | 'outreach_draft' | 'outreach_sent' | 'reply_received';
   content: string;
+  metadata: { audio_url?: string } | null;
   created_at: string;
   author: { id: string; full_name: string } | null;
 }

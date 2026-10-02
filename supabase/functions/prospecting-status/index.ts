@@ -4,6 +4,7 @@
 // ==========================================
 
 import { serviceClient, corsHeaders } from '../_shared/google.ts';
+import { hasRealSpeech } from '../_shared/prospecting/speech.ts';
 
 const CORS: Record<string, string> = {};
 function json(status: number, body: unknown) {
@@ -30,6 +31,7 @@ Deno.serve(async req => {
       google_places: !!Deno.env.get('GOOGLE_PLACES_API_KEY'),
       meta: !!Deno.env.get('META_APP_SECRET') && !!Deno.env.get('META_PAGE_TOKEN'),
       n8n: !!Deno.env.get('N8N_WEBHOOK_URL'),
+      speech: hasRealSpeech(),
     };
 
     return json(200, { channels });

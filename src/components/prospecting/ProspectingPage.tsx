@@ -45,7 +45,7 @@ export default function CampaignsSection({ environment }: ProspectingPageProps) 
     { label: 'Leads qualificados', value: metrics.qualified, icon: Target },
     { label: 'Em abordagem', value: metrics.approach, icon: MessageSquare },
     { label: 'Interessados', value: metrics.interested, icon: TrendingUp },
-    { label: 'ReuniÃƒÂµes', value: metrics.meetings, icon: CalendarCheck },
+    { label: 'Reuniões', value: metrics.meetings, icon: CalendarCheck },
   ];
 
   const handleSubmit = async (values: CampaignFormValues) => {
@@ -57,7 +57,7 @@ export default function CampaignsSection({ environment }: ProspectingPageProps) 
         toast.success('Campanha atualizada!');
       } else {
         await createCampaign(environment, payload, user?.id ?? null);
-        toast.success('Campanha criada! Inicie-a para comeÃƒÂ§ar a prospecÃƒÂ§ÃƒÂ£o.');
+        toast.success('Campanha criada! Inicie-a para começar a prospecção.');
       }
       setFormOpen(false);
       setEditing(null);
@@ -71,7 +71,7 @@ export default function CampaignsSection({ environment }: ProspectingPageProps) 
   const handleStatus = async (campaign: ProspectingCampaign, status: CampaignStatus) => {
     try {
       await setStatus(campaign.id, status);
-      toast.success(status === 'running' ? 'Campanha em execuÃƒÂ§ÃƒÂ£o' : `Campanha ${CAMPAIGN_STATUS_META[status].label.toLowerCase()}`);
+      toast.success(status === 'running' ? 'Campanha em execução' : `Campanha ${CAMPAIGN_STATUS_META[status].label.toLowerCase()}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao atualizar status');
     }
@@ -82,7 +82,7 @@ export default function CampaignsSection({ environment }: ProspectingPageProps) 
     setSubmitting(true);
     try {
       await deleteCampaign(deleting.id);
-      toast.success('Campanha excluÃƒÂ­da');
+      toast.success('Campanha excluída');
       setDeleting(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao excluir campanha');
@@ -99,7 +99,7 @@ export default function CampaignsSection({ environment }: ProspectingPageProps) 
           Nova campanha
         </Button>
       </div>
-      {/* MÃƒÂ©tricas */}
+      {/* Métricas */}
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
         {metricCards.map(({ label, value, icon: Icon }) => (
           <Card key={label} padding="sm" className="flex items-center gap-3">
@@ -124,7 +124,7 @@ export default function CampaignsSection({ environment }: ProspectingPageProps) 
           <Card padding="md">
             <EmptyState
               icon={Radar}
-              title="Nenhuma campanha de prospecÃƒÂ§ÃƒÂ£o"
+              title="Nenhuma campanha de prospecção"
               description="Crie uma campanha definindo o ICP, os produtos do ambiente e os canais de abordagem."
             />
             <div className="flex justify-center pb-2 -mt-2">
@@ -155,7 +155,7 @@ export default function CampaignsSection({ environment }: ProspectingPageProps) 
                       {(c.segment || c.location) && (
                         <span className="inline-flex items-center gap-1">
                           <Building2 className="w-3 h-3" />
-                          {[c.segment, c.location].filter(Boolean).join(' Ã‚Â· ')}
+                          {[c.segment, c.location].filter(Boolean).join(' · ')}
                         </span>
                       )}
                       {c.company_size && <span>Porte: {c.company_size}</span>}
@@ -171,6 +171,23 @@ export default function CampaignsSection({ environment }: ProspectingPageProps) 
                       {(c.products?.length ?? 0) > 0 && (
                         <span>Produtos: {c.products!.map(x => x.product?.name).filter(Boolean).join(', ')}</span>
                       )}
+                      {c.icp_description && (
+                        <span className="max-w-[320px] truncate" title={c.icp_description}>
+                          ICP: {c.icp_description}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2 max-w-xs">
+                      <div className="flex items-center justify-between text-[11px] text-gray-500 mb-0.5">
+                        <span>Progresso da meta</span>
+                        <span className="tabular-nums">{cCount.found}/{c.target_count} · {Math.round(Math.min(1, cCount.found / Math.max(1, c.target_count)) * 100)}%</span>
+                      </div>
+                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className={cn('h-full rounded-full transition-all', cCount.found >= c.target_count ? 'bg-emerald-500' : 'bg-primary-500')}
+                          style={{ width: `${Math.min(100, Math.round((cCount.found / Math.max(1, c.target_count)) * 100))}%` }}
+                        />
+                      </div>
                     </div>
                     <div className="flex items-center gap-1.5 mt-2">
                       {c.assigned_to_user ? (
@@ -180,10 +197,10 @@ export default function CampaignsSection({ environment }: ProspectingPageProps) 
                         </>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-                          <Users className="w-3 h-3" /> Sem responsÃƒÂ¡vel
+                          <Users className="w-3 h-3" /> Sem responsável
                         </span>
                       )}
-                      <span className="text-xs text-gray-300">Ã‚Â·</span>
+                      <span className="text-xs text-gray-300">·</span>
                       <span className="text-xs text-gray-400">
                         criada em {new Date(c.created_at).toLocaleDateString('pt-BR')}
                       </span>
@@ -192,7 +209,7 @@ export default function CampaignsSection({ environment }: ProspectingPageProps) 
 
                   <div className="flex items-center gap-1 shrink-0">
                     {c.status === 'draft' && (
-                      <button onClick={() => handleStatus(c, 'running')} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-colors" title="Iniciar execuÃƒÂ§ÃƒÂ£o">
+                      <button onClick={() => handleStatus(c, 'running')} className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-colors" title="Iniciar execução">
                         <Play className="w-3.5 h-3.5" />
                       </button>
                     )}
@@ -231,11 +248,11 @@ export default function CampaignsSection({ environment }: ProspectingPageProps) 
         onSubmit={handleSubmit}
       />
 
-      {/* Confirmar exclusÃƒÂ£o */}
+      {/* Confirmar exclusão */}
       <Modal isOpen={!!deleting} onClose={() => setDeleting(null)} title="Excluir campanha" size="sm">
         <p className="text-sm text-gray-600">
-          Excluir <strong>{deleting?.name}</strong> e todo o histÃƒÂ³rico de jobs?
-          Leads jÃƒÂ¡ criados no CRM nÃƒÂ£o sÃƒÂ£o afetados.
+          Excluir <strong>{deleting?.name}</strong> e todo o histórico de jobs?
+          Leads já criados no CRM não são afetados.
         </p>
         <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100">
           <Button variant="ghost" onClick={() => setDeleting(null)}>Cancelar</Button>

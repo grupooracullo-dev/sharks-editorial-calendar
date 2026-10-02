@@ -259,6 +259,11 @@ export default function LeadDrawer({
                         </span>
                       </div>
                       <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{a.content}</p>
+                      {a.metadata?.audio_url && (
+                        <div className="mt-1.5">
+                          <audio controls preload="none" src={a.metadata.audio_url} className="w-full h-8" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

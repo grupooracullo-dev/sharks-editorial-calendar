@@ -61,6 +61,7 @@ export default function AgentSection({ environment, editable = false }: AgentPag
     { key: 'n8n' as const, label: 'n8n (Orquestração)' },
     { key: 'decision_ai' as const, label: 'JEV — decisão' },
     { key: 'generative_ai' as const, label: 'GLM — geração' },
+    { key: 'speech' as const, label: 'Voz (ElevenLabs — áudio)' },
   ];
   const activeChannels = channelItems.filter(c => channels[c.key]).length;
   const { settings, loading: settingsLoading, saveSettings } = useAgentSettings(environment);
@@ -75,6 +76,11 @@ export default function AgentSection({ environment, editable = false }: AgentPag
     setSettingsForm(f => (f ? { ...f, params: { ...f.params, [key]: typeof value === 'number' ? value : Number(value) } } : f));
   const setPer = (key: keyof AgentSettings['personality'], value: string) =>
     setSettingsForm(f => (f ? { ...f, personality: { ...f.personality, [key]: value } } : f));
+  const setVoice = (key: keyof AgentSettings['personality']['voice'], value: string) =>
+    setSettingsForm(f => (f ? {
+      ...f,
+      personality: { ...f.personality, voice: { ...f.personality.voice, [key]: value } as AgentSettings['personality']['voice'] },
+    } : f));
 
   const handleSaveSettings = async () => {
     if (!settingsForm) return;
@@ -161,7 +167,7 @@ export default function AgentSection({ environment, editable = false }: AgentPag
           <h3 className="text-sm font-semibold text-gray-900">Canais de integração</h3>
           <span className="text-[11px] text-gray-400">{activeChannels}/{channelItems.length} ativos</span>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-2">
           {channelItems.map(c => (
             <div key={c.key} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100">
               <span className={cn('w-2 h-2 rounded-full shrink-0', channels[c.key] ? 'bg-emerald-500' : 'bg-gray-300')} />
@@ -220,6 +226,31 @@ export default function AgentSection({ environment, editable = false }: AgentPag
               rows={2}
               disabled={!editable}
             />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Select
+                label="Resposta do agente"
+                value={settingsForm.personality.voice.mode}
+                onChange={(e) => setVoice('mode', e.target.value)}
+                options={[
+                  { value: 'text', label: 'Texto' },
+                  { value: 'audio', label: 'Áudio' },
+                  { value: 'both', label: 'Texto + áudio' },
+                ]}
+                disabled={!editable}
+              />
+              <Input
+                label="Voz (ElevenLabs voice ID)"
+                value={settingsForm.personality.voice.voice_id}
+                onChange={(e) => setVoice('voice_id', e.target.value)}
+                placeholder="Em branco = voz padrão pt-BR"
+                disabled={!editable}
+              />
+              <div className="flex items-end pb-1">
+                <p className="text-[11px] text-gray-400 leading-snug">
+                  Áudio exige <code>ELEVENLABS_API_KEY</code> no Edge. Sem a chave, o agente responde apenas em texto.
+                </p>
+              </div>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <Input
                 label="Rascunho auto (fit ≥)"
